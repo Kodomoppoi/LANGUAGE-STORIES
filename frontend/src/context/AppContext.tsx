@@ -21,6 +21,7 @@ import { SAMPLE_STORIES } from '../services/sampleStories';
 import { calculateSM2, isReviewDue, createDefaultSRSMetrics } from '../services/srsEngine';
 import { ttsService } from '../services/ttsService';
 import { apiService } from '../services/apiService';
+import { storageService } from '../services/storageService';
 
 interface AppContextType {
   // Navigation
@@ -80,7 +81,7 @@ interface AppContextType {
   generateWithSameDictionary: () => Promise<void>;
   increaseDictionaryAndGenerate: (numNewWords: number) => Promise<void>;
 
-  // Clean User Stats (No XP / Streak)
+  // User Stats & Settings
   userStats: UserStats;
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
@@ -115,37 +116,16 @@ const DEFAULT_STATS: UserStats = {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // State Initialization
-  const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(() => {
-    return (localStorage.getItem('lang_stories_language') as LanguageCode) || 'ja';
-  });
+  // State Initialization via StorageService
+  const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(() => storageService.loadLanguage('ja'));
+  const [currentProficiency, setCurrentProficiency] = useState<ProficiencyLevel>(() => storageService.loadProficiency('A2'));
+  const [settings, setSettings] = useState<AppSettings>(() => storageService.loadSettings(DEFAULT_SETTINGS));
+  const [userStats, setUserStats] = useState<UserStats>(() => storageService.loadStats(DEFAULT_STATS));
+  const [vocabularyVault, setVocabularyVault] = useState<DictionaryEntry[]>(() =>
+    storageService.loadVault(SAMPLE_STORIES['ja'].targetVocabulary)
+  );
 
-  const [currentProficiency, setCurrentProficiency] = useState<ProficiencyLevel>(() => {
-    return (localStorage.getItem('lang_stories_proficiency') as ProficiencyLevel) || 'A2';
-  });
-
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('lang_stories_settings');
-    return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
-  });
-
-  const [userStats, setUserStats] = useState<UserStats>(() => {
-    const saved = localStorage.getItem('lang_stories_stats');
-    return saved ? { ...DEFAULT_STATS, ...JSON.parse(saved) } : DEFAULT_STATS;
-  });
-
-  const [vocabularyVault, setVocabularyVault] = useState<DictionaryEntry[]>(() => {
-    const saved = localStorage.getItem('lang_stories_vault');
-    if (saved) {
-      try { return JSON.parse(saved); } catch {}
-    }
-    return SAMPLE_STORIES['ja'].targetVocabulary;
-  });
-
-  const [currentStory, setCurrentStory] = useState<Story>(() => {
-    return SAMPLE_STORIES[currentLanguage] || SAMPLE_STORIES['ja'];
-  });
-
+  const [currentStory, setCurrentStory] = useState<Story>(() => SAMPLE_STORIES[currentLanguage] || SAMPLE_STORIES['ja']);
   const [activeTab, setActiveTab] = useState<ActiveTab>('story');
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
 
@@ -162,43 +142,55 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Theme synchronization
+  // Synchronize Settings & Theme
   useEffect(() => {
     document.body.setAttribute('data-theme', settings.theme);
-    localStorage.setItem('lang_stories_settings', JSON.stringify(settings));
+    storageService.saveSettings(settings);
   }, [settings]);
 
-  // Persistence
+  // Persist State Changes
   useEffect(() => {
-    localStorage.setItem('lang_stories_language', currentLanguage);
+    storageService.saveLanguage(currentLanguage);
   }, [currentLanguage]);
 
   useEffect(() => {
-    localStorage.setItem('lang_stories_proficiency', currentProficiency);
+    storageService.saveProficiency(currentProficiency);
   }, [currentProficiency]);
 
   useEffect(() => {
-    localStorage.setItem('lang_stories_vault', JSON.stringify(vocabularyVault));
+    storageService.saveVault(vocabularyVault);
   }, [vocabularyVault]);
 
   useEffect(() => {
-    localStorage.setItem('lang_stories_stats', JSON.stringify(userStats));
+    storageService.saveStats(userStats);
   }, [userStats]);
 
-  // Backend connectivity check
+  // Backend connectivity health check
   useEffect(() => {
+    let isMounted = true;
     const checkHealth = async () => {
       const isConnected = await apiService.checkBackendHealth(settings.backendUrl);
-      setSettings((prev) => ({ ...prev, isBackendConnected: isConnected }));
+      if (isMounted) {
+        setSettings((prev) => ({ ...prev, isBackendConnected: isConnected }));
+      }
     };
     checkHealth();
+    return () => {
+      isMounted = false;
+    };
   }, [settings.backendUrl]);
 
-  // Extract ALL words from the current story into a comprehensive dictionary list
+  // Extract ALL words from current story for Tabular Dictionary
   const allStoryWords = useMemo(() => {
     const wordMap = new Map<string, DictionaryEntry>();
 
-    // 1. First index target vocabulary from story
+    // Pre-index vocabulary vault for instant O(1) lookup
+    const vaultIndex = new Map<string, DictionaryEntry>();
+    vocabularyVault.forEach((v) => {
+      vaultIndex.set(`${v.language}:${v.word}`, v);
+    });
+
+    // 1. Index declared target words
     (currentStory.targetVocabulary || []).forEach((item) => {
       wordMap.set(item.word, {
         ...item,
@@ -206,11 +198,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       });
     });
 
-    // 2. Extract every single token from paragraphs and sentences
+    // 2. Extract every token across paragraphs and sentences
     currentStory.paragraphs.forEach((p) => {
       p.sentences.forEach((s) => {
         s.tokens.forEach((t) => {
-          // Ignore purely punctuation tokens
           if (!t.text || t.partOfSpeech === 'Punctuation' || /^[\s、。,.!?;:()]+$/.test(t.text)) {
             return;
           }
@@ -219,8 +210,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (existing) {
             existing.occurrences = (existing.occurrences || 0) + 1;
           } else {
-            // Check if present in global vault
-            const vaultItem = vocabularyVault.find((v) => v.word === t.text && v.language === currentStory.language);
+            const vaultItem = vaultIndex.get(`${currentStory.language}:${t.text}`);
 
             wordMap.set(t.text, {
               id: `token-${t.id}`,
@@ -248,7 +238,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return Array.from(wordMap.values());
   }, [currentStory, vocabularyVault]);
 
-  // AUTOMATIC MASTER HARVEST: Whenever a story is active, automatically harvest and merge all its tokens into the master JSON bank
+  // AUTOMATIC MASTER HARVEST: Harvest and consolidate all tokens into master JSON bank
   useEffect(() => {
     if (!allStoryWords.length) return;
 
@@ -284,7 +274,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   }, [currentStory.id]);
 
-  // Update stats summary (Total words read & starred count)
+  // Update stats summary
   useEffect(() => {
     const starredCount = vocabularyVault.filter((v) => v.isStarred).length;
     const dueCount = vocabularyVault.filter((v) => isReviewDue(v.srsMetrics.nextReviewDate)).length;
@@ -297,93 +287,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }));
   }, [vocabularyVault, allStoryWords.length]);
 
-  // Export Master Vocabulary JSON file
-  const exportVocabularyJson = useCallback((lang?: LanguageCode) => {
-    const targetLang = lang || currentLanguage;
-    const filteredEntries = vocabularyVault.filter((v) => !targetLang || v.language === targetLang);
+  // Export / Import Helpers via StorageService
+  const exportVocabularyJson = useCallback(
+    (lang?: LanguageCode) => {
+      storageService.exportVocabularyJson(vocabularyVault, lang || currentLanguage);
+    },
+    [currentLanguage, vocabularyVault]
+  );
 
-    const exportData = {
-      app: 'Language Stories',
-      version: '2.0.0',
-      exportDate: new Date().toISOString(),
-      language: targetLang,
-      totalWords: filteredEntries.length,
-      words: filteredEntries.map((w) => ({
-        word: w.word,
-        ruby: w.ruby || null,
-        phonetic: w.phonetic || null,
-        translation: w.translation,
-        partOfSpeech: w.partOfSpeech,
-        definition: w.definition,
-        exampleSentence: w.exampleSentence,
-        exampleTranslation: w.exampleTranslation,
-        language: w.language,
-        proficiency: w.proficiency,
-        isStarred: Boolean(w.isStarred),
-        lifetimeOccurrences: w.lifetimeOccurrences || 1,
-        lastSeenDate: w.lastSeenDate || w.createdAt,
-        srsStage: w.srsMetrics.stage,
-        srsInterval: w.srsMetrics.interval,
-        nextReviewDate: w.srsMetrics.nextReviewDate,
-      })),
-    };
-
-    const jsonString = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `language_stories_vocab_${targetLang}_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [currentLanguage, vocabularyVault]);
-
-  // Import / Restore Vocabulary JSON file
-  const importVocabularyJson = useCallback((jsonString: string): boolean => {
-    try {
-      const parsed = JSON.parse(jsonString);
-      const incomingWords = Array.isArray(parsed) ? parsed : parsed.words;
-      if (!Array.isArray(incomingWords)) return false;
+  const importVocabularyJson = useCallback(
+    (jsonString: string): boolean => {
+      const imported = storageService.parseImportedJson(jsonString, currentLanguage, currentProficiency);
+      if (!imported || !imported.length) return false;
 
       setVocabularyVault((prev) => {
         const vaultMap = new Map<string, DictionaryEntry>();
         prev.forEach((item) => vaultMap.set(`${item.language}:${item.word}`, item));
-
-        incomingWords.forEach((item: any) => {
-          if (!item.word) return;
-          const lang = item.language || currentLanguage;
-          const key = `${lang}:${item.word}`;
-
-          vaultMap.set(key, {
-            id: `vault-import-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-            word: item.word,
-            ruby: item.ruby,
-            phonetic: item.phonetic,
-            translation: item.translation || 'Imported vocabulary',
-            partOfSpeech: item.partOfSpeech || 'Word',
-            definition: item.definition || item.translation || '',
-            exampleSentence: item.exampleSentence || '',
-            exampleTranslation: item.exampleTranslation || '',
-            language: lang,
-            proficiency: item.proficiency || currentProficiency,
-            isStarred: Boolean(item.isStarred),
-            lifetimeOccurrences: item.lifetimeOccurrences || 1,
-            lastSeenDate: item.lastSeenDate || new Date().toISOString(),
-            srsMetrics: createDefaultSRSMetrics(),
-            createdAt: new Date().toISOString(),
-          });
-        });
-
+        imported.forEach((item) => vaultMap.set(`${item.language}:${item.word}`, item));
         return Array.from(vaultMap.values());
       });
 
       return true;
-    } catch {
-      return false;
-    }
-  }, [currentLanguage, currentProficiency]);
+    },
+    [currentLanguage, currentProficiency]
+  );
 
   // Handlers
   const setLanguage = useCallback((lang: LanguageCode) => {
@@ -508,24 +435,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setCurrentPlayingSentenceIndex(-1);
   }, []);
 
-  const speakSingleToken = useCallback((token: StoryToken) => {
-    ttsService.speakToken(token.text, currentStory.language, ttsSpeed * 0.9);
-  }, [currentStory.language, ttsSpeed]);
+  const speakSingleToken = useCallback(
+    (token: StoryToken) => {
+      ttsService.speakToken(token.text, currentStory.language, ttsSpeed * 0.9);
+    },
+    [currentStory.language, ttsSpeed]
+  );
 
-  // Story Generator Actions (USING THE MASTER JSON VOCABULARY BANK PRIMARILY)
+  // Story Generator Actions
   const generateNewStory = useCallback(
     async (contextTheme?: string, customPrompt?: string) => {
       setIsGeneratingStory(true);
       try {
-        // Collect priority words from the master JSON bank (due review + starred + recently seen)
         const langVaultWords = vocabularyVault.filter((v) => v.language === currentLanguage);
         const dueSRSWords = langVaultWords
           .filter((v) => isReviewDue(v.srsMetrics.nextReviewDate))
           .map((v) => v.word);
 
-        const priorityBankWords = dueSRSWords.length > 0
-          ? dueSRSWords
-          : langVaultWords.slice(0, 10).map((v) => v.word);
+        const priorityBankWords =
+          dueSRSWords.length > 0 ? dueSRSWords : langVaultWords.slice(0, 10).map((v) => v.word);
 
         const newStory = await apiService.generateStory(
           {
@@ -542,7 +470,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         );
 
         setCurrentStory(newStory);
-
         setUserStats((prev) => ({
           ...prev,
           totalStoriesRead: prev.totalStoriesRead + 1,
@@ -606,7 +533,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [currentLanguage, currentProficiency, currentStory, settings, vocabularyVault]
   );
 
-  // Quiz submission handler (Recalibrates SM-2 for the next story injections)
   const submitQuiz = useCallback(
     (scoreQuality: number, targetWordIds: string[]) => {
       targetWordIds.forEach((id) => {
