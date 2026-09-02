@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Volume2,
@@ -27,27 +27,39 @@ export const StoryDictionary: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Extract all unique parts of speech
-  const partsOfSpeech = Array.from(
-    new Set(allStoryWords.map((w) => w.partOfSpeech).filter(Boolean))
-  );
+  const partsOfSpeech = useMemo(() => {
+    return Array.from(new Set(allStoryWords.map((w) => w.partOfSpeech).filter(Boolean)));
+  }, [allStoryWords]);
+
+  // Index vocabulary vault for instant O(1) row lookups instead of O(N*M) array scans
+  const vaultMap = useMemo(() => {
+    const map = new Map<string, typeof vocabularyVault[0]>();
+    vocabularyVault.forEach((v) => {
+      map.set(`${v.language}:${v.word}`, v);
+    });
+    return map;
+  }, [vocabularyVault]);
 
   // Filter words
-  const filteredWords = allStoryWords.filter((entry) => {
-    const q = searchTerm.toLowerCase();
-    const matchesSearch =
-      entry.word.toLowerCase().includes(q) ||
-      entry.translation.toLowerCase().includes(q) ||
-      (entry.ruby && entry.ruby.toLowerCase().includes(q)) ||
-      (entry.definition && entry.definition.toLowerCase().includes(q));
+  const filteredWords = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    return allStoryWords.filter((entry) => {
+      const matchesSearch =
+        !q ||
+        entry.word.toLowerCase().includes(q) ||
+        entry.translation.toLowerCase().includes(q) ||
+        (entry.ruby && entry.ruby.toLowerCase().includes(q)) ||
+        (entry.definition && entry.definition.toLowerCase().includes(q));
 
-    const matchesPOS = selectedPOS === 'all' || entry.partOfSpeech === selectedPOS;
+      const matchesPOS = selectedPOS === 'all' || entry.partOfSpeech === selectedPOS;
 
-    const vaultWord = vocabularyVault.find((v) => v.word === entry.word);
-    const isStarred = vaultWord?.isStarred || entry.isStarred || false;
-    const matchesStarred = !starredOnly || isStarred;
+      const vaultWord = vaultMap.get(`${currentStory.language}:${entry.word}`);
+      const isStarred = vaultWord?.isStarred || entry.isStarred || false;
+      const matchesStarred = !starredOnly || isStarred;
 
-    return matchesSearch && matchesPOS && matchesStarred;
-  });
+      return matchesSearch && matchesPOS && matchesStarred;
+    });
+  }, [allStoryWords, searchTerm, selectedPOS, starredOnly, vaultMap, currentStory.language]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -211,7 +223,7 @@ export const StoryDictionary: React.FC = () => {
             </thead>
             <tbody>
               {filteredWords.map((entry, idx) => {
-                const vaultWord = vocabularyVault.find((v) => v.word === entry.word && v.language === currentStory.language);
+                const vaultWord = vaultMap.get(`${currentStory.language}:${entry.word}`);
                 const isStarred = vaultWord?.isStarred || entry.isStarred || false;
 
                 return (

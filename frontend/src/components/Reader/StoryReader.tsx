@@ -1,82 +1,77 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { SUPPORTED_LANGUAGES } from '../../services/sampleStories';
-import { TTSPlayer } from './TTSPlayer';
 import { WordPopover } from './WordPopover';
+import { TTSPlayer } from './TTSPlayer';
 import {
-  BookOpen,
-  Sparkles,
-  Clock,
   Eye,
   EyeOff,
+  Sparkles,
+  BookOpen,
   CheckCircle,
-  HelpCircle,
-  Volume2,
 } from 'lucide-react';
-import { StoryToken } from '../../types';
+import { SUPPORTED_LANGUAGES } from '../../services/sampleStories';
+import { StoryToken, SRSStage } from '../../types';
 
 export const StoryReader: React.FC = () => {
   const {
     currentStory,
     currentLanguage,
-    currentPlayingSentenceIndex,
-    openTokenPopover,
+    currentProficiency,
     settings,
     updateSettings,
-    setIsQuizOpen,
-    speakSingleToken,
+    openTokenPopover,
+    currentPlayingSentenceIndex,
     vocabularyVault,
+    setIsQuizOpen,
   } = useApp();
 
   const [showTranslations, setShowTranslations] = useState(false);
+
   const langInfo = SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage);
 
-  let sentenceCounter = 0;
+  // Map vocabulary vault for instant O(1) SRS stage resolution
+  const vaultMap = useMemo(() => {
+    const map = new Map<string, typeof vocabularyVault[0]>();
+    vocabularyVault.forEach((v) => {
+      map.set(`${v.language}:${v.word}`, v);
+    });
+    return map;
+  }, [vocabularyVault]);
 
-  // Helper to get token's SRS status from vault
-  const getTokenSRSStage = (token: StoryToken) => {
-    const vaultWord = vocabularyVault.find(
-      (v) => v.word === token.text && v.language === currentLanguage
-    );
-    return vaultWord?.srsMetrics?.stage || (token.isTargetWord ? 'new' : undefined);
+  // Lookup SRS Stage for a given token
+  const getTokenSRSStage = (token: StoryToken): SRSStage | null => {
+    const vaultWord = vaultMap.get(`${currentStory.language}:${token.text}`);
+    if (!vaultWord) return null;
+    return vaultWord.srsMetrics.stage;
   };
 
+  // Pre-calculate flattened sentence indices purely for stable, non-mutating rendering
+  const paragraphsWithIndices = useMemo(() => {
+    let counter = 0;
+    return currentStory.paragraphs.map((p) => ({
+      ...p,
+      sentencesWithIndices: p.sentences.map((s) => ({
+        ...s,
+        globalIndex: counter++,
+      })),
+    }));
+  }, [currentStory]);
+
   return (
-    <div className="reader-container">
-      {/* Story Header & Metadata Bar */}
-      <div className="reader-header">
+    <div className="story-reader-container">
+      {/* Story Metadata & Title Header */}
+      <div className="story-meta-header">
         <div>
-          <div className="story-meta-row">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 6 }}>
+            <span className="lang-badge">
+              {langInfo?.flag} {langInfo?.name} · {currentProficiency}
+            </span>
             <span
               style={{
-                fontSize: '0.76rem',
-                fontWeight: 700,
-                padding: '4px 10px',
+                fontSize: '0.78rem',
+                padding: '2px 8px',
                 borderRadius: 'var(--radius-full)',
-                background: 'var(--srs-new-bg)',
-                color: 'var(--flower-500)',
-                border: '1px solid var(--flower-500)',
-              }}
-            >
-              Level {currentStory.proficiency}
-            </span>
-            <span
-              style={{
-                fontSize: '0.76rem',
-                fontWeight: 600,
-                color: 'var(--text-muted)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              <Clock size={13} />
-              ~{currentStory.estimatedReadingMinutes} min read
-            </span>
-            <span
-              style={{
-                fontSize: '0.76rem',
-                fontWeight: 600,
+                background: 'var(--bg-input)',
                 color: 'var(--text-muted)',
               }}
             >
@@ -118,11 +113,10 @@ export const StoryReader: React.FC = () => {
 
       {/* Interactive Story Canvas Text */}
       <div className={`story-text-canvas ${currentStory.isRTL ? 'rtl' : ''}`}>
-        {currentStory.paragraphs.map((paragraph) => (
+        {paragraphsWithIndices.map((paragraph) => (
           <div key={paragraph.id} className="story-paragraph-wrapper">
-            {paragraph.sentences.map((sentence) => {
-              const thisIndex = sentenceCounter++;
-              const isPlayingThis = currentPlayingSentenceIndex === thisIndex;
+            {paragraph.sentencesWithIndices.map((sentence) => {
+              const isPlayingThis = currentPlayingSentenceIndex === sentence.globalIndex;
 
               return (
                 <div
