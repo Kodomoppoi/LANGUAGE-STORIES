@@ -8,7 +8,11 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 
-export const StoryDictionary: React.FC = () => {
+interface StoryDictionaryProps {
+  isStarredView?: boolean;
+}
+
+export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView = false }) => {
   const {
     currentStory,
     allStoryWords,
@@ -22,16 +26,10 @@ export const StoryDictionary: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPOS, setSelectedPOS] = useState<string>('all');
-  const [starredOnly, setStarredOnly] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Extract all unique parts of speech
-  const partsOfSpeech = useMemo(() => {
-    return Array.from(new Set(allStoryWords.map((w) => w.partOfSpeech).filter(Boolean)));
-  }, [allStoryWords]);
-
-  // Index vocabulary vault for instant O(1) row lookups instead of O(N*M) array scans
+  // Index vocabulary vault for instant O(1) row lookups
   const vaultMap = useMemo(() => {
     const map = new Map<string, typeof vocabularyVault[0]>();
     vocabularyVault.forEach((v) => {
@@ -40,10 +38,43 @@ export const StoryDictionary: React.FC = () => {
     return map;
   }, [vocabularyVault]);
 
-  // Filter words
+  // Determine source word set: Starred Focus Words (from vault & current story) OR Complete Story Vocabulary
+  const sourceWords = useMemo(() => {
+    if (!isStarredView) {
+      return allStoryWords;
+    }
+
+    const map = new Map<string, typeof allStoryWords[0]>();
+
+    // 1. All starred words in current language stored in the vault
+    vocabularyVault
+      .filter((v) => v.isStarred && v.language === currentStory.language)
+      .forEach((v) => map.set(v.word, v));
+
+    // 2. Any starred words in current story
+    allStoryWords
+      .filter((w) => {
+        const vaultWord = vaultMap.get(`${currentStory.language}:${w.word}`);
+        return vaultWord?.isStarred || w.isStarred;
+      })
+      .forEach((w) => {
+        if (!map.has(w.word)) {
+          map.set(w.word, w);
+        }
+      });
+
+    return Array.from(map.values());
+  }, [isStarredView, allStoryWords, vocabularyVault, vaultMap, currentStory.language]);
+
+  // Extract unique parts of speech based on active source word set
+  const partsOfSpeech = useMemo(() => {
+    return Array.from(new Set(sourceWords.map((w) => w.partOfSpeech).filter(Boolean)));
+  }, [sourceWords]);
+
+  // Filter words by search query and part of speech
   const filteredWords = useMemo(() => {
     const q = searchTerm.toLowerCase().trim();
-    return allStoryWords.filter((entry) => {
+    return sourceWords.filter((entry) => {
       const matchesSearch =
         !q ||
         entry.word.toLowerCase().includes(q) ||
@@ -53,13 +84,9 @@ export const StoryDictionary: React.FC = () => {
 
       const matchesPOS = selectedPOS === 'all' || entry.partOfSpeech === selectedPOS;
 
-      const vaultWord = vaultMap.get(`${currentStory.language}:${entry.word}`);
-      const isStarred = vaultWord?.isStarred || entry.isStarred || false;
-      const matchesStarred = !starredOnly || isStarred;
-
-      return matchesSearch && matchesPOS && matchesStarred;
+      return matchesSearch && matchesPOS;
     });
-  }, [allStoryWords, searchTerm, selectedPOS, starredOnly, vaultMap, currentStory.language]);
+  }, [sourceWords, searchTerm, selectedPOS]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -89,7 +116,11 @@ export const StoryDictionary: React.FC = () => {
           <input
             type="text"
             className="control-input"
-            placeholder="Search any word, translation, or definition in story..."
+            placeholder={
+              isStarredView
+                ? "Buscar palavras favoritadas..."
+                : "Search any word, translation, or definition in story..."
+            }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -110,25 +141,6 @@ export const StoryDictionary: React.FC = () => {
               </option>
             ))}
           </select>
-
-          {/* Star Filter Button */}
-          <button
-            className={`tts-btn-icon ${starredOnly ? 'active' : ''}`}
-            onClick={() => setStarredOnly((prev) => !prev)}
-            title="Filter by Starred Words"
-            style={{
-              width: 'auto',
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-full)',
-              color: starredOnly ? '#ffb703' : 'var(--text-secondary)',
-              borderColor: starredOnly ? '#ffb703' : 'var(--border-subtle)',
-            }}
-          >
-            <Star size={15} fill={starredOnly ? '#ffb703' : 'none'} />
-            <span style={{ fontSize: '0.8rem', fontWeight: 600, marginLeft: 4 }}>
-              Starred Only ⭐
-            </span>
-          </button>
 
           {/* Export / Download JSON */}
           <button
@@ -187,32 +199,70 @@ export const StoryDictionary: React.FC = () => {
         <div className="dict-table-header-bar">
           <div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 800 }}>
-              📖 Complete Story Vocabulary Table ({filteredWords.length} of {allStoryWords.length} words)
+              {isStarredView
+                ? `⭐ Palavras Favoritadas (${filteredWords.length} de ${sourceWords.length} salvas)`
+                : `📖 Complete Story Vocabulary Table (${filteredWords.length} of ${allStoryWords.length} words)`}
             </h2>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Comprehensive index of all terms appearing in <em>"{currentStory.title}"</em>
+              {isStarredView
+                ? 'Vocabulário marcado com estrela para revisão focada e retenção'
+                : `Comprehensive index of all terms appearing in "${currentStory.title}"`}
             </p>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <span className="stat-pill highlight-orange" style={{ fontSize: '0.76rem' }}>
-              {allStoryWords.length} Words in Story
-            </span>
-            <span className="stat-pill highlight-amber" style={{ fontSize: '0.76rem' }}>
-              {allStoryWords.filter((w) => (w.occurrences || 1) > 1).length} Recurring Words
-            </span>
-            <span className="stat-pill" style={{ fontSize: '0.76rem' }} title="Palavras acumuladas no arquivo JSON master">
-              {vocabularyVault.filter((v) => v.language === currentStory.language).length} Total no Banco JSON
-            </span>
+            {isStarredView ? (
+              <>
+                <span className="stat-pill highlight-orange" style={{ fontSize: '0.76rem' }}>
+                  {sourceWords.length} Palavras Favoritas
+                </span>
+                <span className="stat-pill highlight-amber" style={{ fontSize: '0.76rem' }}>
+                  {sourceWords.filter((w) => (w.occurrences || 1) > 1).length} Recorrentes
+                </span>
+                <span className="stat-pill" style={{ fontSize: '0.76rem' }} title="Palavras acumuladas no arquivo JSON master">
+                  {vocabularyVault.filter((v) => v.language === currentStory.language).length} Total no Banco JSON
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="stat-pill highlight-orange" style={{ fontSize: '0.76rem' }}>
+                  {allStoryWords.length} Words in Story
+                </span>
+                <span className="stat-pill highlight-amber" style={{ fontSize: '0.76rem' }}>
+                  {allStoryWords.filter((w) => (w.occurrences || 1) > 1).length} Recurring Words
+                </span>
+                <span className="stat-pill" style={{ fontSize: '0.76rem' }} title="Palavras acumuladas no arquivo JSON master">
+                  {vocabularyVault.filter((v) => v.language === currentStory.language).length} Total no Banco JSON
+                </span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* The Full Structured Table */}
-        <div className="dict-table-scroll-wrapper">
-          <table className="dict-table">
-            <thead>
-              <tr>
-                <th style={{ width: '4%' }}>#</th>
+        {/* Empty State when no starred words are saved */}
+        {isStarredView && sourceWords.length === 0 ? (
+          <div className="dict-empty-starred-state">
+            <div className="empty-star-icon-circle">
+              <Star size={32} color="#ffb703" fill="#ffb703" />
+            </div>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 800, margin: '14px 0 8px', color: 'var(--text-primary)' }}>
+              Nenhuma palavra favoritada ainda
+            </h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: 460, textAlign: 'center', lineHeight: 1.6, margin: '0 0 16px' }}>
+              Ao ler histórias ou consultar o dicionário, clique no ícone de estrela ⭐ em qualquer palavra para adicioná-la a esta lista de revisão focada.
+            </p>
+          </div>
+        ) : filteredWords.length === 0 ? (
+          <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            Nenhuma palavra corresponde aos filtros de busca atuais.
+          </div>
+        ) : (
+          /* The Full Structured Table */
+          <div className="dict-table-scroll-wrapper">
+            <table className="dict-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '4%' }}>#</th>
                 <th style={{ width: '22%' }}>Term & Reading</th>
                 <th style={{ width: '12%' }}>Type</th>
                 <th style={{ width: '22%' }}>Translation / Meaning</th>
@@ -320,6 +370,7 @@ export const StoryDictionary: React.FC = () => {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   );

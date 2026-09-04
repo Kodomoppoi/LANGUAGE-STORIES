@@ -112,7 +112,7 @@ export interface UserStats {
   lastActiveDate: string;
 }
 
-export type ActiveTab = 'story' | 'dictionary' | 'library';
+export type ActiveTab = 'story' | 'dictionary' | 'starred' | 'library';
 
 export interface AppSettings {
   theme: 'light' | 'dark';

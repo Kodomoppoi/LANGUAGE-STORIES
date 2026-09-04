@@ -1,22 +1,22 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import {
-  BookOpen,
-  Star,
   Globe,
   Sun,
   Moon,
   Settings,
-  Sparkles,
   Download,
+  HelpCircle,
 } from 'lucide-react';
 import { SUPPORTED_LANGUAGES } from '../services/sampleStories';
+import { LanguageCode } from '../types';
 
 export const Header: React.FC = () => {
   const {
-    allStoryWords,
-    vocabularyVault,
+    activeTab,
+    setActiveTab,
     currentLanguage,
+    setLanguage,
     currentProficiency,
     settings,
     toggleTheme,
@@ -25,91 +25,85 @@ export const Header: React.FC = () => {
   } = useApp();
 
   const langInfo = SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage);
-  const starredCount = vocabularyVault.filter((v) => v.isStarred).length;
 
   return (
-    <header className="app-header">
-      {/* Brand Section with Radiant Orange Flower Icon */}
-      <div className="brand-section">
-        <div className="brand-logo-ring">
-          <svg width="24" height="24" viewBox="0 0 100 100" fill="none">
-            <circle cx="50" cy="50" r="14" fill="#D46F33" />
-            <circle cx="50" cy="22" r="14" fill="#FFFFFF" opacity="0.95" />
-            <circle cx="75" cy="36" r="14" fill="#FFFFFF" opacity="0.95" />
-            <circle cx="75" cy="64" r="14" fill="#FFFFFF" opacity="0.95" />
-            <circle cx="50" cy="78" r="14" fill="#FFFFFF" opacity="0.95" />
-            <circle cx="25" cy="64" r="14" fill="#FFFFFF" opacity="0.95" />
-            <circle cx="25" cy="36" r="14" fill="#FFFFFF" opacity="0.95" />
-            <circle cx="50" cy="50" r="8" fill="#B8531D" />
-          </svg>
-        </div>
-        <div>
-          <div className="brand-title">
-            Language Stories
-            <Sparkles size={15} color="var(--flower-500)" />
-          </div>
-          <div className="brand-subtitle">Interactive Reader & Vocabulary Table</div>
-        </div>
+    <header className="book-top-bar">
+      {/* Left: Clean Title */}
+      <div className="book-bar-left">
+        <h1 className="book-app-title">Language reading</h1>
       </div>
 
-      {/* User Data & Story Metrics Bar */}
-      <div className="user-stats-bar">
-        {/* Story Word Count Pill */}
-        <div className="stat-pill highlight-orange" title="Total unique words indexed in current story">
-          <BookOpen size={15} />
-          <span>{allStoryWords.length} Story Words</span>
-        </div>
+      {/* Center: Floating Pill Segmented Switcher */}
+      <div className="book-segmented-dock">
+        <button
+          className={`book-segment-btn ${activeTab === 'story' ? 'active' : ''}`}
+          onClick={() => setActiveTab('story')}
+          type="button"
+        >
+          Interactive
+        </button>
+        <button
+          className={`book-segment-btn ${activeTab === 'dictionary' ? 'active' : ''}`}
+          onClick={() => setActiveTab('dictionary')}
+          type="button"
+        >
+          Dictionary
+        </button>
+      </div>
 
-        {/* Starred Focus Count Pill */}
-        <div className="stat-pill highlight-amber" title="Starred words saved in your vocabulary vault">
-          <Star size={15} fill={starredCount > 0 ? '#ffb703' : 'none'} color="#ffb703" />
-          <span>{starredCount} Starred</span>
-        </div>
-
-        {/* Current Active Language & Level Badge */}
-        <div className="stat-pill" title="Target Language and CEFR Level">
+      {/* Right: Language Selector, Theme, Settings & Profile */}
+      <div className="book-bar-right">
+        {/* Language & Level Selector Dropdown */}
+        <div className="book-lang-picker-wrapper">
           <Globe size={14} color="var(--flower-500)" />
-          <span>{langInfo?.flag} {langInfo?.name} · {currentProficiency}</span>
+          <select
+            className="book-lang-select"
+            value={currentLanguage}
+            onChange={(e) => setLanguage(e.target.value as LanguageCode)}
+            title="Change Target Language"
+          >
+            {SUPPORTED_LANGUAGES.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.flag} {lang.name} ({currentProficiency})
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* Export / Download Master Vocabulary JSON */}
+        {/* Export JSON Bank */}
         <button
-          className="tts-btn-icon"
+          className="book-circle-icon-btn"
           onClick={() => exportVocabularyJson()}
-          title="Baixar Arquivo JSON de Vocabulário (Master Bank)"
+          title="Baixar banco de vocabulário em JSON"
         >
-          <Download size={16} color="var(--flower-400)" />
+          <Download size={15} />
         </button>
 
-        {/* Theme Mode Switcher */}
+        {/* Theme Toggle (Light Warm Wood vs Dark Wood Timber) */}
         <button
-          className="tts-btn-icon"
+          className="book-circle-icon-btn"
           onClick={toggleTheme}
-          title={settings.theme === 'dark' ? 'Switch to Sunlit Honey Birch' : 'Switch to Dark Woody Timber'}
+          title={settings.theme === 'dark' ? 'Mudar para mesa clara' : 'Mudar para madeira escura'}
         >
-          {settings.theme === 'dark' ? (
-            <Sun size={17} color="#ffd166" />
-          ) : (
-            <Moon size={17} color="#c2410c" />
-          )}
+          {settings.theme === 'dark' ? <Sun size={15} color="#ffb703" /> : <Moon size={15} />}
         </button>
 
-        {/* API Settings Modal Trigger */}
+        {/* Help / Info */}
         <button
-          className="tts-btn-icon"
+          className="book-circle-icon-btn"
           onClick={() => setIsSettingsOpen(true)}
-          title="API & Engine Settings"
+          title="Configurações e ajuda"
         >
-          <Settings size={17} />
+          <HelpCircle size={15} />
         </button>
 
-        {/* Profile Emblem */}
+        {/* Avatar Profile */}
         <div
-          className="avatar-ring"
+          className="book-avatar-circle"
           onClick={() => setIsSettingsOpen(true)}
-          title="User Profile & Engine Settings"
+          title="Configurações de IA & Perfil"
         >
-          <div className="avatar-inner">🌼</div>
+          <span>読</span>
         </div>
       </div>
     </header>
