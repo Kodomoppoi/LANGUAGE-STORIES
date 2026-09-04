@@ -10,6 +10,7 @@ export interface GenerateStoryParams {
   targetWords?: string[];
   storyLength?: StoryLength;
   repetitionDensity?: RepetitionDensity;
+  nativeLanguage?: 'Portuguese' | 'English';
 }
 
 export interface StoryGeneratorProvider {

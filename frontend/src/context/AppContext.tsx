@@ -34,6 +34,7 @@ import { ttsService } from '../services/ttsService';
 import { apiService } from '../services/apiService';
 import { storageService } from '../services/storageService';
 import { getTranslation, TranslationKey } from '../services/i18n';
+import { localizeStory } from '../services/storyLocalization';
 
 interface AppContextType {
   // Navigation
@@ -145,7 +146,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     storageService.loadVault(SAMPLE_STORIES['ja'].targetVocabulary)
   );
 
-  const [currentStory, setCurrentStory] = useState<Story>(() => SAMPLE_STORIES[currentLanguage] || SAMPLE_STORIES['ja']);
+  const [currentStory, setCurrentStory] = useState<Story>(() =>
+    localizeStory(SAMPLE_STORIES[currentLanguage] || SAMPLE_STORIES['ja'], settings.uiLanguage || 'pt')
+  );
   const [activeTab, setActiveTab] = useState<ActiveTab>('story');
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
 
@@ -445,8 +448,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsPlayingAudio(false);
     setCurrentPlayingSentenceIndex(-1);
     const story = SAMPLE_STORIES[lang] || SAMPLE_STORIES['ja'];
-    setCurrentStory(story);
-  }, []);
+    setCurrentStory(localizeStory(story, settings.uiLanguage || 'pt'));
+  }, [settings.uiLanguage]);
 
   const setProficiency = useCallback((level: ProficiencyLevel) => {
     setCurrentProficiency(level);
@@ -461,6 +464,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
     setSettings((prev) => ({ ...prev, ...newSettings }));
+    if (newSettings.uiLanguage) {
+      setCurrentStory((prevStory) => localizeStory(prevStory, newSettings.uiLanguage!));
+    }
   }, []);
 
   const setTtsSpeed = useCallback((speed: number) => {

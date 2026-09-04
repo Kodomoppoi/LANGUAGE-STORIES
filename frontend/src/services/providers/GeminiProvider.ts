@@ -40,12 +40,15 @@ export class GeminiProvider implements StoryGeneratorProvider {
       .slice(0, 300)
       .replace(/[\r\n]/g, ' ');
 
+    const targetNativeLang = params.nativeLanguage || (settings.uiLanguage === 'en' ? 'English' : 'Portuguese');
+
     const prompt = `
 You are an expert language pedagogue creating an interactive graded reader story in JSON.
 
 Target Language: ${params.language}
 CEFR Level: ${params.proficiency}
 Theme/Context: ${sanitizedTheme}
+Native Language (Interface Translation Language): ${targetNativeLang}
 ${sanitizedPrompt ? `Custom Topic/Instruction: ${sanitizedPrompt}` : ''}
 Story Length Requirement: ${lengthGuide}
 Spaced Repetition Requirement: ${repetitionGuide}
@@ -59,11 +62,12 @@ CRITICAL RULES:
 3. For Japanese (ja), provide accurate Furigana (Hiragana) in "ruby" for all Kanji tokens.
 4. For Mandarin (zh), provide Pinyin with tone marks in "ruby" for Chinese character tokens.
 5. Provide high-quality tokenization so every word is clickable.
+6. MANDATORY TRANSLATION LANGUAGE: ALL translations ("titleTranslation", sentence "translation", token "translation", token "explanation", vocabulary "translation", "definition", "exampleTranslation", quiz questions and answers) MUST be strictly in ${targetNativeLang}. DO NOT output translations in any other language.
 
 Output ONLY valid JSON following this schema:
 {
   "title": "Story Title in Target Language",
-  "titleTranslation": "Title Translation in English or Portuguese",
+  "titleTranslation": "Title Translation in ${targetNativeLang}",
   "paragraphs": [
     {
       "id": "p-1",
@@ -71,7 +75,7 @@ Output ONLY valid JSON following this schema:
         {
           "id": "s-1",
           "text": "Full sentence in target language.",
-          "translation": "English translation.",
+          "translation": "Accurate sentence translation in ${targetNativeLang}.",
           "tokens": [
             {
               "id": "t-1",
@@ -92,11 +96,11 @@ Output ONLY valid JSON following this schema:
       "id": "v-1",
       "word": "word",
       "ruby": "phonetic reading",
-      "translation": "definition in English/Portuguese",
+      "translation": "definition in ${targetNativeLang}",
       "partOfSpeech": "Noun",
-      "definition": "Clear explanation",
+      "definition": "Clear explanation in ${targetNativeLang}",
       "exampleSentence": "Example in target language",
-      "exampleTranslation": "Example translation"
+      "exampleTranslation": "Example translation in ${targetNativeLang}"
     }
   ],
   "quiz": [

@@ -14,10 +14,17 @@ export class BackendProvider implements StoryGeneratorProvider {
     params: GenerateStoryParams,
     settings: AppSettings
   ): Promise<Story> {
+    const nativeLang = params.nativeLanguage || (settings.uiLanguage === 'en' ? 'English' : 'Portuguese');
+    const payload = {
+      ...params,
+      native_lang: nativeLang,
+      nativeLanguage: nativeLang,
+    };
+
     const response = await fetch(`${settings.backendUrl}/api/stories/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -37,6 +44,12 @@ export class BackendProvider implements StoryGeneratorProvider {
     onEvent: (event: SSEGenerationEvent) => void
   ): Promise<Story> {
     const streamUrl = `${settings.backendUrl}/api/stories/generate/stream`;
+    const nativeLang = params.nativeLanguage || (settings.uiLanguage === 'en' ? 'English' : 'Portuguese');
+    const payload = {
+      ...params,
+      native_lang: nativeLang,
+      nativeLanguage: nativeLang,
+    };
 
     const response = await fetch(streamUrl, {
       method: 'POST',
@@ -44,7 +57,7 @@ export class BackendProvider implements StoryGeneratorProvider {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {

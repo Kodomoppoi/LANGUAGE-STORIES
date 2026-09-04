@@ -24,6 +24,7 @@ export const StoryReader: React.FC = () => {
     settings,
     updateSettings,
     openTokenPopover,
+    activeToken,
     currentPlayingSentenceIndex,
     vocabularyVault,
     setIsQuizOpen,
@@ -178,11 +179,14 @@ export const StoryReader: React.FC = () => {
               {sentence.tokens.map((token) => {
                 const srsStage = getTokenSRSStage(token);
                 const isTarget = token.isTargetWord;
+                const isSelected = activeToken?.id === token.id || (activeToken?.text === token.text && activeToken?.ruby === token.ruby);
 
                 return (
                   <span
                     key={token.id}
                     className={`word-token ${isTarget ? 'target-word' : ''} ${
+                      isSelected ? 'token-selected-active' : ''
+                    } ${
                       settings.highlightSRS && srsStage ? `srs-${srsStage}` : ''
                     }`}
                     onClick={(e) => openTokenPopover(token, e)}

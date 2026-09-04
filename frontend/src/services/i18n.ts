@@ -324,6 +324,18 @@ export const TRANSLATIONS = {
     en: 'Close',
     pt: 'Fechar',
   },
+  lateralPanelTitle: {
+    en: 'Word Details',
+    pt: 'Detalhes da Palavra',
+  },
+  inVaultBadge: {
+    en: 'In Vault',
+    pt: 'No Cofre',
+  },
+  addToVaultBtn: {
+    en: 'Save to Vault',
+    pt: 'Salvar no Cofre',
+  },
 
   // Retention Quiz Modal
   quizModalTitle: {

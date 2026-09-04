@@ -35,10 +35,13 @@ class ApiService {
     settings: AppSettings,
     onEvent: (event: SSEGenerationEvent) => void
   ): Promise<Story> {
+    const nativeLang: 'Portuguese' | 'English' =
+      params.nativeLanguage || (settings.uiLanguage === 'en' ? 'English' : 'Portuguese');
     const finalParams: GenerateStoryParams = {
       ...params,
       storyLength: params.storyLength || settings.storyLength || 'standard',
       repetitionDensity: params.repetitionDensity || settings.repetitionDensity || 'high',
+      nativeLanguage: nativeLang,
     };
 
     // 1. Tenta FastAPI Backend com SSE (/api/stories/generate/stream)
@@ -136,10 +139,13 @@ class ApiService {
     params: GenerateStoryParams,
     settings: AppSettings
   ): Promise<Story> {
+    const nativeLang: 'Portuguese' | 'English' =
+      params.nativeLanguage || (settings.uiLanguage === 'en' ? 'English' : 'Portuguese');
     const finalParams: GenerateStoryParams = {
       ...params,
       storyLength: params.storyLength || settings.storyLength || 'standard',
       repetitionDensity: params.repetitionDensity || settings.repetitionDensity || 'high',
+      nativeLanguage: nativeLang,
     };
 
     // 1. Try Backend if connected or hybrid

@@ -15,7 +15,6 @@ import { DictionaryEntry, ChineseTraits } from '../../types';
 export const WordPopover: React.FC = () => {
   const {
     activeToken,
-    popoverPosition,
     closeTokenPopover,
     currentLanguage,
     currentProficiency,
@@ -27,20 +26,36 @@ export const WordPopover: React.FC = () => {
     t,
   } = useApp();
 
-  const popoverRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  // Close when clicking outside
+  // Close when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+      const target = e.target as HTMLElement;
+      // Não fecha se o usuário estiver clicando em outro token da história (troca dinâmica imediata)
+      if (target.closest('.word-token')) {
+        return;
+      }
+      if (panelRef.current && !panelRef.current.contains(target)) {
         closeTokenPopover();
       }
     };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeTokenPopover();
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [closeTokenPopover]);
 
-  if (!activeToken || !popoverPosition) return null;
+  if (!activeToken) return null;
 
   // Check if token already exists in vault
   const vaultEntry = vocabularyVault.find(
@@ -97,26 +112,17 @@ export const WordPopover: React.FC = () => {
   };
 
   return (
-    <div
-      ref={popoverRef}
-      className="word-popover-card"
-      style={{
-        top: popoverPosition.y,
-        left: popoverPosition.x,
-      }}
+    <aside
+      ref={panelRef}
+      className="word-lateral-panel"
+      role="complementary"
+      aria-label={t('lateralPanelTitle')}
     >
-      {/* Header with Word, Phonetic & Audio */}
-      <div className="popover-header">
-        <div>
-          <div className="popover-word">
-            {activeToken.text}
-            {activeToken.ruby && (
-              <span className="popover-ruby">[{activeToken.ruby}]</span>
-            )}
-          </div>
-          {activeToken.partOfSpeech && (
-            <span className="popover-pos">{activeToken.partOfSpeech}</span>
-          )}
+      {/* Barra Superior do Painel Lateral */}
+      <div className="lateral-panel-top-bar">
+        <div className="lateral-panel-tag">
+          <BookOpen size={13} />
+          <span>{t('lateralPanelTitle')}</span>
         </div>
 
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -127,16 +133,36 @@ export const WordPopover: React.FC = () => {
           >
             <Volume2 size={16} />
           </button>
-          <button className="tts-btn-icon" onClick={closeTokenPopover} title={t('closeBtn')}>
-            <X size={15} />
+          <button
+            className="lateral-panel-close-btn"
+            onClick={closeTokenPopover}
+            title={t('closeBtn')}
+          >
+            <X size={16} />
           </button>
         </div>
       </div>
 
+      {/* Cabeçalho da Palavra, Fonética e Classe */}
+      <div>
+        <div className="lateral-word-title-row">
+          <div>
+            <span className="lateral-word-main">{activeToken.text}</span>
+            {activeToken.ruby && (
+              <span className="lateral-word-ruby">[{activeToken.ruby}]</span>
+            )}
+          </div>
+        </div>
+
+        {activeToken.partOfSpeech && (
+          <span className="lateral-word-pos">{activeToken.partOfSpeech}</span>
+        )}
+      </div>
+
       {/* Badges de Traços Linguísticos e SRS */}
-      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: '6px' }}>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
         {hskLevel && (
-          <span className="trait-hsk-badge" title="Nível de Proficiência HSK">
+          <span className="trait-hsk-badge" title={t('hskLabel')}>
             {hskLevel}
           </span>
         )}
@@ -158,7 +184,7 @@ export const WordPopover: React.FC = () => {
         )}
 
         {isPinned && (
-          <span className="pinned-star-badge" title="Palavra fixada: prioridade máxima no prompt e repetição">
+          <span className="pinned-star-badge" title={t('pinWord')}>
             ⭐ {t('pinWord')}
           </span>
         )}
@@ -166,27 +192,28 @@ export const WordPopover: React.FC = () => {
 
       {/* Traço de Radical Chinês (部首) */}
       {radicals && (
-        <div style={{ marginTop: '4px' }}>
-          <span className="trait-radical-badge" title="Radical estrutural do caractere (部首) e significado">
+        <div>
+          <span className="trait-radical-badge" title={t('radicalsLabel')}>
             <span className="radical-char">部首</span> {radicals}
           </span>
         </div>
       )}
 
-      {/* Translation & Context Details */}
-      <div className="popover-translation">
-        {traits.contextMeaning || activeToken.translation || 'Click to explore translation'}
+      {/* Caixa de Tradução Contextual */}
+      <div className="lateral-translation-box">
+        <div className="lateral-translation-label">{t('contextMeaningLabel')}</div>
+        <div className="lateral-translation-text">
+          {traits.contextMeaning || activeToken.translation || 'Tradução em contexto'}
+        </div>
+        {activeToken.explanation && (
+          <div className="lateral-explanation-text">
+            {activeToken.explanation}
+          </div>
+        )}
       </div>
 
-      {activeToken.explanation && (
-        <div className="popover-details">
-          <div style={{ fontWeight: 600, marginBottom: 2 }}>{t('contextMeaningLabel')}:</div>
-          {activeToken.explanation}
-        </div>
-      )}
-
       {/* Retenção Contínua SRS (0-100%) e Curva de Esquecimento */}
-      <div style={{ marginTop: '8px', padding: '8px 10px', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)' }}>
+      <div style={{ padding: '8px 10px', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
           <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)' }}>
             {t('masteryLabel')} SRS
@@ -200,7 +227,7 @@ export const WordPopover: React.FC = () => {
         </div>
       </div>
 
-      {/* Action Buttons: Add to Vault / Star */}
+      {/* Botões de Ação: Salvar no Cofre e Fixar */}
       <div className="popover-actions">
         <button
           className="btn-secondary"
@@ -211,12 +238,12 @@ export const WordPopover: React.FC = () => {
           {isInVault ? (
             <>
               <Check size={14} color="#22c55e" />
-              <span>{settings.uiLanguage === 'pt' ? 'No Cofre' : 'In Vault'}</span>
+              <span>{t('inVaultBadge')}</span>
             </>
           ) : (
             <>
               <Plus size={14} />
-              <span>{settings.uiLanguage === 'pt' ? 'Salvar no Cofre' : 'Add to Vault'}</span>
+              <span>{t('addToVaultBtn')}</span>
             </>
           )}
         </button>
@@ -232,6 +259,6 @@ export const WordPopover: React.FC = () => {
           <Star size={17} fill={isStarred ? '#ffc107' : 'none'} />
         </button>
       </div>
-    </div>
+    </aside>
   );
 };
