@@ -22,6 +22,7 @@ export const Header: React.FC = () => {
     toggleTheme,
     setIsSettingsOpen,
     exportVocabularyJson,
+    t,
   } = useApp();
 
   const langInfo = SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage);
@@ -30,7 +31,7 @@ export const Header: React.FC = () => {
     <header className="book-top-bar">
       {/* Left: Clean Title */}
       <div className="book-bar-left">
-        <h1 className="book-app-title">Language reading</h1>
+        <h1 className="book-app-title">{t('appName')}</h1>
       </div>
 
       {/* Center: Floating Pill Segmented Switcher */}
@@ -40,14 +41,14 @@ export const Header: React.FC = () => {
           onClick={() => setActiveTab('story')}
           type="button"
         >
-          Interactive
+          {t('tabInteractive')}
         </button>
         <button
           className={`book-segment-btn ${activeTab === 'dictionary' ? 'active' : ''}`}
           onClick={() => setActiveTab('dictionary')}
           type="button"
         >
-          Dictionary
+          {t('tabDictionary')}
         </button>
       </div>
 
@@ -60,10 +61,15 @@ export const Header: React.FC = () => {
             className="book-lang-select"
             value={currentLanguage}
             onChange={(e) => setLanguage(e.target.value as LanguageCode)}
-            title="Change Target Language"
+            title={t('changeLanguage')}
+            style={{ color: '#000000', fontWeight: 700 }}
           >
             {SUPPORTED_LANGUAGES.map((lang) => (
-              <option key={lang.code} value={lang.code}>
+              <option
+                key={lang.code}
+                value={lang.code}
+                style={{ color: '#000000', backgroundColor: '#ffffff', fontWeight: 600 }}
+              >
                 {lang.flag} {lang.name} ({currentProficiency})
               </option>
             ))}
@@ -74,7 +80,7 @@ export const Header: React.FC = () => {
         <button
           className="book-circle-icon-btn"
           onClick={() => exportVocabularyJson()}
-          title="Baixar banco de vocabulário em JSON"
+          title={t('exportJson')}
         >
           <Download size={15} />
         </button>
@@ -83,7 +89,7 @@ export const Header: React.FC = () => {
         <button
           className="book-circle-icon-btn"
           onClick={toggleTheme}
-          title={settings.theme === 'dark' ? 'Mudar para mesa clara' : 'Mudar para madeira escura'}
+          title={settings.theme === 'dark' ? t('switchToLight') : t('switchToDark')}
         >
           {settings.theme === 'dark' ? <Sun size={15} color="#ffb703" /> : <Moon size={15} />}
         </button>
@@ -92,7 +98,7 @@ export const Header: React.FC = () => {
         <button
           className="book-circle-icon-btn"
           onClick={() => setIsSettingsOpen(true)}
-          title="Configurações e ajuda"
+          title={t('settingsAndHelp')}
         >
           <HelpCircle size={15} />
         </button>
@@ -101,7 +107,7 @@ export const Header: React.FC = () => {
         <div
           className="book-avatar-circle"
           onClick={() => setIsSettingsOpen(true)}
-          title="Configurações de IA & Perfil"
+          title={t('profileSettings')}
         >
           <span>読</span>
         </div>

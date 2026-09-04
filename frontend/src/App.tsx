@@ -6,6 +6,7 @@ import { StoryReader } from './components/Reader/StoryReader';
 import { StoryDictionary } from './components/Dictionary/StoryDictionary';
 import { RetentionQuiz } from './components/Quiz/RetentionQuiz';
 import { SettingsModal } from './components/Settings/SettingsModal';
+import { StoryGenerationMascot } from './components/Mascot/StoryGenerationMascot';
 
 export const App: React.FC = () => {
   const { activeTab } = useApp();
@@ -34,6 +35,7 @@ export const App: React.FC = () => {
       {/* Modals & Overlays */}
       <RetentionQuiz />
       <SettingsModal />
+      <StoryGenerationMascot />
     </div>
   );
 };

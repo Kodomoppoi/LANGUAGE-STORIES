@@ -5,11 +5,10 @@ import {
   Settings,
   Sparkles,
   Server,
-  Key,
   Volume2,
   Database,
-  CheckCircle2,
   RefreshCw,
+  Globe,
 } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 
@@ -21,6 +20,7 @@ export const SettingsModal: React.FC = () => {
     updateSettings,
     vocabularyVault,
     userStats,
+    t,
   } = useApp();
 
   const [isTestingBackend, setIsTestingBackend] = useState(false);
@@ -34,7 +34,7 @@ export const SettingsModal: React.FC = () => {
     const isLive = await apiService.checkBackendHealth(settings.backendUrl);
     setIsTestingBackend(false);
     updateSettings({ isBackendConnected: isLive });
-    setTestResult(isLive ? 'Backend is online & connected! 🚀' : 'Backend is unreachable. Using smart offline hybrid.');
+    setTestResult(isLive ? t('backendConnected') : t('backendUnreachable'));
   };
 
   const handleExportData = () => {
@@ -58,7 +58,7 @@ export const SettingsModal: React.FC = () => {
         <div className="modal-header">
           <div className="modal-title">
             <Settings size={20} color="var(--flower-500)" />
-            <span>Application & AI Settings</span>
+            <span>{t('settingsTitle')}</span>
           </div>
           <button className="tts-btn-icon" onClick={() => setIsSettingsOpen(false)}>
             <X size={18} />
@@ -66,15 +66,93 @@ export const SettingsModal: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          {/* Section 1: Backend FastAPI Connection */}
+          {/* Section 1: Interface Language (English / Português) */}
           <div className="sidebar-panel" style={{ padding: '14px 16px' }}>
             <div className="panel-header-title">
-              <Server size={16} />
-              <span>Python FastAPI Backend</span>
+              <Globe size={16} />
+              <span>{t('interfaceLanguageSection')}</span>
             </div>
 
             <div className="control-group">
-              <label className="control-label">Backend REST API Endpoint</label>
+              <label className="control-label">{t('interfaceLanguageDesc')}</label>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px',
+                  marginTop: '6px',
+                }}
+              >
+                <button
+                  type="button"
+                  className={`btn-secondary ${settings.uiLanguage === 'pt' ? 'active-lang-choice' : ''}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontWeight: 700,
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    border: settings.uiLanguage === 'pt'
+                      ? '2px solid var(--flower-500)'
+                      : '1.5px solid var(--border-medium)',
+                    background: settings.uiLanguage === 'pt'
+                      ? 'rgba(200, 90, 43, 0.12)'
+                      : 'var(--bg-input)',
+                    color: settings.uiLanguage === 'pt'
+                      ? 'var(--flower-600)'
+                      : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.18s ease',
+                  }}
+                  onClick={() => updateSettings({ uiLanguage: 'pt' })}
+                >
+                  <span style={{ fontSize: '1.15rem' }}>🇧🇷</span>
+                  <span>{t('langPortuguese')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`btn-secondary ${settings.uiLanguage === 'en' ? 'active-lang-choice' : ''}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontWeight: 700,
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    border: settings.uiLanguage === 'en'
+                      ? '2px solid var(--flower-500)'
+                      : '1.5px solid var(--border-medium)',
+                    background: settings.uiLanguage === 'en'
+                      ? 'rgba(200, 90, 43, 0.12)'
+                      : 'var(--bg-input)',
+                    color: settings.uiLanguage === 'en'
+                      ? 'var(--flower-600)'
+                      : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.18s ease',
+                  }}
+                  onClick={() => updateSettings({ uiLanguage: 'en' })}
+                >
+                  <span style={{ fontSize: '1.15rem' }}>🇺🇸</span>
+                  <span>{t('langEnglish')}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Backend FastAPI Connection */}
+          <div className="sidebar-panel" style={{ padding: '14px 16px' }}>
+            <div className="panel-header-title">
+              <Server size={16} />
+              <span>{t('backendSection')}</span>
+            </div>
+
+            <div className="control-group">
+              <label className="control-label">{t('backendEndpointLabel')}</label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
                   type="text"
@@ -90,7 +168,7 @@ export const SettingsModal: React.FC = () => {
                   disabled={isTestingBackend}
                 >
                   <RefreshCw size={14} className={isTestingBackend ? 'spin' : ''} />
-                  <span>Test</span>
+                  <span>{t('testBtn')}</span>
                 </button>
               </div>
               {testResult && (
@@ -101,15 +179,15 @@ export const SettingsModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 2: Direct Google Gemini API Integration */}
+          {/* Section 3: Direct Google Gemini API Integration */}
           <div className="sidebar-panel" style={{ padding: '14px 16px' }}>
             <div className="panel-header-title">
               <Sparkles size={16} />
-              <span>Google Gemini AI (Direct Client)</span>
+              <span>{t('geminiSection')}</span>
             </div>
 
             <div className="control-group">
-              <label className="control-label">Gemini API Key (Optional)</label>
+              <label className="control-label">{t('geminiKeyLabel')}</label>
               <input
                 type="password"
                 className="control-input"
@@ -118,12 +196,12 @@ export const SettingsModal: React.FC = () => {
                 placeholder="AIzaSy..."
               />
               <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                Allows direct client-side generation without needing a backend server running.
+                {t('geminiKeyDesc')}
               </span>
             </div>
 
             <div className="control-group">
-              <label className="control-label">Model Selection</label>
+              <label className="control-label">{t('modelSelectionLabel')}</label>
               <select
                 className="control-select"
                 value={settings.geminiModel}
@@ -137,11 +215,11 @@ export const SettingsModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 3: TTS & Display Options */}
+          {/* Section 4: TTS & Display Options */}
           <div className="sidebar-panel" style={{ padding: '14px 16px' }}>
             <div className="panel-header-title">
               <Volume2 size={16} />
-              <span>Audio & Display Preferences</span>
+              <span>{t('audioDisplaySection')}</span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -152,7 +230,7 @@ export const SettingsModal: React.FC = () => {
                   onChange={(e) => updateSettings({ showRuby: e.target.checked })}
                   style={{ accentColor: 'var(--flower-500)' }}
                 />
-                <span>Show Ruby Annotations (Furigana for JA / Pinyin for ZH)</span>
+                <span>{t('showRubyLabel')}</span>
               </label>
 
               <label className="toggle-switch-label">
@@ -162,16 +240,16 @@ export const SettingsModal: React.FC = () => {
                   onChange={(e) => updateSettings({ highlightSRS: e.target.checked })}
                   style={{ accentColor: 'var(--flower-500)' }}
                 />
-                <span>Highlight Target Words with SRS Status</span>
+                <span>{t('highlightSRSLabel')}</span>
               </label>
             </div>
           </div>
 
-          {/* Section 4: Data Backup */}
+          {/* Section 5: Data Backup */}
           <div className="sidebar-panel" style={{ padding: '14px 16px' }}>
             <div className="panel-header-title">
               <Database size={16} />
-              <span>Data & Backup</span>
+              <span>{t('dataBackupSection')}</span>
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
@@ -179,7 +257,7 @@ export const SettingsModal: React.FC = () => {
                 style={{ flex: 1 }}
                 onClick={handleExportData}
               >
-                Export JSON Vault Backup
+                {t('exportVaultBtn')}
               </button>
             </div>
           </div>

@@ -15,7 +15,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { SUPPORTED_LANGUAGES } from '../../services/sampleStories';
-import { StoryToken, SRSStage, StoryParagraph } from '../../types';
+import { StoryToken, SRSStage, StoryParagraph, StorySentence, DictionaryEntry } from '../../types';
 
 export const StoryReader: React.FC = () => {
   const {
@@ -34,6 +34,7 @@ export const StoryReader: React.FC = () => {
     playStoryAudio,
     pauseStoryAudio,
     stopStoryAudio,
+    t,
   } = useApp();
 
   const [currentSpread, setCurrentSpread] = useState(0);
@@ -49,9 +50,9 @@ export const StoryReader: React.FC = () => {
 
   // Index vocabulary vault for instant O(1) SRS stage lookup
   const vaultMap = useMemo(() => {
-    const map = new Map<string, typeof vocabularyVault[0]>();
-    vocabularyVault.forEach((v) => {
-      map.set(`${v.language}:${v.word}`, v);
+    const map = new Map<string, DictionaryEntry>();
+    vocabularyVault.forEach((entry) => {
+      map.set(`${entry.language}:${entry.word}`, entry);
     });
     return map;
   }, [vocabularyVault]);
@@ -144,6 +145,25 @@ export const StoryReader: React.FC = () => {
     await increaseDictionaryAndGenerate(newWordQuantity);
   };
 
+  const getSentenceTranslation = (sentence: StorySentence): string => {
+    if (sentence.translation && sentence.translation.trim().length > 0) {
+      return sentence.translation.trim();
+    }
+    // Fallback: synthesize translation from target vocabulary and token definitions
+    const tokenTranslations = sentence.tokens
+      .map((t) => t.translation || t.explanation || t.traits?.contextMeaning)
+      .filter(Boolean) as string[];
+
+    if (tokenTranslations.length > 0) {
+      const uniqueParts = tokenTranslations.filter(
+        (val, idx, arr) => idx === 0 || val !== arr[idx - 1]
+      );
+      return uniqueParts.join(' • ');
+    }
+
+    return sentence.text;
+  };
+
   const renderParagraph = (p: (typeof paragraphsWithIndices)[0]) => (
     <div key={p.id} className="book-paragraph-block">
       {p.sentencesWithIndices.map((sentence) => {
@@ -166,7 +186,7 @@ export const StoryReader: React.FC = () => {
                       settings.highlightSRS && srsStage ? `srs-${srsStage}` : ''
                     }`}
                     onClick={(e) => openTokenPopover(token, e)}
-                    title="Clique para tradução, pronúncia e detalhes"
+                    title={t('clickForDetails')}
                   >
                     {settings.showRuby && token.ruby ? (
                       <ruby>
@@ -181,10 +201,15 @@ export const StoryReader: React.FC = () => {
               })}
             </p>
 
-            {/* Translation overlay */}
+            {/* Translation underneath each sentence */}
             {showTranslations && (
               <div className="book-sentence-translation">
-                {sentence.translation}
+                <span className="sentence-translation-marker" aria-hidden="true">
+                  {t('translationPrefix')}
+                </span>
+                <span className="sentence-translation-content">
+                  {getSentenceTranslation(sentence)}
+                </span>
               </div>
             )}
           </div>
@@ -214,7 +239,7 @@ export const StoryReader: React.FC = () => {
             <header className="book-running-header left-header">
               <span className="running-header-leaf">❦</span>
               <span className="running-header-title">
-                Language Stories • {langInfo?.name || 'Reading'}
+                Language Stories • {langInfo?.name || t('reading')}
               </span>
               <span className="running-header-leaf">❦</span>
             </header>
@@ -225,9 +250,20 @@ export const StoryReader: React.FC = () => {
                 <header className="book-story-title-header">
                   <div className="book-fleuron-ornament">❧ ❦ ❧</div>
                   <h2 className="book-title-heading">{currentStory.title}</h2>
-                  <div className="book-title-subheading">
-                    {currentStory.titleTranslation}
-                  </div>
+                  {currentStory.titleTranslation && (
+                    <div
+                      className={`book-title-subheading ${
+                        showTranslations ? 'highlighted-translation' : ''
+                      }`}
+                    >
+                      {showTranslations && (
+                        <span className="sentence-translation-marker" style={{ marginRight: '6px' }}>
+                          {t('translationPrefix')}
+                        </span>
+                      )}
+                      {currentStory.titleTranslation}
+                    </div>
+                  )}
                   <div className="book-title-divider" />
                 </header>
               )}
@@ -258,7 +294,7 @@ export const StoryReader: React.FC = () => {
             <header className="book-running-header right-header">
               <span className="running-header-leaf">✦</span>
               <span className="running-header-title">
-                Capítulo {currentSpread + 1} • {currentStory.title}
+                {t('chapterPrefix')} {currentSpread + 1} • {currentStory.title}
               </span>
               <span className="running-header-leaf">✦</span>
             </header>
@@ -270,7 +306,7 @@ export const StoryReader: React.FC = () => {
                 ) : (
                   <div className="book-empty-page-placeholder">
                     <Sparkles size={20} color="var(--flower-400)" />
-                    <p>Fim da narrativa.</p>
+                    <p>{t('endOfNarrative')}</p>
                   </div>
                 )}
               </div>
@@ -284,10 +320,10 @@ export const StoryReader: React.FC = () => {
                     </div>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: '0.86rem' }}>
-                        Leitura concluída!
+                        {t('readingComplete')}
                       </div>
                       <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                        Fixe as palavras na memória.
+                        {t('readingCompleteSub')}
                       </div>
                     </div>
                   </div>
@@ -295,7 +331,7 @@ export const StoryReader: React.FC = () => {
                     className="book-quiz-trigger-btn"
                     onClick={() => setIsQuizOpen(true)}
                   >
-                    Iniciar Mini-Quiz
+                    {t('startMiniQuiz')}
                   </button>
                 </div>
               )}
@@ -313,7 +349,7 @@ export const StoryReader: React.FC = () => {
           <button
             className="book-nav-arrow-btn prev-arrow"
             onClick={handlePrevPage}
-            title="Página anterior"
+            title={t('prevPageTitle')}
           >
             <ChevronLeft size={22} />
           </button>
@@ -323,7 +359,7 @@ export const StoryReader: React.FC = () => {
           <button
             className="book-nav-arrow-btn next-arrow"
             onClick={handleNextPage}
-            title="Próxima página"
+            title={t('nextPageTitle')}
           >
             <ChevronRight size={22} />
           </button>
@@ -346,12 +382,12 @@ export const StoryReader: React.FC = () => {
       <div className="book-bottom-dock">
         {/* Toggle / Generate New Story */}
         <div className="dock-control-item">
-          <span className="dock-label">new story:</span>
+          <span className="dock-label">{t('newStory').toLowerCase()}:</span>
           <button
             className={`dock-toggle-btn ${isGeneratingStory ? 'generating' : ''}`}
             onClick={handleToggleNewStory}
             disabled={isGeneratingStory}
-            title="Gerar nova história com alta repetição de vocabulário"
+            title={t('newStory')}
           >
             {isGeneratingStory ? (
               <Loader2 size={15} className="spin" />
@@ -365,21 +401,21 @@ export const StoryReader: React.FC = () => {
 
         {/* New Word Quantity Stepper */}
         <div className="dock-control-item">
-          <span className="dock-label">new word quantity:</span>
+          <span className="dock-label">{t('newWordQuantity')}</span>
           <div className="dock-stepper-box">
             <span className="dock-stepper-value">{newWordQuantity}</span>
             <div className="dock-stepper-arrows">
               <button
                 className="stepper-arrow-btn"
                 onClick={() => setNewWordQuantity((prev) => Math.min(10, prev + 1))}
-                title="Aumentar palavras (+)"
+                title={t('increaseWordsTitle')}
               >
                 ▲
               </button>
               <button
                 className="stepper-arrow-btn"
                 onClick={() => setNewWordQuantity((prev) => Math.max(2, prev - 1))}
-                title="Diminuir palavras (-)"
+                title={t('decreaseWordsTitle')}
               >
                 ▼
               </button>
@@ -389,9 +425,9 @@ export const StoryReader: React.FC = () => {
             className="dock-action-text-btn"
             onClick={handleIncreaseWords}
             disabled={isGeneratingStory}
-            title="Injetar novas palavras no vocabulário atual"
+            title={t('addWordsTooltip')}
           >
-            + Adicionar
+            {t('addWordsBtn')}
           </button>
         </div>
 
@@ -401,10 +437,10 @@ export const StoryReader: React.FC = () => {
         <button
           className={`dock-audio-btn ${isPlayingAudio ? 'playing' : ''}`}
           onClick={isPlayingAudio ? pauseStoryAudio : playStoryAudio}
-          title={isPlayingAudio ? 'Pausar narração' : 'Ouvir narração em áudio'}
+          title={isPlayingAudio ? t('pauseAudioTooltip') : t('listenAudioTooltip')}
         >
           {isPlayingAudio ? <Pause size={15} /> : <Play size={15} />}
-          <span>{isPlayingAudio ? 'Pausar' : 'Áudio'}</span>
+          <span>{isPlayingAudio ? t('pauseBtn') : t('audioBtn')}</span>
         </button>
 
         {/* Ruby Toggle */}
@@ -412,7 +448,7 @@ export const StoryReader: React.FC = () => {
           <button
             className={`dock-chip-btn ${settings.showRuby ? 'active' : ''}`}
             onClick={() => updateSettings({ showRuby: !settings.showRuby })}
-            title="Alternar anotações de leitura (Furigana / Pinyin)"
+            title={t('rubyTooltip')}
           >
             Ruby {settings.showRuby ? 'ON' : 'OFF'}
           </button>
@@ -422,20 +458,20 @@ export const StoryReader: React.FC = () => {
         <button
           className={`dock-chip-btn ${showTranslations ? 'active' : ''}`}
           onClick={() => setShowTranslations((prev) => !prev)}
-          title="Alternar traduções das frases"
+          title={t('translationTooltip')}
         >
           {showTranslations ? <EyeOff size={14} /> : <Eye size={14} />}
-          <span>Tradução</span>
+          <span>{t('translationToggle')}</span>
         </button>
 
         {/* Mini Quiz Shortcut */}
         <button
           className="dock-quiz-btn"
           onClick={() => setIsQuizOpen(true)}
-          title="Testar retenção e alimentar a curva SM-2"
+          title={t('miniQuizTooltip')}
         >
           <CheckCircle size={15} />
-          <span>Mini-Quiz</span>
+          <span>{t('miniQuizBtn')}</span>
         </button>
       </div>
 
