@@ -577,6 +577,7 @@ body {
   min-height: 480px;
   aspect-ratio: 1.42 / 1;
   position: relative;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1381,6 +1382,8 @@ body[data-theme='dark'] .book-page-footer {
    ========================================================================== */
 
 .book-bottom-dock {
+  position: relative;
+  z-index: 500;
   background: var(--bg-glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -2699,6 +2702,7 @@ body[data-theme='dark'] .stat-pill.highlight-orange {
 
 .dock-theme-container {
   position: relative;
+  z-index: 600;
 }
 
 .dock-theme-btn {
@@ -2717,17 +2721,17 @@ body[data-theme='dark'] .stat-pill.highlight-orange {
   left: 50%;
   transform: translateX(-50%);
   width: 330px;
-  background: var(--bg-card, #2b221d);
-  border: 1.5px solid var(--border-medium, #4e3b31);
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-medium);
   border-radius: var(--radius-xl, 16px);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.15);
   padding: 16px;
-  z-index: 1000;
+  z-index: 9999;
   display: flex;
   flex-direction: column;
   gap: 12px;
   animation: slideUpFade 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
 }
 
 .dock-theme-popover::after {
@@ -2738,7 +2742,8 @@ body[data-theme='dark'] .stat-pill.highlight-orange {
   transform: translateX(-50%);
   border-width: 7px;
   border-style: solid;
-  border-color: var(--border-medium, #4e3b31) transparent transparent transparent;
+  border-color: var(--bg-card) transparent transparent transparent;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.2));
 }
 
 .dock-theme-popover-header {
