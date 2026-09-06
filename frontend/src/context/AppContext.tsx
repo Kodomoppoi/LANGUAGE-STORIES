@@ -36,6 +36,7 @@ import { storageService } from '../services/storageService';
 import { logService } from '../services/logService';
 import { getTranslation, TranslationKey } from '../services/i18n';
 import { localizeStory } from '../services/storyLocalization';
+import { getProficiencyNativeInfo } from '../services/proficiencyUtils';
 
 interface AppContextType {
   // Navigation
@@ -96,6 +97,11 @@ interface AppContextType {
   isTerminalOpen: boolean;
   setIsTerminalOpen: (open: boolean) => void;
 
+  // Word Deep Dive (Raio-X IA)
+  deepDiveTarget: { word: string; contextSentence?: string } | null;
+  openDeepDive: (word: string, contextSentence?: string) => void;
+  closeDeepDive: () => void;
+
   // Custom Story Theme (Bottom Dock)
   customStoryTheme: string;
   setCustomStoryTheme: (theme: string) => void;
@@ -146,7 +152,9 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // State Initialization via StorageService
   const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(() => storageService.loadLanguage('ja'));
-  const [currentProficiency, setCurrentProficiency] = useState<ProficiencyLevel>(() => storageService.loadProficiency('A2'));
+  const [currentProficiency, setCurrentProficiency] = useState<ProficiencyLevel>(() =>
+    storageService.loadProficiencyForLanguage(storageService.loadLanguage('ja'), 'A2')
+  );
   const [settings, setSettings] = useState<AppSettings>(() => storageService.loadSettings(DEFAULT_SETTINGS));
   const [userStats, setUserStats] = useState<UserStats>(() => storageService.loadStats(DEFAULT_STATS));
   const [vocabularyVault, setVocabularyVault] = useState<DictionaryEntry[]>(() =>
@@ -252,6 +260,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Modals state
   const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [deepDiveTarget, setDeepDiveTarget] = useState<{ word: string; contextSentence?: string } | null>(null);
+
+  const openDeepDive = useCallback((word: string, contextSentence?: string) => {
+    setDeepDiveTarget({ word, contextSentence });
+  }, []);
+
+  const closeDeepDive = useCallback(() => {
+    setDeepDiveTarget(null);
+  }, []);
 
   // Synchronize Settings & Theme
   useEffect(() => {
@@ -457,6 +474,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Handlers
   const setLanguage = useCallback((lang: LanguageCode) => {
     setCurrentLanguage(lang);
+    const savedLevel = storageService.loadProficiencyForLanguage(lang, 'A2');
+    setCurrentProficiency(savedLevel);
     ttsService.stop();
     setIsPlayingAudio(false);
     setCurrentPlayingSentenceIndex(-1);
@@ -466,7 +485,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const setProficiency = useCallback((level: ProficiencyLevel) => {
     setCurrentProficiency(level);
-  }, []);
+    storageService.saveProficiencyForLanguage(currentLanguage, level);
+    const info = getProficiencyNativeInfo(currentLanguage, level);
+    logService.addLog('INFO', 'STAGE', `Dificuldade ajustada: ${info.fullLabel}`);
+  }, [currentLanguage]);
 
   const toggleTheme = useCallback(() => {
     setSettings((prev) => ({
@@ -785,6 +807,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setIsSettingsOpen,
         isTerminalOpen,
         setIsTerminalOpen,
+        deepDiveTarget,
+        openDeepDive,
+        closeDeepDive,
         customStoryTheme,
         setCustomStoryTheme,
         generateNewStory,

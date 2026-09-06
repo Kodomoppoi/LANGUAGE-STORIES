@@ -1,4 +1,4 @@
-import { DictionaryEntry, LanguageCode, ProficiencyLevel, UserStats, AppSettings } from '../types';
+import { DictionaryEntry, LanguageCode, ProficiencyLevel, UserStats, AppSettings, WordDeepDiveData } from '../types';
 import { createDefaultSRSMetrics } from './srsEngine';
 
 const KEYS = {
@@ -48,6 +48,34 @@ export class StorageService {
 
   public saveProficiency(level: ProficiencyLevel): void {
     localStorage.setItem(KEYS.PROFICIENCY, level);
+  }
+
+  public loadProficiencyForLanguage(lang: LanguageCode, defaultLevel: ProficiencyLevel = 'A2'): ProficiencyLevel {
+    try {
+      const mapRaw = localStorage.getItem('lang_stories_proficiencies_map');
+      if (mapRaw) {
+        const map = JSON.parse(mapRaw);
+        if (map && map[lang]) return map[lang] as ProficiencyLevel;
+      }
+    } catch {
+      // ignore
+    }
+    return this.loadProficiency(defaultLevel);
+  }
+
+  public saveProficiencyForLanguage(lang: LanguageCode, level: ProficiencyLevel): void {
+    try {
+      let map: Record<string, string> = {};
+      const mapRaw = localStorage.getItem('lang_stories_proficiencies_map');
+      if (mapRaw) {
+        map = JSON.parse(mapRaw) || {};
+      }
+      map[lang] = level;
+      localStorage.setItem('lang_stories_proficiencies_map', JSON.stringify(map));
+      this.saveProficiency(level);
+    } catch (e) {
+      console.error('Failed to save proficiency map', e);
+    }
   }
 
   public loadVault(defaultEntries: DictionaryEntry[] = []): DictionaryEntry[] {
@@ -155,6 +183,30 @@ export class StorageService {
         }));
     } catch {
       return null;
+    }
+  }
+
+  public loadWordDeepDive(lang: LanguageCode, word: string): WordDeepDiveData | null {
+    try {
+      const raw = localStorage.getItem('lang_stories_deep_dives_cache');
+      if (!raw) return null;
+      const cache = JSON.parse(raw);
+      const key = `${lang}:${word.trim()}`;
+      return cache[key] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  public saveWordDeepDive(lang: LanguageCode, word: string, data: WordDeepDiveData): void {
+    try {
+      const raw = localStorage.getItem('lang_stories_deep_dives_cache');
+      const cache = raw ? JSON.parse(raw) : {};
+      const key = `${lang}:${word.trim()}`;
+      cache[key] = data;
+      localStorage.setItem('lang_stories_deep_dives_cache', JSON.stringify(cache));
+    } catch (e) {
+      console.error('Failed to save deep dive cache to localStorage', e);
     }
   }
 }

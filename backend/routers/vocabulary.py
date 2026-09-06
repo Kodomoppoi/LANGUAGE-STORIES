@@ -25,6 +25,17 @@ class LookupRequest(BaseModel):
     nativeLanguage: Optional[str] = None
 
 
+class DeepDiveRequest(BaseModel):
+    word: str
+    language: str = "zh"
+    sentence_context: Optional[str] = ""
+    proficiency: Optional[str] = "A2"
+    native_lang: Optional[str] = None
+    nativeLanguage: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+    gemini_model: Optional[str] = None
+
+
 class RecordClickRequest(BaseModel):
     id: Optional[str] = None
     word: Optional[str] = None
@@ -140,6 +151,26 @@ async def lookup_word(
         language=req.language,
         db=db,
         native_lang=native,
+    )
+
+
+@router.post("/deep-dive")
+async def get_word_deep_dive(
+    req: DeepDiveRequest,
+) -> Dict[str, Any]:
+    """
+    Análise aprofundada (Raio-X) da palavra com anatomia, radicais, família de palavras,
+    fonética, homófonos e sinônimos com limites estritos de caracteres.
+    """
+    native = req.native_lang or req.nativeLanguage or "Portuguese"
+    return await ai_service.explain_word_deep_dive(
+        word=req.word.strip(),
+        language=req.language,
+        sentence_context=req.sentence_context or "",
+        proficiency=req.proficiency or "A2",
+        native_lang=native,
+        api_key=req.gemini_api_key,
+        model=req.gemini_model,
     )
 
 

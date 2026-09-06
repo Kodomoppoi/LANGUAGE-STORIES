@@ -104,18 +104,22 @@ export const Sidebar: React.FC = () => {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {settings.isBackendConnected ? (
+              {settings.isBackendConnected && settings.geminiApiKey?.trim() ? (
+                <Sparkles size={15} color="#22c55e" />
+              ) : settings.isBackendConnected ? (
                 <CheckCircle2 size={15} color="#22c55e" />
-              ) : settings.geminiApiKey ? (
+              ) : settings.geminiApiKey?.trim() ? (
                 <Sparkles size={15} color="var(--flower-400)" />
               ) : (
                 <AlertCircle size={15} color="var(--flower-400)" />
               )}
               <span style={{ fontWeight: 600 }}>
-                {settings.isBackendConnected
-                  ? 'FastAPI Backend Live'
-                  : settings.geminiApiKey
-                  ? 'Gemini 3.6 Flash'
+                {settings.isBackendConnected && settings.geminiApiKey?.trim()
+                  ? 'FastAPI + Gemini 3.6 Flash'
+                  : settings.isBackendConnected
+                  ? 'FastAPI Local (Sem Gemini)'
+                  : settings.geminiApiKey?.trim()
+                  ? 'Gemini 3.6 Flash (Direto)'
                   : 'Smart Procedural Offline'}
               </span>
             </div>

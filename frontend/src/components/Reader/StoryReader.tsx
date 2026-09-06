@@ -13,9 +13,11 @@ import {
   EyeOff,
   RotateCcw,
   Loader2,
+  Gauge,
 } from 'lucide-react';
 import { SUPPORTED_LANGUAGES } from '../../services/sampleStories';
 import { StoryToken, SRSStage, StoryParagraph, StorySentence, DictionaryEntry } from '../../types';
+import { getProficiencyNativeInfo, getProficiencyOptions } from '../../services/proficiencyUtils';
 
 export const StoryReader: React.FC = () => {
   const {
@@ -37,6 +39,8 @@ export const StoryReader: React.FC = () => {
     playStoryAudio,
     pauseStoryAudio,
     stopStoryAudio,
+    currentProficiency,
+    setProficiency,
     t,
   } = useApp();
 
@@ -44,8 +48,11 @@ export const StoryReader: React.FC = () => {
   const [showTranslations, setShowTranslations] = useState(false);
   const [newWordQuantity, setNewWordQuantity] = useState(5);
   const [isThemePopoverOpen, setIsThemePopoverOpen] = useState(false);
+  const [isDifficultyPopoverOpen, setIsDifficultyPopoverOpen] = useState(false);
 
   const langInfo = SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage);
+  const currentLevelInfo = getProficiencyNativeInfo(currentLanguage, currentProficiency);
+  const difficultyOptions = getProficiencyOptions(currentLanguage);
 
   // Reset page spread when story changes
   useEffect(() => {
@@ -497,7 +504,10 @@ export const StoryReader: React.FC = () => {
         <div className="dock-control-item dock-theme-container">
           <button
             className={`dock-chip-btn dock-theme-btn ${customStoryTheme.trim() ? 'active' : ''}`}
-            onClick={() => setIsThemePopoverOpen((prev) => !prev)}
+            onClick={() => {
+              setIsThemePopoverOpen((prev) => !prev);
+              setIsDifficultyPopoverOpen(false);
+            }}
             title={t('themeTooltip')}
           >
             <Sparkles size={13} color="var(--flower-400)" />
@@ -594,6 +604,64 @@ export const StoryReader: React.FC = () => {
                 >
                   Confirmar
                 </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Story Difficulty / Level Selector Popover */}
+        <div className="dock-control-item dock-difficulty-container">
+          <button
+            className="dock-chip-btn dock-difficulty-btn active"
+            onClick={() => {
+              setIsDifficultyPopoverOpen((prev) => !prev);
+              setIsThemePopoverOpen(false);
+            }}
+            title="Alterar nível e dificuldade da história"
+          >
+            <Gauge size={13} style={{ color: currentLevelInfo.color }} />
+            <span>Nível: {currentLevelInfo.badgeLabel}</span>
+          </button>
+
+          {isDifficultyPopoverOpen && (
+            <div className="dock-difficulty-popover">
+              <div className="dock-difficulty-popover-header">
+                <span className="dock-difficulty-popover-title">
+                  <Gauge size={15} color="var(--flower-500)" />
+                  Dificuldade da História
+                </span>
+                <button
+                  type="button"
+                  className="dock-theme-close-btn"
+                  onClick={() => setIsDifficultyPopoverOpen(false)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="dock-difficulty-levels-list">
+                {difficultyOptions.map((opt) => (
+                  <button
+                    key={opt.level}
+                    type="button"
+                    className={`dock-difficulty-level-card ${currentProficiency === opt.level ? 'selected' : ''}`}
+                    onClick={() => {
+                      setProficiency(opt.level);
+                      setIsDifficultyPopoverOpen(false);
+                    }}
+                  >
+                    <div className="dock-difficulty-level-top">
+                      <span
+                        className="dock-difficulty-level-badge"
+                        style={{ backgroundColor: `${opt.color}22`, color: opt.color, borderColor: opt.color }}
+                      >
+                        {opt.shortLabel}
+                      </span>
+                      <span className="dock-difficulty-level-full">{opt.fullLabel}</span>
+                    </div>
+                    <p className="dock-difficulty-level-desc">{opt.description}</p>
+                  </button>
+                ))}
               </div>
             </div>
           )}

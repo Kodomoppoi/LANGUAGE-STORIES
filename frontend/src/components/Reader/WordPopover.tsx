@@ -8,6 +8,7 @@ import {
   X,
   Sparkles,
   BookOpen,
+  Bot,
 } from 'lucide-react';
 import { createDefaultSRSMetrics, getStatusColor, getRepetitionWeight } from '../../services/srsEngine';
 import { DictionaryEntry, ChineseTraits } from '../../types';
@@ -22,6 +23,7 @@ export const WordPopover: React.FC = () => {
     addWordToVault,
     toggleStarWord,
     speakSingleToken,
+    openDeepDive,
     settings,
     t,
   } = useApp();
@@ -227,11 +229,36 @@ export const WordPopover: React.FC = () => {
         </div>
       </div>
 
-      {/* Botões de Ação: Salvar no Cofre e Fixar */}
+      {/* Botões de Ação: Raio-X IA, Salvar no Cofre e Fixar */}
       <div className="popover-actions">
         <button
+          type="button"
+          className="btn-secondary popover-deep-dive-btn"
+          onClick={() => {
+            closeTokenPopover();
+            openDeepDive(activeToken.text, activeToken.explanation || activeToken.translation);
+          }}
+          title="Raio-X IA: Explicação detalhada (radicais, fonética, componentes, sinônimos)"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '5px',
+            padding: '8px 10px',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            background: 'var(--bg-card)',
+            border: '1px solid var(--flower-500)',
+            color: 'var(--flower-400)',
+          }}
+        >
+          <Bot size={15} color="var(--flower-500)" />
+          <span>Raio-X IA</span>
+        </button>
+
+        <button
           className="btn-secondary"
-          style={{ flex: 1, padding: '8px 12px', fontSize: '0.82rem' }}
+          style={{ flex: 1, padding: '8px 10px', fontSize: '0.8rem' }}
           onClick={handleAddToVault}
           disabled={isInVault}
         >

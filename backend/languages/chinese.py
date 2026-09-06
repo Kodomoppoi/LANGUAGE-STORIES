@@ -349,3 +349,97 @@ Return strictly valid JSON only:
                 },
             ],
         }
+
+    def build_deep_dive_prompt(
+        self,
+        word: str,
+        sentence_context: str,
+        proficiency: str,
+        native_lang: str = "Portuguese",
+    ) -> str:
+        return f"""Analyze the Mandarin word/character "{word}" in deep pedagogical detail for a language learner (Level: {proficiency}).
+Sentence Context: "{sentence_context or 'N/A'}"
+Target Explanation Language: {native_lang}
+
+CRITICAL RULES:
+1. EXTREME BREVITY: Max 1-2 direct lines per section. No filler, no introductions. Total output must be under 500 characters.
+2. Provide exact Chinese CJK structural breakdown:
+   - Meaning in this specific context and nuance.
+   - Anatomy: Deconstruct characters and radicals (部首) with component meanings.
+   - Shared Characters: 2 high-frequency words sharing the same Hanzi.
+   - Phonetics & Homophones: Pinyin with tones + homophone/confusable sounds alert.
+   - Synonyms: 1-2 practical synonyms and brief contrast.
+3. Return STRICTLY valid JSON ONLY:
+
+{{
+  "word": "{word}",
+  "pinyin": "pīnyīn with tones",
+  "hsk_level": "HSK 1-6",
+  "part_of_speech": "Substantivo / Verbo / etc",
+  "context_meaning": "Significado exato no contexto (máx 120 caracteres)",
+  "character_anatomy": [
+    {{
+      "char": "字",
+      "radical": "宀 (teto)",
+      "components": "componentes ou traços",
+      "meaning": "significado individual"
+    }}
+  ],
+  "shared_characters": [
+    {{
+      "word": "词语",
+      "pinyin": "cí yǔ",
+      "meaning": "tradução direta"
+    }}
+  ],
+  "phonetics_homophones": {{
+    "pinyin_tone_tip": "dica de tom e som",
+    "homophones": ["同音词 (tóng yīn cí)"]
+  }},
+  "synonyms_and_nuances": [
+    {{
+      "synonym": "近义词",
+      "difference": "diferença prática de uso"
+    }}
+  ]
+}}
+"""
+
+    def get_deep_dive_fallback(
+        self,
+        word: str,
+        proficiency: str,
+        native_lang: str = "Portuguese",
+    ) -> Dict[str, Any]:
+        return {
+            "word": word,
+            "pinyin": "kā fēi guǎn" if word == "咖啡馆" else "",
+            "hsk_level": f"HSK 2 ({proficiency})",
+            "part_of_speech": "Substantivo",
+            "context_meaning": f"Uso de '{word}' no contexto da narrativa.",
+            "character_anatomy": [
+                {
+                    "char": word[0] if word else "字",
+                    "radical": "口 (boca)",
+                    "components": "Radical semântico + elemento fonético",
+                    "meaning": "Componente fundamental do caractere",
+                }
+            ],
+            "shared_characters": [
+                {
+                    "word": f"{word[0]}厅" if word else "茶室",
+                    "pinyin": "kā tīng",
+                    "meaning": "Salão / Espaço relacionado",
+                }
+            ],
+            "phonetics_homophones": {
+                "pinyin_tone_tip": "Preste atenção à modulação dos tons para clareza.",
+                "homophones": [],
+            },
+            "synonyms_and_nuances": [
+                {
+                    "synonym": "茶馆",
+                    "difference": "Estabelecimento similar voltado a infusões tradicionais.",
+                }
+            ],
+        }

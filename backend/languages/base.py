@@ -10,6 +10,10 @@ class LanguageProfile(ABC):
         pass
 
     @property
+    def code(self) -> str:
+        return self.language_code
+
+    @property
     @abstractmethod
     def language_name(self) -> str:
         """Ex: 'Mandarin Chinese', 'Japanese'"""
@@ -65,4 +69,25 @@ class LanguageProfile(ABC):
     @abstractmethod
     def get_sample_data(self, proficiency: str, theme: str, native_lang: str = "Portuguese") -> Dict[str, Any]:
         """Gera dados de fallback estruturados em caso de offline/teste"""
+        pass
+
+    @abstractmethod
+    def build_deep_dive_prompt(
+        self,
+        word: str,
+        sentence_context: str,
+        proficiency: str,
+        native_lang: str = "Portuguese",
+    ) -> str:
+        """Prompt estruturado para análise profunda (Raio-X) da palavra com limite estrito de caracteres"""
+        pass
+
+    @abstractmethod
+    def get_deep_dive_fallback(
+        self,
+        word: str,
+        proficiency: str,
+        native_lang: str = "Portuguese",
+    ) -> Dict[str, Any]:
+        """Dados de fallback ricos para o Raio-X em caso de falha de conexão/offline"""
         pass

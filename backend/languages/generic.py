@@ -248,3 +248,162 @@ Return strictly valid JSON only:
                 }
             ],
         }
+
+    def build_deep_dive_prompt(
+        self,
+        word: str,
+        sentence_context: str,
+        proficiency: str,
+        native_lang: str = "Portuguese",
+    ) -> str:
+        is_japanese = self._code == "ja"
+
+        if is_japanese:
+            return f"""Analyze the Japanese word/kanji "{word}" in deep pedagogical detail for a learner (Level: JLPT {proficiency}).
+Sentence Context: "{sentence_context or 'N/A'}"
+Target Explanation Language: {native_lang}
+
+CRITICAL RULES:
+1. EXTREME BREVITY: Max 1-2 direct lines per section. Total under 500 characters.
+2. Provide Japanese CJK structural breakdown:
+   - Meaning in this specific sentence context.
+   - Kanji Anatomy & Radicais (部首/Kanji components).
+   - Shared Kanji / Compounds (熟語 - 2 high-frequency words).
+   - Phonetics & Homophones (Furigana / pitch / similar sounding kanji).
+   - Synonyms & practical nuances.
+3. Return STRICTLY valid JSON ONLY:
+
+{{
+  "word": "{word}",
+  "ruby": "furigana/kana",
+  "level": "JLPT {proficiency}",
+  "part_of_speech": "Substantivo / Verbo / etc",
+  "context_meaning": "Significado exato no contexto (máx 120 caracteres)",
+  "character_anatomy": [
+    {{
+      "char": "漢字",
+      "radical": "radical / kanji component",
+      "components": "decomposição",
+      "meaning": "significado da parte"
+    }}
+  ],
+  "shared_characters": [
+    {{
+      "word": "熟語",
+      "ruby": "じゅくご",
+      "meaning": "tradução"
+    }}
+  ],
+  "phonetics_homophones": {{
+    "tip": "dica de pronúncia ou tom",
+    "homophones": ["同音異義語"]
+  }},
+  "synonyms_and_nuances": [
+    {{
+      "synonym": "類義語",
+      "difference": "diferença prática de uso"
+    }}
+  ]
+}}
+"""
+
+        # Línguas Alfabéticas (Espanhol, Francês, Alemão, etc.)
+        return f"""Analyze the word "{word}" ({self._name}) in deep pedagogical detail for a learner (CEFR: {proficiency}).
+Sentence Context: "{sentence_context or 'N/A'}"
+Target Explanation Language: {native_lang}
+
+CRITICAL RULES:
+1. EXTREME BREVITY: Max 1-2 direct lines per section. Total under 500 characters.
+2. Breakdown hierarchy:
+   - Contextual meaning & register (formal/informal).
+   - Roots & Etymology (prefix/suffix/origin).
+   - Common collocations (2 natural word partnerships).
+   - False friends or confusable homophones alert.
+   - Synonyms and practical difference.
+3. Return STRICTLY valid JSON ONLY:
+
+{{
+  "word": "{word}",
+  "ruby": "",
+  "level": "{proficiency}",
+  "part_of_speech": "Substantivo / Verbo / etc",
+  "context_meaning": "Significado exato no contexto (máx 120 caracteres)",
+  "etymology_roots": "Origem / raiz / prefixo relevante",
+  "common_collocations": [
+    {{
+      "phrase": "colocação comum",
+      "meaning": "tradução"
+    }}
+  ],
+  "false_friends_or_homophones": "Alerta de falso amigo ou som parecido (se houver)",
+  "synonyms_and_nuances": [
+    {{
+      "synonym": "sinônimo",
+      "difference": "diferença prática de uso"
+    }}
+  ]
+}}
+"""
+
+    def get_deep_dive_fallback(
+        self,
+        word: str,
+        proficiency: str,
+        native_lang: str = "Portuguese",
+    ) -> Dict[str, Any]:
+        is_japanese = self._code == "ja"
+        if is_japanese:
+            return {
+                "word": word,
+                "ruby": "ことば",
+                "level": f"JLPT {proficiency}",
+                "part_of_speech": "Substantivo",
+                "context_meaning": f"Uso contextual de '{word}' na história.",
+                "character_anatomy": [
+                    {
+                        "char": word[0] if word else "言",
+                        "radical": "言 (palavra)",
+                        "components": "Radical de fala + elemento sonoro",
+                        "meaning": "Componente principal do kanji",
+                    }
+                ],
+                "shared_characters": [
+                    {
+                        "word": f"{word[0]}語" if word else "言語",
+                        "ruby": "げんご",
+                        "meaning": "Linguagem / idioma",
+                    }
+                ],
+                "phonetics_homophones": {
+                    "tip": "Observe o alongamento vocálico e entonação de pitch.",
+                    "homophones": [],
+                },
+                "synonyms_and_nuances": [
+                    {
+                        "synonym": "単語",
+                        "difference": "Refere-se a vocábulo individual no estudo gramatical.",
+                    }
+                ],
+            }
+
+        return {
+            "word": word,
+            "ruby": "",
+            "level": proficiency,
+            "part_of_speech": "Palavra",
+            "context_meaning": f"Significado contextual de '{word}' no texto.",
+            "etymology_roots": f"Termo usual no idioma {self._name}.",
+            "common_collocations": [
+                {
+                    "phrase": f"usar {word}",
+                    "meaning": "Combinação frequente no dia a dia",
+                }
+            ],
+            "false_friends_or_homophones": "Atenção ao contexto para evitar falsos cognatos.",
+            "synonyms_and_nuances": [
+                {
+                    "synonym": "Termo equivalente",
+                    "difference": "Variação de registro ou intensidade.",
+                }
+            ],
+        }

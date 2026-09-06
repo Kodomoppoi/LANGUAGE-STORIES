@@ -8,9 +8,10 @@ import { RetentionQuiz } from './components/Quiz/RetentionQuiz';
 import { SettingsModal } from './components/Settings/SettingsModal';
 import { StoryGenerationMascot } from './components/Mascot/StoryGenerationMascot';
 import { TerminalDrawer } from './components/Terminal/TerminalDrawer';
+import { WordDeepDiveModal } from './components/Dictionary/WordDeepDiveModal';
 
 export const App: React.FC = () => {
-  const { activeTab } = useApp();
+  const { activeTab, deepDiveTarget, closeDeepDive } = useApp();
 
   return (
     <div className="desk-surface">
@@ -38,6 +39,13 @@ export const App: React.FC = () => {
       <SettingsModal />
       <StoryGenerationMascot />
       <TerminalDrawer />
+      {deepDiveTarget && (
+        <WordDeepDiveModal
+          word={deepDiveTarget.word}
+          contextSentence={deepDiveTarget.contextSentence}
+          onClose={closeDeepDive}
+        />
+      )}
     </div>
   );
 };

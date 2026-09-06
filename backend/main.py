@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 from .config import settings
 from .database import init_db
-from .routers import stories, vocabulary, tts, logs
+from .routers import stories, vocabulary, tts, logs, settings as settings_router
 
 
 @asynccontextmanager
@@ -42,6 +42,7 @@ app.include_router(stories.router)
 app.include_router(vocabulary.router)
 app.include_router(tts.router)
 app.include_router(logs.router)
+app.include_router(settings_router.router)
 
 
 @app.get("/health")
@@ -55,6 +56,7 @@ def health_check():
         "version": "1.0.0",
         "database": "sqlite_ready",
         "gemini_configured": bool(settings.gemini_api_key),
+        "gemini_model": settings.gemini_model,
         "ollama_configured": bool(settings.ollama_url),
     }
 

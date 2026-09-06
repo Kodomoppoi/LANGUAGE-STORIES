@@ -4,9 +4,11 @@ import {
   StoryParagraph,
   DictionaryEntry,
   QuizQuestion,
+  WordDeepDiveData,
 } from '../../types';
 import { createDefaultSRSMetrics } from '../srsEngine';
 import { GenerateStoryParams, StoryGeneratorProvider } from './types';
+import { logService } from '../logService';
 
 export class GeminiProvider implements StoryGeneratorProvider {
   public readonly id = 'gemini';
@@ -125,26 +127,61 @@ Output ONLY valid JSON following this schema:
 `;
 
     const modelName = settings.geminiModel || 'gemini-3.6-flash';
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${settings.geminiApiKey}`;
+    logService.addLog('INFO', 'GEMINI', `[Cliente Direto] Disparando inferência no modelo ${modelName}...`);
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json' },
-      }),
-    });
+    const candidateModels = [modelName];
+    for (const alt of ['gemini-2.5-flash', 'gemini-1.5-flash']) {
+      if (!candidateModels.includes(alt)) candidateModels.push(alt);
+    }
 
-    if (!response.ok) {
-      throw new Error(`Gemini API returned status ${response.status}`);
+    let response: Response | null = null;
+    let usedModel = modelName;
+
+    for (const curModel of candidateModels) {
+      usedModel = curModel;
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${curModel}:generateContent?key=${settings.geminiApiKey}`;
+
+      try {
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: 'application/json' },
+          }),
+        });
+
+        if (resp.ok) {
+          response = resp;
+          break;
+        } else if (resp.status === 404) {
+          logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Modelo ${curModel} retornou 404. Tentando modelo alternativo...`);
+          continue;
+        } else {
+          const errText = await resp.text();
+          logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Gemini retornou status ${resp.status}: ${errText.slice(0, 160)}`);
+          response = resp;
+          break;
+        }
+      } catch (networkErr: any) {
+        logService.addLog('ERROR', 'GEMINI', `[Cliente Direto] Erro de rede ao chamar ${curModel}: ${networkErr?.message}`);
+      }
+    }
+
+    if (!response || !response.ok) {
+      const errStatus = response ? response.status : 'Offline';
+      logService.addLog('ERROR', 'GEMINI', `[Cliente Direto] Falha final na requisição à API Gemini (${errStatus}).`);
+      throw new Error(`Gemini API returned status ${errStatus}`);
     }
 
     const data = await response.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
+      logService.addLog('ERROR', 'GEMINI', '[Cliente Direto] Resposta da API Gemini sem conteúdo de texto.');
       throw new Error('Empty Gemini response text');
     }
+
+    logService.addLog('SUCCESS', 'GEMINI', `[Cliente Direto] Resposta estruturada recebida da API Gemini [${usedModel}] (${rawText.length} chars).`);
 
     const parsed = JSON.parse(rawText);
 
@@ -230,5 +267,128 @@ Output ONLY valid JSON following this schema:
       isRTL: params.language === 'ar',
       fullText,
     };
+  }
+
+  /**
+   * Análise aprofundada (Raio-X IA) de palavra diretamente via Gemini no frontend
+   */
+  public async fetchWordDeepDive(
+    word: string,
+    language: string,
+    context: string,
+    proficiency: string,
+    nativeLang: string,
+    settings: AppSettings
+  ): Promise<WordDeepDiveData> {
+    const isCJK = language === 'zh' || language === 'ja';
+    const isJapanese = language === 'ja';
+
+    const prompt = isCJK
+      ? `You are an expert language pedagogue analyzing the ${isJapanese ? 'Japanese' : 'Mandarin'} word "${word}".
+Sentence Context: "${context || 'N/A'}"
+Learner Proficiency: ${proficiency}
+Target Explanation Language: ${nativeLang}
+
+CRITICAL RULES:
+1. EXTREME BREVITY: Max 1-2 lines per section, under 500 characters total.
+2. Return STRICTLY valid JSON matching:
+{
+  "word": "${word}",
+  "ruby": "${isJapanese ? 'furigana' : 'pinyin'}",
+  "level": "${proficiency}",
+  "part_of_speech": "Substantivo/Verbo/etc",
+  "context_meaning": "Significado exato no contexto (máx 120 chars)",
+  "character_anatomy": [
+    {
+      "char": "字",
+      "radical": "radical",
+      "components": "decomposição",
+      "meaning": "significado"
+    }
+  ],
+  "shared_characters": [
+    {
+      "word": "palavra composta",
+      "ruby": "pronúncia",
+      "meaning": "tradução"
+    }
+  ],
+  "phonetics_homophones": {
+    "tip": "dica de pronúncia ou tom",
+    "homophones": ["palavra com som parecido"]
+  },
+  "synonyms_and_nuances": [
+    {
+      "synonym": "sinônimo",
+      "difference": "diferença prática"
+    }
+  ]
+}`
+      : `You are an expert language pedagogue analyzing the word "${word}" (${language}).
+Sentence Context: "${context || 'N/A'}"
+Learner Proficiency: ${proficiency}
+Target Explanation Language: ${nativeLang}
+
+CRITICAL RULES:
+1. EXTREME BREVITY: Max 1-2 lines per section, under 500 characters total.
+2. Return STRICTLY valid JSON matching:
+{
+  "word": "${word}",
+  "ruby": "",
+  "level": "${proficiency}",
+  "part_of_speech": "Substantivo/Verbo/etc",
+  "context_meaning": "Significado exato no contexto (máx 120 chars)",
+  "etymology_roots": "Origem ou raiz da palavra",
+  "common_collocations": [
+    {
+      "phrase": "colocação comum",
+      "meaning": "tradução"
+    }
+  ],
+  "false_friends_or_homophones": "Alerta de falso amigo ou som parecido",
+  "synonyms_and_nuances": [
+    {
+      "synonym": "sinônimo",
+      "difference": "diferença prática"
+    }
+  ]
+}`;
+
+    const candidateModels = [settings.geminiModel || 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+    const apiKey = settings.geminiApiKey?.trim();
+    if (!apiKey) {
+      throw new Error('Chave Gemini API não configurada.');
+    }
+
+    let rawText = '';
+    for (const model of candidateModels) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+            },
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (rawText) break;
+        }
+      } catch (err) {
+        console.warn(`Model ${model} failed, trying next...`, err);
+      }
+    }
+
+    if (!rawText) {
+      throw new Error('Não foi possível obter resposta dos modelos Gemini.');
+    }
+
+    const cleaned = rawText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    return JSON.parse(cleaned) as WordDeepDiveData;
   }
 }

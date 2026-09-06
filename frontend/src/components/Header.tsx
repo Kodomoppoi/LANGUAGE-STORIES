@@ -7,9 +7,11 @@ import {
   Settings,
   Download,
   HelpCircle,
+  Gauge,
 } from 'lucide-react';
 import { SUPPORTED_LANGUAGES } from '../services/sampleStories';
-import { LanguageCode } from '../types';
+import { LanguageCode, ProficiencyLevel } from '../types';
+import { getProficiencyNativeInfo, getProficiencyOptions } from '../services/proficiencyUtils';
 
 export const Header: React.FC = () => {
   const {
@@ -18,6 +20,7 @@ export const Header: React.FC = () => {
     currentLanguage,
     setLanguage,
     currentProficiency,
+    setProficiency,
     settings,
     toggleTheme,
     setIsSettingsOpen,
@@ -26,6 +29,8 @@ export const Header: React.FC = () => {
   } = useApp();
 
   const langInfo = SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage);
+  const currentLevelInfo = getProficiencyNativeInfo(currentLanguage, currentProficiency);
+  const proficiencyOptions = getProficiencyOptions(currentLanguage);
 
   return (
     <header className="book-top-bar">
@@ -54,7 +59,7 @@ export const Header: React.FC = () => {
 
       {/* Right: Language Selector, Theme, Settings & Profile */}
       <div className="book-bar-right">
-        {/* Language & Level Selector Dropdown */}
+        {/* Language Selector Dropdown */}
         <div className="book-lang-picker-wrapper">
           <Globe size={14} color="var(--flower-500)" />
           <select
@@ -62,15 +67,30 @@ export const Header: React.FC = () => {
             value={currentLanguage}
             onChange={(e) => setLanguage(e.target.value as LanguageCode)}
             title={t('changeLanguage')}
-            style={{ color: '#000000', fontWeight: 700 }}
           >
             {SUPPORTED_LANGUAGES.map((lang) => (
               <option
                 key={lang.code}
                 value={lang.code}
-                style={{ color: '#000000', backgroundColor: '#ffffff', fontWeight: 600 }}
               >
-                {lang.flag} {lang.name} ({currentProficiency})
+                {lang.flag} {lang.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Dedicated Native Level / Difficulty Selector */}
+        <div className="book-level-picker-wrapper" title={`Dificuldade atual: ${currentLevelInfo.fullLabel}`}>
+          <Gauge size={14} style={{ color: currentLevelInfo.color }} />
+          <select
+            className="book-level-select"
+            value={currentProficiency}
+            onChange={(e) => setProficiency(e.target.value as ProficiencyLevel)}
+            title="Alterar nível e dificuldade da história"
+          >
+            {proficiencyOptions.map((opt) => (
+              <option key={opt.level} value={opt.level}>
+                {opt.badgeLabel}
               </option>
             ))}
           </select>

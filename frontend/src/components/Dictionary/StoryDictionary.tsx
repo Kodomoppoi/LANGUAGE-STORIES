@@ -6,6 +6,7 @@ import {
   Download,
   Upload,
   CheckCircle2,
+  Bot,
 } from 'lucide-react';
 
 interface StoryDictionaryProps {
@@ -22,6 +23,7 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
     speakSingleToken,
     exportVocabularyJson,
     importVocabularyJson,
+    openDeepDive,
     t,
   } = useApp();
 
@@ -409,15 +411,23 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
                         </div>
                       </td>
 
-                      {/* Audio Pronounce & Focus Star Action */}
+                      {/* Audio Pronounce, Deep Dive & Focus Star Action */}
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                           <button
                             className="tts-btn-icon"
                             onClick={() => speakSingleToken({ id: entry.id, text: entry.word })}
-                            title="Listen to pronunciation"
+                            title="Ouvir pronúncia"
                           >
                             <Volume2 size={15} />
+                          </button>
+                          <button
+                            className="tts-btn-icon"
+                            onClick={() => openDeepDive(entry.word, entry.exampleSentence || entry.definition || entry.translation)}
+                            title="Raio-X IA: Explicação profunda (radicais, componentes, fonética, sinônimos)"
+                            style={{ color: 'var(--flower-400)' }}
+                          >
+                            <Bot size={15} />
                           </button>
                           <button
                             className="tts-btn-icon"

@@ -78,6 +78,8 @@ def test_story_generate():
             "story_length": "standard",
             "repetition_density": "high",
             "native_lang": "Portuguese",
+            "gemini_api_key": "test_key_placeholder",
+            "gemini_model": "gemini-3.6-flash",
         },
     )
     assert res.status_code == 200
@@ -88,3 +90,31 @@ def test_story_generate():
     assert "translation_text" in story["sentences"][0]
     assert "story_dictionary" in story
     assert "paragraphs" in story
+
+
+def test_settings_endpoints():
+    # 1. Get settings
+    get_res = client.get("/api/settings")
+    assert get_res.status_code == 200
+    data = get_res.json()
+    assert "gemini_configured" in data
+    assert "gemini_model" in data
+
+    # 2. Update Gemini settings
+    post_res = client.post(
+        "/api/settings/gemini",
+        json={"gemini_api_key": "AIzaSyFakeKeyForTesting123456", "gemini_model": "gemini-3.6-flash"},
+    )
+    assert post_res.status_code == 200
+    post_data = post_res.json()
+    assert post_data["gemini_configured"] is True
+
+    # 3. Test Gemini key (fake key should return success=False gracefully without 500 error)
+    test_res = client.post(
+        "/api/settings/gemini/test",
+        json={"gemini_api_key": "AIzaSyFakeKeyForTesting123456"},
+    )
+    assert test_res.status_code == 200
+    test_data = test_res.json()
+    assert "success" in test_data
+    assert "message" in test_data

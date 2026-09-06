@@ -26,6 +26,11 @@ class GenerateStoryRequest(BaseModel):
     native_lang: Optional[str] = None
     nativeLanguage: Optional[str] = None
 
+    gemini_api_key: Optional[str] = None
+    geminiApiKey: Optional[str] = None
+    gemini_model: Optional[str] = None
+    geminiModel: Optional[str] = None
+
     def resolved_theme(self) -> str:
         val = (self.theme or self.contextTheme or "").strip()
         if not val or val.lower() in ["general", "auto", "none", "automatic", "automático"]:
@@ -43,6 +48,12 @@ class GenerateStoryRequest(BaseModel):
 
     def resolved_native_lang(self) -> str:
         return self.native_lang or self.nativeLanguage or "Portuguese"
+
+    def resolved_gemini_key(self) -> str:
+        return (self.gemini_api_key or self.geminiApiKey or "").strip()
+
+    def resolved_gemini_model(self) -> str:
+        return (self.gemini_model or self.geminiModel or "").strip()
 
 
 def _enrich_story_response(story_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -125,6 +136,14 @@ async def generate_story(
     length = req.resolved_story_length()
     rep = req.resolved_repetition_density()
     native = req.resolved_native_lang()
+    gemini_key = req.resolved_gemini_key()
+    gemini_model = req.resolved_gemini_model()
+
+    if gemini_key:
+        from ..config import settings
+        settings.gemini_api_key = gemini_key
+        if gemini_model:
+            settings.gemini_model = gemini_model
 
     # Estágio 1: Curadoria
     curated_vocab = await ai_service.curate_vocabulary_stage1(
@@ -134,6 +153,8 @@ async def generate_story(
         target_count=count,
         db=db,
         native_lang=native,
+        api_key=gemini_key,
+        model=gemini_model,
     )
 
     # Estágio 2: Geração Interlinear e Hidratação SQLite
@@ -146,6 +167,8 @@ async def generate_story(
         repetition_density=rep,
         db=db,
         native_lang=native,
+        api_key=gemini_key,
+        model=gemini_model,
     )
 
     return _enrich_story_response(story_data)
@@ -212,6 +235,14 @@ async def generate_story_stream(
     length = req.resolved_story_length()
     rep = req.resolved_repetition_density()
     native = req.resolved_native_lang()
+    gemini_key = req.resolved_gemini_key()
+    gemini_model = req.resolved_gemini_model()
+
+    if gemini_key:
+        from ..config import settings
+        settings.gemini_api_key = gemini_key
+        if gemini_model:
+            settings.gemini_model = gemini_model
 
     async def sse_event_generator():
         # 1. Início da Curadoria
@@ -224,6 +255,8 @@ async def generate_story_stream(
             target_count=count,
             db=db,
             native_lang=native,
+            api_key=gemini_key,
+            model=gemini_model,
         )
 
         words_list = [v.get("word") or v.get("lemma") for v in curated_vocab if v.get("word") or v.get("lemma")]
@@ -241,6 +274,8 @@ async def generate_story_stream(
             repetition_density=rep,
             db=db,
             native_lang=native,
+            api_key=gemini_key,
+            model=gemini_model,
         )
 
         # 3. Validação e Traços

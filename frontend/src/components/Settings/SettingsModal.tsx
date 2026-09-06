@@ -9,6 +9,9 @@ import {
   Database,
   RefreshCw,
   Globe,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 
@@ -26,6 +29,9 @@ export const SettingsModal: React.FC = () => {
   const [isTestingBackend, setIsTestingBackend] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
 
+  const [isTestingGemini, setIsTestingGemini] = useState(false);
+  const [geminiTestResult, setGeminiTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
   if (!isSettingsOpen) return null;
 
   const handleTestBackend = async () => {
@@ -35,6 +41,35 @@ export const SettingsModal: React.FC = () => {
     setIsTestingBackend(false);
     updateSettings({ isBackendConnected: isLive });
     setTestResult(isLive ? t('backendConnected') : t('backendUnreachable'));
+    if (isLive && settings.geminiApiKey?.trim()) {
+      await apiService.syncGeminiSettings(settings);
+    }
+  };
+
+  const handleTestGemini = async () => {
+    const key = settings.geminiApiKey?.trim();
+    if (!key) {
+      setGeminiTestResult({ success: false, message: 'Insira sua chave de API Gemini primeiro.' });
+      return;
+    }
+    setIsTestingGemini(true);
+    setGeminiTestResult(null);
+
+    const result = await apiService.testGeminiConnection(
+      key,
+      settings.geminiModel,
+      settings.backendUrl
+    );
+
+    setIsTestingGemini(false);
+    setGeminiTestResult({
+      success: result.success,
+      message: result.message,
+    });
+
+    if (result.success && settings.backendUrl) {
+      await apiService.syncGeminiSettings(settings);
+    }
   };
 
   const handleExportData = () => {
@@ -192,12 +227,48 @@ export const SettingsModal: React.FC = () => {
                 type="password"
                 className="control-input"
                 value={settings.geminiApiKey}
-                onChange={(e) => updateSettings({ geminiApiKey: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  updateSettings({ geminiApiKey: val });
+                  setGeminiTestResult(null);
+                }}
+                onBlur={() => {
+                  if (settings.geminiApiKey?.trim() && settings.isBackendConnected) {
+                    apiService.syncGeminiSettings(settings);
+                  }
+                }}
                 placeholder="AIzaSy..."
               />
               <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                 {t('geminiKeyDesc')}
               </span>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleTestGemini}
+                  disabled={isTestingGemini || !settings.geminiApiKey?.trim()}
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  {isTestingGemini ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} color="var(--flower-400)" />}
+                  <span>Testar Conexão Gemini</span>
+                </button>
+              </div>
+
+              {geminiTestResult && (
+                <div style={{
+                  fontSize: '0.78rem',
+                  color: geminiTestResult.success ? '#22c55e' : '#f87171',
+                  marginTop: 6,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}>
+                  {geminiTestResult.success ? <CheckCircle2 size={14} color="#22c55e" /> : <AlertCircle size={14} color="#f87171" />}
+                  <span>{geminiTestResult.message}</span>
+                </div>
+              )}
             </div>
 
             <div className="control-group">

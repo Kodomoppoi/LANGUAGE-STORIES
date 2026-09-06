@@ -22,31 +22,51 @@ def clean_json_response(raw_text: str) -> str:
 
 
 class AIService:
-    async def _call_llm(self, prompt: str) -> str:
+    async def _call_llm(
+        self,
+        prompt: str,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> str:
         """
         Executa a chamada para Gemini API ou Ollama local, com fallback defensivo.
         """
+        effective_key = (api_key or settings.gemini_api_key or "").strip()
+        effective_model = (model or settings.gemini_model or "gemini-3.6-flash").strip()
+
         # 1. Tenta Google Gemini API se houver chave configurada
-        if settings.gemini_api_key:
-            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent?key={settings.gemini_api_key}"
+        if effective_key:
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {"responseMimeType": "application/json"},
             }
-            emit_log(f"Disparando inferência no modelo {settings.gemini_model}...", level="INFO", source="GEMINI")
-            try:
-                async with httpx.AsyncClient(timeout=35.0) as client:
-                    resp = await client.post(endpoint, json=payload)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text")
-                        if text:
-                            emit_log(f"Resposta estruturada recebida da API Gemini ({len(text)} chars).", level="SUCCESS", source="GEMINI")
-                            return text
-                    else:
-                        emit_log(f"Gemini retornou status {resp.status_code}: {resp.text[:150]}", level="WARN", source="GEMINI")
-            except Exception as e:
-                emit_log(f"Falha na requisição Gemini ({e}). Tentando fallback...", level="WARN", source="GEMINI")
+            emit_log(f"Disparando inferência no modelo {effective_model} via Gemini API...", level="INFO", source="GEMINI")
+
+            candidate_models = [effective_model]
+            for alt in ["gemini-2.5-flash", "gemini-1.5-flash"]:
+                if alt not in candidate_models:
+                    candidate_models.append(alt)
+
+            for target_model in candidate_models:
+                endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model}:generateContent?key={effective_key}"
+                try:
+                    async with httpx.AsyncClient(timeout=35.0) as client:
+                        resp = await client.post(endpoint, json=payload)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text")
+                            if text:
+                                emit_log(f"Resposta estruturada recebida da API Gemini [{target_model}] ({len(text)} chars).", level="SUCCESS", source="GEMINI")
+                                return text
+                        elif resp.status_code == 404:
+                            emit_log(f"Modelo {target_model} não encontrado (404) para esta chave. Tentando modelo alternativo...", level="WARN", source="GEMINI")
+                            continue
+                        else:
+                            emit_log(f"Gemini retornou status {resp.status_code} [{target_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
+                except Exception as e:
+                    emit_log(f"Falha na requisição Gemini [{target_model}] ({e}).", level="WARN", source="GEMINI")
+        else:
+            emit_log("Chave Gemini não detectada no backend. Tentando Ollama local...", level="INFO", source="STAGE")
 
         # 2. Tenta Ollama local
         if settings.ollama_url:
@@ -61,12 +81,13 @@ class AIService:
                 async with httpx.AsyncClient(timeout=40.0) as client:
                     resp = await client.post(endpoint, json=payload)
                     if resp.status_code == 200:
+                        emit_log(f"Resposta recebida do Ollama local ({settings.ollama_model}).", level="SUCCESS", source="BACKEND")
                         return resp.json().get("response", "{}")
             except Exception as e:
                 print(f"[AIService] Ollama API error: {e}")
 
         # Se nenhum provedor LLM estiver configurado ou online, lança erro para acionar fallback
-        raise RuntimeError("Nenhum provedor de IA (Gemini ou Ollama) respondeu.")
+        raise RuntimeError("Nenhum provedor de IA (Gemini ou Ollama) respondeu. Verifique sua chave nas Configurações.")
 
     async def curate_vocabulary_stage1(
         self,
@@ -76,6 +97,8 @@ class AIService:
         target_count: int,
         db: Session,
         native_lang: str = "Portuguese",
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         ETAPA 1: Curadoria de vocabulário alvo e traços linguísticos.
@@ -113,7 +136,7 @@ class AIService:
         emit_log(f"Iniciando Etapa 1: Curadoria de vocabulário ({language.upper()} | {proficiency} | Tema: {theme_desc})", level="INFO", source="STAGE")
 
         try:
-            raw = await self._call_llm(prompt)
+            raw = await self._call_llm(prompt, api_key=api_key, model=model)
             data = json.loads(clean_json_response(raw))
             vocab = data.get("vocabulary", [])
             if isinstance(vocab, list) and len(vocab) > 0:
@@ -135,6 +158,8 @@ class AIService:
         repetition_density: str,
         db: Session,
         native_lang: str = "Portuguese",
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         ETAPA 2: Geração da narrativa interlinear, duplo dicionário e hidratação SQLite.
@@ -152,7 +177,7 @@ class AIService:
 
         story_payload = None
         try:
-            raw = await self._call_llm(prompt)
+            raw = await self._call_llm(prompt, api_key=api_key, model=model)
             data = json.loads(clean_json_response(raw))
             if "sentences" in data and len(data["sentences"]) > 0:
                 emit_log(f"Etapa 2 Concluída: História redigida com {len(data['sentences'])} pares de sentenças!", level="SUCCESS", source="STAGE")
@@ -390,6 +415,41 @@ class AIService:
             "in_vault": True,
             "is_pinned": False,
         }
+
+    async def explain_word_deep_dive(
+        self,
+        word: str,
+        language: str,
+        sentence_context: str = "",
+        proficiency: str = "A2",
+        native_lang: str = "Portuguese",
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Gera uma explicação aprofundada (Raio-X) sob demanda com anatomia de caracteres,
+        radicais, fonética, homófonos e sinônimos com limites rígidos de caracteres.
+        """
+        profile = registry.get(language)
+        emit_log(f"Iniciando Raio-X IA para o termo: '{word}' ({language.upper()} | {proficiency})", level="INFO", source="STAGE")
+
+        prompt = profile.build_deep_dive_prompt(
+            word=word,
+            sentence_context=sentence_context,
+            proficiency=proficiency,
+            native_lang=native_lang,
+        )
+
+        try:
+            raw = await self._call_llm(prompt, api_key=api_key, model=model)
+            cleaned = clean_json_response(raw)
+            data = json.loads(cleaned)
+            emit_log(f"Raio-X IA gerado com sucesso para '{word}'!", level="SUCCESS", source="STAGE")
+            return data
+        except Exception as e:
+            emit_log(f"Falha ao gerar Raio-X via IA ({e}). Usando síntese estruturada de fallback.", level="WARN", source="STAGE")
+            fallback = profile.get_deep_dive_fallback(word, proficiency, native_lang=native_lang)
+            return fallback
 
 
 ai_service = AIService()

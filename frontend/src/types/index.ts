@@ -214,3 +214,5 @@ export interface MascotState {
   };
   progress: number;
 }
+
+export * from './deepDive';

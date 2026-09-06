@@ -19,6 +19,8 @@ export class BackendProvider implements StoryGeneratorProvider {
       ...params,
       native_lang: nativeLang,
       nativeLanguage: nativeLang,
+      gemini_api_key: settings.geminiApiKey?.trim() || undefined,
+      gemini_model: settings.geminiModel || undefined,
     };
 
     const response = await fetch(`${settings.backendUrl}/api/stories/generate`, {
@@ -49,6 +51,8 @@ export class BackendProvider implements StoryGeneratorProvider {
       ...params,
       native_lang: nativeLang,
       nativeLanguage: nativeLang,
+      gemini_api_key: settings.geminiApiKey?.trim() || undefined,
+      gemini_model: settings.geminiModel || undefined,
     };
 
     const response = await fetch(streamUrl, {
