@@ -2,15 +2,22 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+import logging
 from .config import settings
 from .database import init_db
-from .routers import stories, vocabulary, tts
+from .routers import stories, vocabulary, tts, logs
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Inicializa tabelas SQLite e diretórios de cache na inicialização
     init_db()
+    # Anexa o interceptor de logs para alimentar o buffer do terminal em tempo real
+    root_logger = logging.getLogger()
+    root_logger.addHandler(logs.system_log_handler)
+    logging.getLogger("uvicorn").addHandler(logs.system_log_handler)
+    logging.getLogger("uvicorn.access").addHandler(logs.system_log_handler)
+    logs.emit_log("Servidor FastAPI iniciado com sucesso e pronto para processamento.", level="SUCCESS", source="SYSTEM")
     yield
 
 
@@ -34,6 +41,7 @@ app.add_middleware(
 app.include_router(stories.router)
 app.include_router(vocabulary.router)
 app.include_router(tts.router)
+app.include_router(logs.router)
 
 
 @app.get("/health")

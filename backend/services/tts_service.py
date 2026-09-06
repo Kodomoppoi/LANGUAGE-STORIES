@@ -2,7 +2,12 @@ import hashlib
 import os
 from pathlib import Path
 from typing import Optional
-import edge_tts
+
+try:
+    import edge_tts
+except ImportError:
+    edge_tts = None
+
 from ..config import settings
 from ..languages.registry import registry
 

@@ -58,9 +58,15 @@ class GenericLanguageProfile(LanguageProfile):
         pinned_str = ", ".join(pinned_words) if pinned_words else "None"
         review_str = ", ".join(review_words) if review_words else "None"
 
+        has_custom_theme = bool(theme and theme.strip() and theme.strip().lower() not in ["general", "auto", "none", "automatic", "automático"])
+        if has_custom_theme:
+            theme_instruction = f'Specific Theme: "{theme.strip()}". The vocabulary and pedagogical focus MUST strictly center around this theme.'
+        else:
+            theme_instruction = f'Theme: AUTOMATIC & HIGHLY DIDACTIC. Choose the most practical, pedagogically effective, and engaging everyday theme for a {proficiency} language learner (e.g. daily routine, introducing oneself, asking for help/directions, café/restaurant, hobbies, or community life).'
+
         return f"""You are an expert language curriculum designer for {self._name}.
 Proficiency Level: {proficiency}.
-Theme: "{theme}".
+{theme_instruction}
 Native Translation Language: {native_lang}.
 
 Select {target_count} target vocabulary words for this lesson.
@@ -97,8 +103,14 @@ Return strictly valid JSON only:
              for v in curated_vocab]
         )
 
+        has_custom_theme = bool(theme and theme.strip() and theme.strip().lower() not in ["general", "auto", "none", "automatic", "automático"])
+        if has_custom_theme:
+            theme_instruction = f'Specific Theme: "{theme.strip()}". The entire story plot, characters, and setting MUST strictly revolve around this theme.'
+        else:
+            theme_instruction = f'Story Theme: AUTOMATIC & HIGHLY DIDACTIC. Pick the most natural, immersive, and didactic scenario for a {proficiency} learner.'
+
         return f"""Write an engaging story in {self._name} for proficiency level {proficiency}.
-Theme: "{theme}".
+{theme_instruction}
 Native Language for Translations: {native_lang}.
 Repetition Density: {repetition_density}.
 

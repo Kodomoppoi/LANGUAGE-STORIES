@@ -27,7 +27,10 @@ class GenerateStoryRequest(BaseModel):
     nativeLanguage: Optional[str] = None
 
     def resolved_theme(self) -> str:
-        return self.theme or self.contextTheme or "General"
+        val = (self.theme or self.contextTheme or "").strip()
+        if not val or val.lower() in ["general", "auto", "none", "automatic", "automático"]:
+            return ""
+        return val
 
     def resolved_target_count(self) -> int:
         return self.target_vocab_count or self.targetVocabCount or 8
@@ -52,6 +55,7 @@ def _enrich_story_response(story_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # Cria parágrafos estruturados caso o frontend utilize tokens diretamente
     paragraphs = []
+    sentences_objects = []
     translations = []
 
     for idx, s in enumerate(sentences):
@@ -78,18 +82,23 @@ def _enrich_story_response(story_data: Dict[str, Any]) -> Dict[str, Any]:
                 "traits": matched.get("traits", {}) if matched else {},
             })
 
+        sentences_objects.append({
+            "id": f"s-{idx + 1}",
+            "text": target_text,
+            "target_text": target_text,
+            "translation": translation_text,
+            "translation_text": translation_text,
+            "tokens": tokens,
+        })
+
+    # Agrupa sentenças em parágrafos literários naturais (2 a 3 sentenças por bloco)
+    chunk_size = 2 if len(sentences_objects) <= 6 else 3
+    paragraphs = []
+    for p_idx in range(0, len(sentences_objects), chunk_size):
+        chunk = sentences_objects[p_idx:p_idx + chunk_size]
         paragraphs.append({
-            "id": f"p-{idx + 1}",
-            "sentences": [
-                {
-                    "id": f"s-{idx + 1}-1",
-                    "text": target_text,
-                    "target_text": target_text,
-                    "translation": translation_text,
-                    "translation_text": translation_text,
-                    "tokens": tokens,
-                }
-            ],
+            "id": f"p-{(p_idx // chunk_size) + 1}",
+            "sentences": chunk,
         })
 
     enriched = dict(story_data)
@@ -140,6 +149,48 @@ async def generate_story(
     )
 
     return _enrich_story_response(story_data)
+
+
+@router.get("/current")
+def get_current_story(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Retorna a história ativa atual salva no banco.
+    """
+    from ..database import StoryModel
+    story = db.query(StoryModel).order_by(StoryModel.created_at.desc()).first()
+    if not story:
+        raise HTTPException(status_code=404, detail="Nenhuma história ativa encontrada")
+
+    story_data = {
+        "id": story.id,
+        "title": story.title,
+        "title_translation": story.title_translation,
+        "language": story.language,
+        "proficiency": story.proficiency,
+        "theme": story.theme,
+        "story_length": story.story_length,
+        "repetition_density": story.repetition_density,
+        "full_text": story.full_text,
+        "sentences": story.sentences_json,
+        "story_dictionary": story.story_dictionary_json,
+        "story_translated_dictionary": story.story_translated_dict_json,
+    }
+    return _enrich_story_response(story_data)
+
+
+@router.delete("")
+def delete_all_stories(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Apaga todas as histórias do banco, preservando integralmente o vocabulário global (VocabularyModel).
+    """
+    from ..database import StoryModel
+    deleted_count = db.query(StoryModel).delete()
+    db.commit()
+    return {
+        "status": "ok",
+        "deleted_count": deleted_count,
+        "message": "Histórias temporárias apagadas com sucesso. O vocabulário global foi mantido intacto."
+    }
 
 
 @router.post("/generate/stream")

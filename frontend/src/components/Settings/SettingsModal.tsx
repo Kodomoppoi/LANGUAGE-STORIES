@@ -207,10 +207,7 @@ export const SettingsModal: React.FC = () => {
                 value={settings.geminiModel}
                 onChange={(e) => updateSettings({ geminiModel: e.target.value })}
               >
-                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fastest & Rich Structure)</option>
-                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
               </select>
             </div>
           </div>

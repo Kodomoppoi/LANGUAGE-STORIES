@@ -33,9 +33,16 @@ export class GeminiProvider implements StoryGeneratorProvider {
       intense: 'Repeat each target vocabulary word naturally at least 4 to 6 times across multiple paragraphs and dialogues for intensive immersion.',
     }[params.repetitionDensity || 'high'];
 
-    const sanitizedTheme = (params.contextTheme || 'Atmospheric Adventure & Daily Life')
-      .slice(0, 150)
-      .replace(/[\r\n]/g, ' ');
+    const hasCustomTheme = Boolean(
+      params.contextTheme &&
+      params.contextTheme.trim() &&
+      !['general', 'auto', 'none', 'automatic', 'automático'].includes(params.contextTheme.trim().toLowerCase())
+    );
+
+    const themeInstruction = hasCustomTheme
+      ? `Specific Theme: "${params.contextTheme!.trim().slice(0, 150).replace(/[\r\n]/g, ' ')}". The story plot, setting, and vocabulary MUST strictly revolve around this theme.`
+      : `Story Theme: AUTOMATIC & HIGHLY DIDACTIC. Choose the most practical, pedagogically effective, and engaging everyday scenario for a ${params.proficiency} language learner (e.g. daily routines, introducing oneself, asking for directions, café/restaurant, hobbies, or community encounters).`;
+
     const sanitizedPrompt = (params.customPrompt || '')
       .slice(0, 300)
       .replace(/[\r\n]/g, ' ');
@@ -47,7 +54,7 @@ You are an expert language pedagogue creating an interactive graded reader story
 
 Target Language: ${params.language}
 CEFR Level: ${params.proficiency}
-Theme/Context: ${sanitizedTheme}
+Theme / Pedagogical Focus: ${themeInstruction}
 Native Language (Interface Translation Language): ${targetNativeLang}
 ${sanitizedPrompt ? `Custom Topic/Instruction: ${sanitizedPrompt}` : ''}
 Story Length Requirement: ${lengthGuide}
@@ -117,7 +124,7 @@ Output ONLY valid JSON following this schema:
 }
 `;
 
-    const modelName = settings.geminiModel || 'gemini-2.5-flash';
+    const modelName = settings.geminiModel || 'gemini-3.6-flash';
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${settings.geminiApiKey}`;
 
     const response = await fetch(endpoint, {

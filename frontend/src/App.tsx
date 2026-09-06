@@ -7,6 +7,7 @@ import { StoryDictionary } from './components/Dictionary/StoryDictionary';
 import { RetentionQuiz } from './components/Quiz/RetentionQuiz';
 import { SettingsModal } from './components/Settings/SettingsModal';
 import { StoryGenerationMascot } from './components/Mascot/StoryGenerationMascot';
+import { TerminalDrawer } from './components/Terminal/TerminalDrawer';
 
 export const App: React.FC = () => {
   const { activeTab } = useApp();
@@ -36,6 +37,7 @@ export const App: React.FC = () => {
       <RetentionQuiz />
       <SettingsModal />
       <StoryGenerationMascot />
+      <TerminalDrawer />
     </div>
   );
 };

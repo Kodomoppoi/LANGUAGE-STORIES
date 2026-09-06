@@ -9,6 +9,7 @@ from ..config import settings
 from ..database import StoryModel, VocabularyModel
 from ..languages.registry import registry
 from .srs_engine import get_status_info
+from ..routers.logs import emit_log
 
 
 def clean_json_response(raw_text: str) -> str:
@@ -32,6 +33,7 @@ class AIService:
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {"responseMimeType": "application/json"},
             }
+            emit_log(f"Disparando inferência no modelo {settings.gemini_model}...", level="INFO", source="GEMINI")
             try:
                 async with httpx.AsyncClient(timeout=35.0) as client:
                     resp = await client.post(endpoint, json=payload)
@@ -39,9 +41,12 @@ class AIService:
                         data = resp.json()
                         text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text")
                         if text:
+                            emit_log(f"Resposta estruturada recebida da API Gemini ({len(text)} chars).", level="SUCCESS", source="GEMINI")
                             return text
+                    else:
+                        emit_log(f"Gemini retornou status {resp.status_code}: {resp.text[:150]}", level="WARN", source="GEMINI")
             except Exception as e:
-                print(f"[AIService] Gemini API error: {e}. Trying Ollama fallback...")
+                emit_log(f"Falha na requisição Gemini ({e}). Tentando fallback...", level="WARN", source="GEMINI")
 
         # 2. Tenta Ollama local
         if settings.ollama_url:
@@ -104,14 +109,18 @@ class AIService:
             native_lang=native_lang,
         )
 
+        theme_desc = f'"{theme}"' if theme and theme.strip() else 'Automático (mais didático)'
+        emit_log(f"Iniciando Etapa 1: Curadoria de vocabulário ({language.upper()} | {proficiency} | Tema: {theme_desc})", level="INFO", source="STAGE")
+
         try:
             raw = await self._call_llm(prompt)
             data = json.loads(clean_json_response(raw))
             vocab = data.get("vocabulary", [])
             if isinstance(vocab, list) and len(vocab) > 0:
+                emit_log(f"Etapa 1 Concluída: {len(vocab)} termos alvo curados com sucesso.", level="SUCCESS", source="STAGE")
                 return vocab
         except Exception as e:
-            print(f"[AIService] Erro na Etapa 1 ({e}), usando fallback inteligente do perfil.")
+            emit_log(f"Erro na Etapa 1 ({e}). Usando perfil inteligente de fallback.", level="WARN", source="STAGE")
 
         sample = profile.get_sample_data(proficiency, theme, native_lang=native_lang)
         return sample.get("story_dictionary", [])
@@ -130,6 +139,7 @@ class AIService:
         """
         ETAPA 2: Geração da narrativa interlinear, duplo dicionário e hidratação SQLite.
         """
+        emit_log(f"Iniciando Etapa 2: Redigindo narrativa interlinear com {len(curated_vocab)} termos alvo...", level="INFO", source="STAGE")
         profile = registry.get(language)
         prompt = profile.build_story_prompt(
             curated_vocab=curated_vocab,
@@ -145,9 +155,10 @@ class AIService:
             raw = await self._call_llm(prompt)
             data = json.loads(clean_json_response(raw))
             if "sentences" in data and len(data["sentences"]) > 0:
+                emit_log(f"Etapa 2 Concluída: História redigida com {len(data['sentences'])} pares de sentenças!", level="SUCCESS", source="STAGE")
                 story_payload = data
         except Exception as e:
-            print(f"[AIService] Erro na Etapa 2 ({e}), usando modelo de fallback garantido.")
+            emit_log(f"Erro na Etapa 2 ({e}). Usando modelo literário de contingência.", level="WARN", source="STAGE")
 
         if not story_payload:
             story_payload = profile.get_sample_data(proficiency, theme, native_lang=native_lang)
@@ -238,8 +249,20 @@ class AIService:
 
         db.commit()
 
-        # Constrói o texto completo concatenado para exibição/fallback
-        full_text = "\n\n".join([s["target_text"] for s in sentences_normalized])
+        # Constrói o texto completo concatenado com parágrafos literários naturais
+        para_chunks = []
+        c_size = 2 if len(sentences_normalized) <= 6 else 3
+        for i in range(0, len(sentences_normalized), c_size):
+            chunk_s = sentences_normalized[i:i + c_size]
+            join_char = "" if any("\u4e00" <= c <= "\u9fff" for c in "".join(s["target_text"] for s in chunk_s)) else " "
+            para_chunks.append(join_char.join([s["target_text"] for s in chunk_s]))
+        full_text = "\n\n".join(para_chunks)
+
+        # Regra de ciclo de vida: Ao gerar uma nova história, todas as histórias anteriores
+        # (textos, traduções e glossários temporários) são apagadas do banco.
+        # A ÚNICA coisa preservada e acumulada é o vocabulário global (VocabularyModel).
+        db.query(StoryModel).delete()
+        db.commit()
 
         story_record = StoryModel(
             title=story_payload.get("title", "História"),

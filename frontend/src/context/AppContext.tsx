@@ -33,6 +33,7 @@ import {
 import { ttsService } from '../services/ttsService';
 import { apiService } from '../services/apiService';
 import { storageService } from '../services/storageService';
+import { logService } from '../services/logService';
 import { getTranslation, TranslationKey } from '../services/i18n';
 import { localizeStory } from '../services/storyLocalization';
 
@@ -89,9 +90,15 @@ interface AppContextType {
   setIsQuizOpen: (open: boolean) => void;
   submitQuiz: (scoreQuality: number, targetWordIds: string[]) => void;
 
-  // Modals
+  // Modals & Panels
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
+  isTerminalOpen: boolean;
+  setIsTerminalOpen: (open: boolean) => void;
+
+  // Custom Story Theme (Bottom Dock)
+  customStoryTheme: string;
+  setCustomStoryTheme: (theme: string) => void;
 
   // Generator Actions (Sidebar)
   generateNewStory: (contextTheme?: string, customPrompt?: string) => Promise<void>;
@@ -113,7 +120,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   uiLanguage: 'pt', // Default interface language: Portuguese (BR)
   apiProvider: 'hybrid',
   geminiApiKey: '',
-  geminiModel: 'gemini-2.5-flash',
+  geminiModel: 'gemini-3.6-flash',
   ollamaUrl: 'http://localhost:11434',
   ollamaModel: 'llama3.2',
   backendUrl: 'http://localhost:8000',
@@ -151,6 +158,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   );
   const [activeTab, setActiveTab] = useState<ActiveTab>('story');
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  const [customStoryTheme, setCustomStoryTheme] = useState('');
 
   // Popover Token state
   const [activeToken, setActiveToken] = useState<StoryToken | null>(null);
@@ -168,9 +177,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const cancelGeneration = useCallback(() => {
     setIsGeneratingStory(false);
     setMascotState((prev) => ({ ...prev, isActive: false }));
+    logService.addLog('WARN', 'FRONTEND', 'Geração da história cancelada pelo usuário.');
   }, []);
 
   const handleSSEEvent = useCallback((event: SSEGenerationEvent) => {
+    if (event.data?.message) {
+      logService.addLog('INFO', 'STAGE', `[Etapa SSE] ${event.data.message}`);
+    }
     switch (event.event) {
       case 'stage_start:curation':
         setMascotState({
@@ -608,6 +621,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const generateNewStory = useCallback(
     async (contextTheme?: string, customPrompt?: string) => {
       setIsGeneratingStory(true);
+      const effectiveTheme = contextTheme !== undefined ? contextTheme : (customStoryTheme.trim() || undefined);
+      logService.addLog(
+        'INFO',
+        'FRONTEND',
+        `Disparando geração (${currentLanguage.toUpperCase()} - ${currentProficiency}). Tema: ${effectiveTheme || 'Automático (mais didático)'}`
+      );
       try {
         const langVaultWords = vocabularyVault.filter((v) => v.language === currentLanguage);
 
@@ -624,7 +643,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           {
             language: currentLanguage,
             proficiency: currentProficiency,
-            contextTheme,
+            contextTheme: effectiveTheme,
             customPrompt,
             targetWords: prioritizedTargetWords.length > 0 ? prioritizedTargetWords : undefined,
             existingDictionary: langVaultWords.slice(0, 15),
@@ -636,17 +655,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         );
 
         setCurrentStory(newStory);
+        logService.addLog(
+          'SUCCESS',
+          'FRONTEND',
+          `História "${newStory.title}" recebida com sucesso (${newStory.paragraphs.length} parágrafos, ${newStory.targetVocabulary.length} vocábulos)!`
+        );
         setUserStats((prev) => ({
           ...prev,
           totalStoriesRead: prev.totalStoriesRead + 1,
         }));
       } catch (err) {
+        logService.addLog('ERROR', 'FRONTEND', `Erro na geração da história: ${err instanceof Error ? err.message : String(err)}`);
         console.error('Failed to generate story:', err);
       } finally {
         setIsGeneratingStory(false);
       }
     },
-    [currentLanguage, currentProficiency, settings, vocabularyVault, handleSSEEvent]
+    [currentLanguage, currentProficiency, settings, vocabularyVault, handleSSEEvent, customStoryTheme]
   );
 
   const generateWithSameDictionary = useCallback(async () => {
@@ -676,13 +701,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const increaseDictionaryAndGenerate = useCallback(
     async (numNewWords: number) => {
       setIsGeneratingStory(true);
+      const themeSuffix = customStoryTheme.trim() ? ` - Tema: ${customStoryTheme.trim()}` : '';
+      logService.addLog('INFO', 'FRONTEND', `Injetando +${numNewWords} palavras no vocabulário e gerando nova história${themeSuffix}...`);
       try {
         const langVaultWords = vocabularyVault.filter((v) => v.language === currentLanguage);
         const newStory = await apiService.generateStoryStream(
           {
             language: currentLanguage,
             proficiency: currentProficiency,
-            contextTheme: `Expanded Story (+${numNewWords} words)`,
+            contextTheme: customStoryTheme.trim() ? customStoryTheme.trim() : `Expanded Story (+${numNewWords} words)`,
             existingDictionary: langVaultWords.length > 0 ? langVaultWords.slice(0, 15) : currentStory.targetVocabulary,
             injectNewWordsCount: numNewWords,
             storyLength: settings.storyLength,
@@ -692,13 +719,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           handleSSEEvent
         );
         setCurrentStory(newStory);
+        logService.addLog('SUCCESS', 'FRONTEND', `História expandida gerada com sucesso (+${numNewWords} palavras inseridas)!`);
       } catch (err) {
+        logService.addLog('ERROR', 'FRONTEND', `Erro ao injetar palavras: ${err instanceof Error ? err.message : String(err)}`);
         console.error('Failed to increase dictionary and generate:', err);
       } finally {
         setIsGeneratingStory(false);
       }
     },
-    [currentLanguage, currentProficiency, currentStory, settings, vocabularyVault, handleSSEEvent]
+    [currentLanguage, currentProficiency, currentStory, settings, vocabularyVault, handleSSEEvent, customStoryTheme]
   );
 
   const submitQuiz = useCallback(
@@ -754,6 +783,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         submitQuiz,
         isSettingsOpen,
         setIsSettingsOpen,
+        isTerminalOpen,
+        setIsTerminalOpen,
+        customStoryTheme,
+        setCustomStoryTheme,
         generateNewStory,
         generateWithSameDictionary,
         increaseDictionaryAndGenerate,

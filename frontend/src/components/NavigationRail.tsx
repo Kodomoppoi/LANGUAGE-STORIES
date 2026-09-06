@@ -8,6 +8,7 @@ import {
   Settings,
   RotateCcw,
   Sparkles,
+  Terminal,
 } from 'lucide-react';
 
 export const NavigationRail: React.FC = () => {
@@ -15,8 +16,11 @@ export const NavigationRail: React.FC = () => {
     activeTab,
     setActiveTab,
     setIsSettingsOpen,
+    isTerminalOpen,
+    setIsTerminalOpen,
     vocabularyVault,
     currentLanguage,
+    t,
   } = useApp();
 
   const starredCount = vocabularyVault.filter(
@@ -62,6 +66,15 @@ export const NavigationRail: React.FC = () => {
         >
           <Star size={20} />
           {starredCount > 0 && <span className="nav-badge-dot" />}
+        </button>
+
+        {/* Real-time Debug Terminal */}
+        <button
+          className={`nav-rail-btn ${isTerminalOpen ? 'active-pill' : ''}`}
+          onClick={() => setIsTerminalOpen(!isTerminalOpen)}
+          title={t('terminalTooltip')}
+        >
+          <Terminal size={20} />
         </button>
 
         {/* Profile / Stats */}

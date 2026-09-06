@@ -13,7 +13,14 @@ export class StorageService {
   public loadSettings(defaultSettings: AppSettings): AppSettings {
     try {
       const saved = localStorage.getItem(KEYS.SETTINGS);
-      return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (!parsed.geminiModel || parsed.geminiModel !== 'gemini-3.6-flash') {
+          parsed.geminiModel = 'gemini-3.6-flash';
+        }
+        return { ...defaultSettings, ...parsed };
+      }
+      return defaultSettings;
     } catch {
       return defaultSettings;
     }

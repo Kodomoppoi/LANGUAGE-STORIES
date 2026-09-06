@@ -115,7 +115,7 @@ export const Sidebar: React.FC = () => {
                 {settings.isBackendConnected
                   ? 'FastAPI Backend Live'
                   : settings.geminiApiKey
-                  ? 'Gemini 2.5 Flash'
+                  ? 'Gemini 3.6 Flash'
                   : 'Smart Procedural Offline'}
               </span>
             </div>

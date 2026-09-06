@@ -31,6 +31,8 @@ export const StoryReader: React.FC = () => {
     generateNewStory,
     increaseDictionaryAndGenerate,
     isGeneratingStory,
+    customStoryTheme,
+    setCustomStoryTheme,
     isPlayingAudio,
     playStoryAudio,
     pauseStoryAudio,
@@ -41,6 +43,7 @@ export const StoryReader: React.FC = () => {
   const [currentSpread, setCurrentSpread] = useState(0);
   const [showTranslations, setShowTranslations] = useState(false);
   const [newWordQuantity, setNewWordQuantity] = useState(5);
+  const [isThemePopoverOpen, setIsThemePopoverOpen] = useState(false);
 
   const langInfo = SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage);
 
@@ -76,33 +79,111 @@ export const StoryReader: React.FC = () => {
     }));
   }, [currentStory]);
 
-  // Distribute paragraphs into spreads of 2 pages (Left & Right)
+  // Intelligent content-aware book pagination:
+  // Balances paragraphs & sentences across 2-page spreads to eliminate empty or starved pages
   const spreads = useMemo(() => {
-    const totalParas = paragraphsWithIndices.length;
-    if (totalParas <= 2) {
+    const paras = paragraphsWithIndices;
+    if (!paras || paras.length === 0) {
+      return [{ left: [], right: [] }];
+    }
+
+    // Special case: Single paragraph with multiple sentences -> split across left and right
+    if (paras.length === 1) {
+      const sentences = paras[0].sentencesWithIndices;
+      if (sentences.length >= 2) {
+        const mid = Math.ceil(sentences.length / 2);
+        return [
+          {
+            left: [
+              {
+                ...paras[0],
+                id: `${paras[0].id}-left`,
+                sentencesWithIndices: sentences.slice(0, mid),
+              },
+            ],
+            right: [
+              {
+                ...paras[0],
+                id: `${paras[0].id}-right`,
+                sentencesWithIndices: sentences.slice(mid),
+              },
+            ],
+          },
+        ];
+      }
+      return [{ left: [paras[0]], right: [] }];
+    }
+
+    // Count total sentences
+    const totalSentences = paras.reduce((acc, p) => acc + p.sentencesWithIndices.length, 0);
+
+    // If story is compact (<= 4 paragraphs AND <= 8 sentences),
+    // present the entire story across 1 single, beautifully balanced 2-page spread!
+    if (paras.length <= 4 && totalSentences <= 8) {
+      // Left page has title header (~120px), so it takes slightly fewer or equal paragraphs
+      const leftCount = Math.max(1, Math.floor(paras.length / 2));
       return [
         {
-          left: [paragraphsWithIndices[0]].filter(Boolean),
-          right: [paragraphsWithIndices[1]].filter(Boolean),
+          left: paras.slice(0, leftCount),
+          right: paras.slice(leftCount),
         },
       ];
     }
 
-    const pagesPerSpread = 2;
-    // Calculate how many paragraphs per page
-    const parasPerPage = Math.max(1, Math.ceil(totalParas / (Math.ceil(totalParas / 2) * 2)));
-    const spreadList: { left: typeof paragraphsWithIndices; right: typeof paragraphsWithIndices }[] = [];
+    // For larger stories, compute optimal number of 2-page spreads
+    // Target ~3-4 sentences per page (approx. 6-8 sentences per spread)
+    const targetSentencesPerSpread = 7;
+    const computedSpreads = Math.ceil(totalSentences / targetSentencesPerSpread);
+    // Don't create more spreads than we have paragraphs / 2 (ensures pages have at least 1 paragraph)
+    const numSpreads = Math.max(1, Math.min(computedSpreads, Math.floor(paras.length / 2)));
+    const totalPages = numSpreads * 2;
 
-    for (let i = 0; i < totalParas; i += pagesPerSpread) {
+    // Distribute paragraphs across totalPages using weight-balanced partition
+    // Ensures EVERY page gets at least 1 paragraph (since paras.length >= totalPages)
+    const pages: (typeof paragraphsWithIndices)[] = [];
+    const weights = paras.map((p) => Math.max(1, p.sentencesWithIndices.length));
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    const avgWeightPerPage = totalWeight / totalPages;
+
+    let currentIdx = 0;
+    for (let pIdx = 0; pIdx < totalPages; pIdx++) {
+      const remainingPages = totalPages - pIdx;
+      if (remainingPages === 1) {
+        pages.push(paras.slice(currentIdx));
+        break;
+      }
+
+      // We must leave at least 1 paragraph for each remaining page
+      const maxAllowedIdx = paras.length - (remainingPages - 1);
+      let bestEnd = currentIdx + 1;
+      let accumWeight = weights[currentIdx];
+      let bestDiff = Math.abs(accumWeight - avgWeightPerPage);
+
+      for (let testEnd = currentIdx + 2; testEnd <= maxAllowedIdx; testEnd++) {
+        accumWeight += weights[testEnd - 1];
+        const diff = Math.abs(accumWeight - avgWeightPerPage);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestEnd = testEnd;
+        } else {
+          break;
+        }
+      }
+
+      pages.push(paras.slice(currentIdx, bestEnd));
+      currentIdx = bestEnd;
+    }
+
+    // Pair into Left and Right pages for each spread
+    const spreadList: { left: typeof paragraphsWithIndices; right: typeof paragraphsWithIndices }[] = [];
+    for (let i = 0; i < pages.length; i += 2) {
       spreadList.push({
-        left: [paragraphsWithIndices[i]].filter(Boolean),
-        right: [paragraphsWithIndices[i + 1]].filter(Boolean),
+        left: pages[i] || [],
+        right: pages[i + 1] || [],
       });
     }
 
-    return spreadList.length > 0
-      ? spreadList
-      : [{ left: paragraphsWithIndices, right: [] }];
+    return spreadList.length > 0 ? spreadList : [{ left: paras, right: [] }];
   }, [paragraphsWithIndices]);
 
   // Auto-flip spread if TTS is reading a sentence on the next spread
@@ -308,35 +389,46 @@ export const StoryReader: React.FC = () => {
                 {activeSpreadData?.right.length > 0 ? (
                   activeSpreadData.right.map(renderParagraph)
                 ) : (
-                  <div className="book-empty-page-placeholder">
-                    <Sparkles size={20} color="var(--flower-400)" />
-                    <p>{t('endOfNarrative')}</p>
+                  <div className="book-colophon-placeholder">
+                    <div className="book-fleuron-ornament">✦ ❦ ✦</div>
+                    <div className="book-colophon-badge">
+                      <Sparkles size={24} color="var(--flower-500)" />
+                    </div>
+                    <h4 className="book-colophon-title">{currentStory.title}</h4>
+                    <p className="book-colophon-desc">{t('endOfNarrative')}</p>
                   </div>
                 )}
               </div>
 
               {/* Retention mini-quiz banner on the last spread */}
               {isLastSpread && (
-                <div className="book-end-quiz-banner">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div className="book-quiz-icon-badge">
-                      <CheckCircle size={16} />
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.86rem' }}>
-                        {t('readingComplete')}
-                      </div>
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                        {t('readingCompleteSub')}
-                      </div>
-                    </div>
+                <div className="book-end-section-container">
+                  <div className="book-story-tailpiece" aria-hidden="true">
+                    <span>❧</span>
+                    <span>❦</span>
+                    <span>❧</span>
                   </div>
-                  <button
-                    className="book-quiz-trigger-btn"
-                    onClick={() => setIsQuizOpen(true)}
-                  >
-                    {t('startMiniQuiz')}
-                  </button>
+                  <div className="book-end-quiz-banner">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div className="book-quiz-icon-badge">
+                        <CheckCircle size={16} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.86rem' }}>
+                          {t('readingComplete')}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--page-text-muted)' }}>
+                          {t('readingCompleteSub')}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      className="book-quiz-trigger-btn"
+                      onClick={() => setIsQuizOpen(true)}
+                    >
+                      {t('startMiniQuiz')}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -399,6 +491,112 @@ export const StoryReader: React.FC = () => {
               <span className="dock-toggle-thumb" />
             )}
           </button>
+        </div>
+
+        {/* Story Theme Selector / Popover Tab */}
+        <div className="dock-control-item dock-theme-container">
+          <button
+            className={`dock-chip-btn dock-theme-btn ${customStoryTheme.trim() ? 'active' : ''}`}
+            onClick={() => setIsThemePopoverOpen((prev) => !prev)}
+            title={t('themeTooltip')}
+          >
+            <Sparkles size={13} color="var(--flower-400)" />
+            <span>
+              {t('themeLabel')}: {customStoryTheme.trim() ? `"${customStoryTheme.trim().slice(0, 12)}${customStoryTheme.trim().length > 12 ? '...' : ''}"` : t('themeAutomatic')}
+            </span>
+          </button>
+
+          {isThemePopoverOpen && (
+            <div className="dock-theme-popover">
+              <div className="dock-theme-popover-header">
+                <span className="dock-theme-popover-title">{t('themeCustomTitle')}</span>
+                <button
+                  type="button"
+                  className="dock-theme-close-btn"
+                  onClick={() => setIsThemePopoverOpen(false)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="dock-theme-input-wrap">
+                <input
+                  type="text"
+                  className="dock-theme-input"
+                  placeholder={t('themePlaceholder')}
+                  value={customStoryTheme}
+                  onChange={(e) => setCustomStoryTheme(e.target.value)}
+                  autoFocus
+                />
+                {customStoryTheme && (
+                  <button
+                    type="button"
+                    className="dock-theme-clear-btn"
+                    onClick={() => setCustomStoryTheme('')}
+                    title={t('themeClear')}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="dock-theme-presets">
+                <span className="dock-theme-presets-label">Sugestões rápidas:</span>
+                <div className="dock-theme-presets-list">
+                  <button
+                    type="button"
+                    className="dock-theme-preset-tag"
+                    onClick={() => setCustomStoryTheme('')}
+                  >
+                    ✨ {t('themeAutomatic')}
+                  </button>
+                  <button
+                    type="button"
+                    className="dock-theme-preset-tag"
+                    onClick={() => setCustomStoryTheme('Café e Conversa')}
+                  >
+                    ☕ Café & Conversa
+                  </button>
+                  <button
+                    type="button"
+                    className="dock-theme-preset-tag"
+                    onClick={() => setCustomStoryTheme('Viagem de Trem')}
+                  >
+                    🚆 Viagem de Trem
+                  </button>
+                  <button
+                    type="button"
+                    className="dock-theme-preset-tag"
+                    onClick={() => setCustomStoryTheme('Feira e Culinária')}
+                  >
+                    🍜 Feira & Comida
+                  </button>
+                  <button
+                    type="button"
+                    className="dock-theme-preset-tag"
+                    onClick={() => setCustomStoryTheme('Mistério Leve')}
+                  >
+                    🔍 Mistério Leve
+                  </button>
+                </div>
+              </div>
+
+              <div className="dock-theme-footer">
+                <span className="dock-theme-hint">
+                  {customStoryTheme.trim()
+                    ? 'A próxima história gerada seguirá este tema.'
+                    : 'Deixe em branco para tema didático automático.'}
+                </span>
+                <button
+                  type="button"
+                  className="dock-theme-apply-btn"
+                  onClick={() => setIsThemePopoverOpen(false)}
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="dock-separator" />

@@ -27,9 +27,15 @@ class ChineseProfile(LanguageProfile):
         pinned_str = ", ".join(pinned_words) if pinned_words else "None"
         review_str = ", ".join(review_words) if review_words else "None"
 
+        has_custom_theme = bool(theme and theme.strip() and theme.strip().lower() not in ["general", "auto", "none", "automatic", "automático"])
+        if has_custom_theme:
+            theme_instruction = f'Specific Theme: "{theme.strip()}". The vocabulary and pedagogical focus MUST strictly center around this theme.'
+        else:
+            theme_instruction = f'Theme: AUTOMATIC & HIGHLY DIDACTIC. Choose the most practical, pedagogically effective everyday theme for a {proficiency} (HSK) learner (e.g. coffee shop, train journey, making friends, ordering food, or city life).'
+
         return f"""You are an expert curriculum designer for Mandarin Chinese (HSK framework).
 Target Proficiency: {proficiency} (HSK 1-6).
-Theme: "{theme}".
+{theme_instruction}
 Native Translation Language: {native_lang}.
 
 Task:
@@ -88,9 +94,15 @@ Return strictly valid JSON only:
             "epic": 20,
         }.get(story_length, 8)
 
+        has_custom_theme = bool(theme and theme.strip() and theme.strip().lower() not in ["general", "auto", "none", "automatic", "automático"])
+        if has_custom_theme:
+            theme_instruction = f'Specific Theme: "{theme.strip()}". The entire story plot, characters, and dialogues MUST strictly revolve around this theme.'
+        else:
+            theme_instruction = f'Story Theme: AUTOMATIC & HIGHLY DIDACTIC. Pick the most natural, immersive, and didactic everyday scenario for an HSK {proficiency} learner.'
+
         return f"""You are a master storyteller and Mandarin pedagogy author.
 Write an engaging, culturally authentic story in Simplified Mandarin Chinese tailored for proficiency level {proficiency}.
-Theme: "{theme}".
+{theme_instruction}
 Target Length: Approximately {num_sentences} sentence pairs.
 Native Language for Translations: {native_lang}.
 Repetition Density: {repetition_density} (Each target word MUST appear naturally 2 to 4 times across the text).

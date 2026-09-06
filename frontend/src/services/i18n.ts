@@ -392,6 +392,68 @@ export const TRANSLATIONS = {
     en: 'Cancel generation',
     pt: 'Cancelar geração',
   },
+
+  // Terminal Drawer & Theme Controls
+  terminalTitle: {
+    en: 'Real-time Process Terminal',
+    pt: 'Terminal de Processamento em Tempo Real',
+  },
+  terminalTooltip: {
+    en: 'Real-time Terminal (Troubleshoot & Logs)',
+    pt: 'Terminal em Tempo Real (Logs e Diagnóstico)',
+  },
+  terminalClear: {
+    en: 'Clear',
+    pt: 'Limpar',
+  },
+  terminalCopy: {
+    en: 'Copy Logs',
+    pt: 'Copiar Logs',
+  },
+  terminalCopied: {
+    en: 'Copied!',
+    pt: 'Copiado!',
+  },
+  terminalFilterAll: {
+    en: 'All',
+    pt: 'Todos',
+  },
+  terminalFilterBackend: {
+    en: 'Backend',
+    pt: 'Backend',
+  },
+  terminalFilterFrontend: {
+    en: 'Frontend',
+    pt: 'Frontend',
+  },
+  terminalFilterErrors: {
+    en: 'Errors',
+    pt: 'Erros',
+  },
+  themeLabel: {
+    en: 'Theme',
+    pt: 'Tema',
+  },
+  themeTooltip: {
+    en: 'Change story theme (leave blank for automatic didactic choice)',
+    pt: 'Mudar tema da história (em branco para tema didático automático)',
+  },
+  themePlaceholder: {
+    en: 'Automatic (most didactic)...',
+    pt: 'Automático (mais didático)...',
+  },
+  themeAutomatic: {
+    en: 'Automatic',
+    pt: 'Automático',
+  },
+  themeClear: {
+    en: 'Clear (Auto)',
+    pt: 'Limpar (Auto)',
+  },
+  themeCustomTitle: {
+    en: 'Story Theme & Context',
+    pt: 'Tema e Contexto da História',
+  },
 } as const;
 
 export type TranslationKey = keyof typeof TRANSLATIONS;
