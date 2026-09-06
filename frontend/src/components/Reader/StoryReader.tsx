@@ -19,6 +19,15 @@ import { SUPPORTED_LANGUAGES } from '../../services/sampleStories';
 import { StoryToken, SRSStage, StoryParagraph, StorySentence, DictionaryEntry } from '../../types';
 import { getProficiencyNativeInfo, getProficiencyOptions } from '../../services/proficiencyUtils';
 
+const WELCOME_THEMES = [
+  { icon: '☕', label: 'Café Matinal', text: 'Uma conversa tranquila em uma cafeteria charmosa' },
+  { icon: '🏮', label: 'Festival de Rua', text: 'Cores, comidas e lanternas em uma noite festiva' },
+  { icon: '🚆', label: 'Viagem de Trem', text: 'Um passageiro viajando de trem descobrindo novas cidades' },
+  { icon: '🐈', label: 'Gato Curioso', text: 'Um gato curioso que entra em uma antiga livraria' },
+  { icon: '🍜', label: 'Restaurante Local', text: 'Pedindo comida deliciosa em um restaurante tradicional' },
+  { icon: '🌿', label: 'Passeio no Parque', text: 'Um passeio relaxante sob as árvores em um dia ensolarado' },
+];
+
 export const StoryReader: React.FC = () => {
   const {
     currentStory,
@@ -54,6 +63,9 @@ export const StoryReader: React.FC = () => {
   const currentLevelInfo = getProficiencyNativeInfo(currentLanguage, currentProficiency);
   const difficultyOptions = getProficiencyOptions(currentLanguage);
 
+  const isWelcomeState =
+    currentStory.id === 'welcome' || !currentStory.paragraphs || currentStory.paragraphs.length === 0;
+
   // Reset page spread when story changes
   useEffect(() => {
     setCurrentSpread(0);
@@ -77,9 +89,9 @@ export const StoryReader: React.FC = () => {
   // Pre-calculate flattened sentence indices purely for stable speech sync
   const paragraphsWithIndices = useMemo(() => {
     let counter = 0;
-    return currentStory.paragraphs.map((p) => ({
+    return (currentStory.paragraphs || []).map((p) => ({
       ...p,
-      sentencesWithIndices: p.sentences.map((s) => ({
+      sentencesWithIndices: (p.sentences || []).map((s) => ({
         ...s,
         globalIndex: counter++,
       })),
@@ -337,33 +349,92 @@ export const StoryReader: React.FC = () => {
             </header>
 
             <div className="page-inner-content">
-              {/* Story Title displayed on the first left page */}
-              {isFirstSpread && (
-                <header className="book-story-title-header">
-                  <div className="book-fleuron-ornament">❧ ❦ ❧</div>
-                  <h2 className="book-title-heading">{currentStory.title}</h2>
-                  {currentStory.titleTranslation && (
-                    <div
-                      className={`book-title-subheading ${
-                        showTranslations ? 'highlighted-translation' : ''
-                      }`}
-                    >
-                      {showTranslations && (
-                        <span className="sentence-translation-marker" style={{ marginRight: '6px' }}>
-                          {t('translationPrefix')}
-                        </span>
-                      )}
-                      {currentStory.titleTranslation}
+              {isWelcomeState ? (
+                <div className="book-welcome-container">
+                  <div>
+                    <div className="book-fleuron-ornament">❧ ❦ ❧</div>
+                    <h2 className="book-title-heading" style={{ fontSize: '1.45rem', marginBottom: '6px' }}>
+                      {settings.uiLanguage === 'pt' ? 'Bem-vindo ao Language Stories' : 'Welcome to Language Stories'}
+                    </h2>
+                    <div className="book-title-subheading" style={{ fontSize: '0.9rem', marginBottom: '16px' }}>
+                      {settings.uiLanguage === 'pt'
+                        ? 'Sua jornada de aprendizado imersivo começa aqui'
+                        : 'Your immersive language learning journey starts here'}
                     </div>
-                  )}
-                  <div className="book-title-divider" />
-                </header>
-              )}
+                    <div className="book-title-divider" style={{ margin: '0 auto 16px' }} />
 
-              {/* Paragraphs rendered on left page */}
-              <div className="book-page-paragraphs">
-                {activeSpreadData?.left.map(renderParagraph)}
-              </div>
+                    <div className="book-welcome-description">
+                      <p>
+                        {settings.uiLanguage === 'pt'
+                          ? 'O Language Stories gera narrativas originais sob medida para o seu nível de compreensão. Aprenda naturalmente através de repetição contextual, áudio sincronizado e consultas instantâneas de vocabulário.'
+                          : 'Language Stories generates custom narratives tailored to your comprehension level. Learn naturally through contextual repetition, synchronized audio, and instant vocabulary lookups.'}
+                      </p>
+                    </div>
+
+                    <div className="book-welcome-features-list">
+                      <div className="book-welcome-feature-item">
+                        <span className="welcome-feature-icon">📖</span>
+                        <div className="welcome-feature-text">
+                          <strong>{settings.uiLanguage === 'pt' ? 'Vocabulário Ativo & SRS' : 'Target Vocabulary & SRS'}</strong>
+                          <span>{settings.uiLanguage === 'pt' ? 'Palavras-chave repetidas naturalmente em contexto' : 'Key words repeated naturally in context'}</span>
+                        </div>
+                      </div>
+                      <div className="book-welcome-feature-item">
+                        <span className="welcome-feature-icon">🔊</span>
+                        <div className="welcome-feature-text">
+                          <strong>{settings.uiLanguage === 'pt' ? 'Áudio Nativo Sincronizado' : 'Native Synchronized Audio'}</strong>
+                          <span>{settings.uiLanguage === 'pt' ? 'Acompanhamento frase a frase em tempo real' : 'Real-time sentence-by-sentence read aloud'}</span>
+                        </div>
+                      </div>
+                      <div className="book-welcome-feature-item">
+                        <span className="welcome-feature-icon">🔍</span>
+                        <div className="welcome-feature-text">
+                          <strong>{settings.uiLanguage === 'pt' ? 'Dicionário & Raio-X' : 'Dictionary & Deep Dive'}</strong>
+                          <span>{settings.uiLanguage === 'pt' ? 'Traduções, fonética e análise morfológica instantânea' : 'Translations, phonetics, and instant morphological breakdown'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="book-welcome-lang-badge">
+                    <span className="welcome-badge-flag">{langInfo?.flag || '🌐'}</span>
+                    <div className="welcome-badge-info">
+                      <span className="welcome-badge-title">{langInfo?.name || currentLanguage}</span>
+                      <span className="welcome-badge-level">{currentLevelInfo.fullLabel}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Story Title displayed on the first left page */}
+                  {isFirstSpread && (
+                    <header className="book-story-title-header">
+                      <div className="book-fleuron-ornament">❧ ❦ ❧</div>
+                      <h2 className="book-title-heading">{currentStory.title}</h2>
+                      {currentStory.titleTranslation && (
+                        <div
+                          className={`book-title-subheading ${
+                            showTranslations ? 'highlighted-translation' : ''
+                          }`}
+                        >
+                          {showTranslations && (
+                            <span className="sentence-translation-marker" style={{ marginRight: '6px' }}>
+                              {t('translationPrefix')}
+                            </span>
+                          )}
+                          {currentStory.titleTranslation}
+                        </div>
+                      )}
+                      <div className="book-title-divider" />
+                    </header>
+                  )}
+
+                  {/* Paragraphs rendered on left page */}
+                  <div className="book-page-paragraphs">
+                    {activeSpreadData?.left.map(renderParagraph)}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Page Number (Left) - Classical printed folio */}
@@ -386,57 +457,157 @@ export const StoryReader: React.FC = () => {
             <header className="book-running-header right-header">
               <span className="running-header-leaf">✦</span>
               <span className="running-header-title">
-                {t('chapterPrefix')} {currentSpread + 1} • {currentStory.title}
+                {isWelcomeState
+                  ? (settings.uiLanguage === 'pt' ? 'Novo Conto • Criação com IA' : 'New Story • AI Creation')
+                  : `${t('chapterPrefix')} ${currentSpread + 1} • ${currentStory.title}`}
               </span>
               <span className="running-header-leaf">✦</span>
             </header>
 
             <div className="page-inner-content">
-              <div className="book-page-paragraphs">
-                {activeSpreadData?.right.length > 0 ? (
-                  activeSpreadData.right.map(renderParagraph)
-                ) : (
-                  <div className="book-colophon-placeholder">
+              {isWelcomeState ? (
+                <div className="book-welcome-container">
+                  <div>
                     <div className="book-fleuron-ornament">✦ ❦ ✦</div>
-                    <div className="book-colophon-badge">
-                      <Sparkles size={24} color="var(--flower-500)" />
-                    </div>
-                    <h4 className="book-colophon-title">{currentStory.title}</h4>
-                    <p className="book-colophon-desc">{t('endOfNarrative')}</p>
-                  </div>
-                )}
-              </div>
+                    <h3 className="book-welcome-prompt-title">
+                      {settings.uiLanguage === 'pt' ? 'Criar Sua Primeira História' : 'Create Your First Story'}
+                    </h3>
+                    <p className="book-welcome-prompt-subtitle">
+                      {settings.uiLanguage === 'pt'
+                        ? 'Escolha um tema sugerido abaixo ou digite seu próprio tema para a IA compor a narrativa:'
+                        : 'Choose a suggested theme below or type your own topic for the AI to compose:'}
+                    </p>
 
-              {/* Retention mini-quiz banner on the last spread */}
-              {isLastSpread && (
-                <div className="book-end-section-container">
-                  <div className="book-story-tailpiece" aria-hidden="true">
-                    <span>❧</span>
-                    <span>❦</span>
-                    <span>❧</span>
-                  </div>
-                  <div className="book-end-quiz-banner">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div className="book-quiz-icon-badge">
-                        <CheckCircle size={16} />
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.86rem' }}>
-                          {t('readingComplete')}
-                        </div>
-                        <div style={{ fontSize: '0.74rem', color: 'var(--page-text-muted)' }}>
-                          {t('readingCompleteSub')}
-                        </div>
-                      </div>
+                    {/* Suggested theme quick chips */}
+                    <div className="book-welcome-theme-chips">
+                      {WELCOME_THEMES.map((themeItem) => (
+                        <button
+                          key={themeItem.text}
+                          type="button"
+                          className={`welcome-chip-btn ${customStoryTheme === themeItem.text ? 'selected' : ''}`}
+                          onClick={() =>
+                            setCustomStoryTheme(customStoryTheme === themeItem.text ? '' : themeItem.text)
+                          }
+                          title={`Selecionar tema: ${themeItem.label}`}
+                        >
+                          <span>{themeItem.icon}</span>
+                          <span>{themeItem.label}</span>
+                        </button>
+                      ))}
                     </div>
+
+                    {/* Custom theme input */}
+                    <div className="book-welcome-input-wrap">
+                      <input
+                        type="text"
+                        className="book-welcome-input"
+                        placeholder={
+                          settings.uiLanguage === 'pt'
+                            ? 'Digite um tema (ou deixe vazio para tema surpresa)...'
+                            : 'Type a theme (or leave empty for surprise)...'
+                        }
+                        value={customStoryTheme}
+                        onChange={(e) => setCustomStoryTheme(e.target.value)}
+                        disabled={isGeneratingStory}
+                      />
+                      {customStoryTheme && (
+                        <button
+                          type="button"
+                          className="welcome-clear-theme-btn"
+                          onClick={() => setCustomStoryTheme('')}
+                          title={t('themeClear')}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Primary Action Button */}
                     <button
-                      className="book-quiz-trigger-btn"
-                      onClick={() => setIsQuizOpen(true)}
+                      className={`book-welcome-generate-btn ${isGeneratingStory ? 'loading' : ''}`}
+                      onClick={() => generateNewStory(customStoryTheme)}
+                      disabled={isGeneratingStory}
                     >
-                      {t('startMiniQuiz')}
+                      {isGeneratingStory ? (
+                        <>
+                          <Loader2 size={20} className="spin" />
+                          <span>
+                            {settings.uiLanguage === 'pt'
+                              ? 'Criando sua história com IA...'
+                              : 'Generating your story with AI...'}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={20} color="#fff" />
+                          <span>
+                            {settings.uiLanguage === 'pt'
+                              ? '✨ Gerar Minha Primeira História'
+                              : '✨ Generate My First Story'}
+                          </span>
+                        </>
+                      )}
                     </button>
                   </div>
+
+                  <div className="book-welcome-hint">
+                    <span>💡</span>
+                    <p>
+                      {settings.uiLanguage === 'pt'
+                        ? 'Você pode trocar o idioma ou alterar o nível a qualquer momento na barra superior ou no dock inferior.'
+                        : 'You can change the language or adjust the proficiency level at any time in the top bar or bottom dock.'}
+                    </p>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <div className="book-page-paragraphs">
+                    {activeSpreadData?.right.length > 0 ? (
+                      activeSpreadData.right.map(renderParagraph)
+                    ) : (
+                      <div className="book-colophon-placeholder">
+                        <div className="book-fleuron-ornament">✦ ❦ ✦</div>
+                        <div className="book-colophon-badge">
+                          <Sparkles size={24} color="var(--flower-500)" />
+                        </div>
+                        <h4 className="book-colophon-title">{currentStory.title}</h4>
+                        <p className="book-colophon-desc">{t('endOfNarrative')}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Retention mini-quiz banner on the last spread */}
+                  {isLastSpread && (
+                    <div className="book-end-section-container">
+                      <div className="book-story-tailpiece" aria-hidden="true">
+                        <span>❧</span>
+                        <span>❦</span>
+                        <span>❧</span>
+                      </div>
+                      <div className="book-end-quiz-banner">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div className="book-quiz-icon-badge">
+                            <CheckCircle size={16} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '0.86rem' }}>
+                              {t('readingComplete')}
+                            </div>
+                            <div style={{ fontSize: '0.74rem', color: 'var(--page-text-muted)' }}>
+                              {t('readingCompleteSub')}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          className="book-quiz-trigger-btn"
+                          onClick={() => setIsQuizOpen(true)}
+                        >
+                          {t('startMiniQuiz')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -448,7 +619,7 @@ export const StoryReader: React.FC = () => {
         </div>
 
         {/* Page Flip Navigation Buttons (Left/Right) */}
-        {!isFirstSpread && (
+        {!isWelcomeState && !isFirstSpread && (
           <button
             className="book-nav-arrow-btn prev-arrow"
             onClick={handlePrevPage}
@@ -458,7 +629,7 @@ export const StoryReader: React.FC = () => {
           </button>
         )}
 
-        {!isLastSpread && (
+        {!isWelcomeState && !isLastSpread && (
           <button
             className="book-nav-arrow-btn next-arrow"
             onClick={handleNextPage}
@@ -470,16 +641,18 @@ export const StoryReader: React.FC = () => {
       </div>
 
       {/* Pagination Dots (Matching reference ••••) */}
-      <div className="book-pagination-dots-bar">
-        {spreads.map((_, idx) => (
-          <button
-            key={idx}
-            className={`book-dot-indicator ${idx === currentSpread ? 'active' : ''}`}
-            onClick={() => setCurrentSpread(idx)}
-            title={`Ir para páginas ${idx * 2 + 1}-${idx * 2 + 2}`}
-          />
-        ))}
-      </div>
+      {!isWelcomeState && (
+        <div className="book-pagination-dots-bar">
+          {spreads.map((_, idx) => (
+            <button
+              key={idx}
+              className={`book-dot-indicator ${idx === currentSpread ? 'active' : ''}`}
+              onClick={() => setCurrentSpread(idx)}
+              title={`Ir para páginas ${idx * 2 + 1}-${idx * 2 + 2}`}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Bottom Floating Control Dock (Exact match to reference capsule) */}
       <div className="book-bottom-dock">
@@ -694,8 +867,8 @@ export const StoryReader: React.FC = () => {
           <button
             className="dock-action-text-btn"
             onClick={handleIncreaseWords}
-            disabled={isGeneratingStory}
-            title={t('addWordsTooltip')}
+            disabled={isGeneratingStory || isWelcomeState}
+            title={isWelcomeState ? 'Gere uma história antes de expandir o vocabulário' : t('addWordsTooltip')}
           >
             {t('addWordsBtn')}
           </button>
@@ -707,7 +880,14 @@ export const StoryReader: React.FC = () => {
         <button
           className={`dock-audio-btn ${isPlayingAudio ? 'playing' : ''}`}
           onClick={isPlayingAudio ? pauseStoryAudio : playStoryAudio}
-          title={isPlayingAudio ? t('pauseAudioTooltip') : t('listenAudioTooltip')}
+          disabled={isWelcomeState || isGeneratingStory}
+          title={
+            isWelcomeState
+              ? (settings.uiLanguage === 'pt' ? 'Gere uma história para ouvir' : 'Generate a story to listen')
+              : isPlayingAudio
+              ? t('pauseAudioTooltip')
+              : t('listenAudioTooltip')
+          }
         >
           {isPlayingAudio ? <Pause size={15} /> : <Play size={15} />}
           <span>{isPlayingAudio ? t('pauseBtn') : t('audioBtn')}</span>
@@ -728,6 +908,7 @@ export const StoryReader: React.FC = () => {
         <button
           className={`dock-chip-btn ${showTranslations ? 'active' : ''}`}
           onClick={() => setShowTranslations((prev) => !prev)}
+          disabled={isWelcomeState}
           title={t('translationTooltip')}
         >
           {showTranslations ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -738,7 +919,12 @@ export const StoryReader: React.FC = () => {
         <button
           className="dock-quiz-btn"
           onClick={() => setIsQuizOpen(true)}
-          title={t('miniQuizTooltip')}
+          disabled={isWelcomeState}
+          title={
+            isWelcomeState
+              ? (settings.uiLanguage === 'pt' ? 'Gere uma história para acessar o quiz' : 'Generate a story to access quiz')
+              : t('miniQuizTooltip')
+          }
         >
           <CheckCircle size={15} />
           <span>{t('miniQuizBtn')}</span>

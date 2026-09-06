@@ -3857,3 +3857,258 @@ body[data-theme='dark'] .stat-pill.highlight-orange {
   font-size: 0.72rem;
   color: var(--text-muted);
 }
+
+/* ==========================================================================
+   Book Welcome & Story Prompt State (Empty / First Visit Experience)
+   ========================================================================== */
+.book-welcome-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: space-between;
+}
+
+.book-welcome-description {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--page-text);
+  margin-bottom: 20px;
+  text-align: justify;
+}
+
+.book-welcome-features-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.book-welcome-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(180, 140, 100, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid var(--flower-400);
+}
+
+body[data-theme='dark'] .book-welcome-feature-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-left-color: var(--flower-500);
+}
+
+.welcome-feature-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.welcome-feature-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.welcome-feature-text strong {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--page-text);
+}
+
+.welcome-feature-text span {
+  font-size: 0.78rem;
+  color: var(--page-text-muted);
+}
+
+.book-welcome-lang-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: rgba(180, 140, 100, 0.12);
+  border: 1px dashed rgba(180, 140, 100, 0.35);
+  border-radius: 10px;
+  margin-top: auto;
+}
+
+body[data-theme='dark'] .book-welcome-lang-badge {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.welcome-badge-flag {
+  font-size: 1.6rem;
+}
+
+.welcome-badge-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.welcome-badge-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--page-text);
+}
+
+.welcome-badge-level {
+  font-size: 0.78rem;
+  color: var(--page-text-muted);
+}
+
+/* Right Page - Prompt & Theme Picker */
+.book-welcome-prompt-title {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--page-text);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.book-welcome-prompt-subtitle {
+  font-size: 0.86rem;
+  color: var(--page-text-muted);
+  text-align: center;
+  margin-bottom: 18px;
+  line-height: 1.45;
+}
+
+.book-welcome-theme-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.welcome-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--page-text);
+  background: rgba(180, 140, 100, 0.1);
+  border: 1px solid rgba(180, 140, 100, 0.25);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.welcome-chip-btn:hover {
+  background: rgba(200, 90, 43, 0.15);
+  border-color: var(--flower-400);
+  transform: translateY(-1px);
+}
+
+.welcome-chip-btn.selected {
+  background: var(--flower-500);
+  color: #fff;
+  border-color: var(--flower-600);
+  box-shadow: 0 2px 8px rgba(200, 90, 43, 0.35);
+}
+
+.book-welcome-input-wrap {
+  position: relative;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.book-welcome-input {
+  width: 100%;
+  padding: 12px 38px 12px 14px;
+  font-size: 0.88rem;
+  font-family: var(--font-body);
+  color: var(--page-text);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1.5px solid rgba(180, 140, 100, 0.35);
+  border-radius: 10px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+body[data-theme='dark'] .book-welcome-input {
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.book-welcome-input:focus {
+  border-color: var(--flower-500);
+  box-shadow: 0 0 0 3px rgba(200, 90, 43, 0.2);
+}
+
+.welcome-clear-theme-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--page-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 0.8rem;
+}
+
+.welcome-clear-theme-btn:hover {
+  color: var(--flower-500);
+}
+
+.book-welcome-generate-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 20px;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(135deg, #c85a2b 0%, #b0491d 50%, #8f2d0a 100%);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(180, 73, 29, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  transition: all 0.25s ease;
+  margin-bottom: 16px;
+}
+
+.book-welcome-generate-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px rgba(180, 73, 29, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  background: linear-gradient(135deg, #d96633 0%, #bd4f22 50%, #99320e 100%);
+}
+
+.book-welcome-generate-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.book-welcome-generate-btn:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.book-welcome-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(180, 140, 100, 0.08);
+  border-radius: 8px;
+  margin-top: auto;
+}
+
+.book-welcome-hint span {
+  font-size: 0.95rem;
+}
+
+.book-welcome-hint p {
+  font-size: 0.74rem;
+  color: var(--page-text-muted);
+  line-height: 1.4;
+  margin: 0;
+}

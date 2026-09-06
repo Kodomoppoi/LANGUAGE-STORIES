@@ -19,7 +19,7 @@ import {
   MascotState,
   SSEGenerationEvent,
 } from '../types';
-import { SAMPLE_STORIES } from '../services/sampleStories';
+import { SAMPLE_STORIES, createWelcomeStory } from '../services/sampleStories';
 import {
   calculateSM2,
   isReviewDue,
@@ -140,10 +140,10 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const DEFAULT_STATS: UserStats = {
-  totalWordsRead: 350,
-  starredWordsCount: 14,
-  totalStoriesRead: 6,
-  reviewsDueToday: 5,
+  totalWordsRead: 0,
+  starredWordsCount: 0,
+  totalStoriesRead: 0,
+  reviewsDueToday: 0,
   lastActiveDate: new Date().toISOString(),
 };
 
@@ -158,12 +158,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [settings, setSettings] = useState<AppSettings>(() => storageService.loadSettings(DEFAULT_SETTINGS));
   const [userStats, setUserStats] = useState<UserStats>(() => storageService.loadStats(DEFAULT_STATS));
   const [vocabularyVault, setVocabularyVault] = useState<DictionaryEntry[]>(() =>
-    storageService.loadVault(SAMPLE_STORIES['ja'].targetVocabulary)
+    storageService.loadVault([])
   );
 
-  const [currentStory, setCurrentStory] = useState<Story>(() =>
-    localizeStory(SAMPLE_STORIES[currentLanguage] || SAMPLE_STORIES['ja'], settings.uiLanguage || 'pt')
-  );
+  const [currentStory, setCurrentStory] = useState<Story>(() => {
+    const lang = storageService.loadLanguage('ja');
+    const uiLang = storageService.loadSettings(DEFAULT_SETTINGS).uiLanguage || 'pt';
+    const welcome = createWelcomeStory(lang, uiLang);
+    return storageService.loadStory(welcome);
+  });
   const [activeTab, setActiveTab] = useState<ActiveTab>('story');
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
@@ -389,7 +392,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // AUTOMATIC MASTER HARVEST: Harvest and consolidate all tokens into master JSON bank
   useEffect(() => {
-    if (!allStoryWords.length) return;
+    if (!allStoryWords.length || currentStory.id === 'welcome') return;
 
     setVocabularyVault((prev) => {
       const vaultMap = new Map<string, DictionaryEntry>();
@@ -431,9 +434,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       return Array.from(vaultMap.values());
     });
-  }, [currentStory.id]);
+  }, [currentStory.id, allStoryWords]);
 
-  // Update stats summary
+  // Update stats summary (sync stars & reviews due from vault)
   useEffect(() => {
     const starredCount = vocabularyVault.filter((v) => v.isStarred).length;
     const dueCount = vocabularyVault.filter((v) => isReviewDue(v.srsMetrics.nextReviewDate)).length;
@@ -442,9 +445,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       ...prev,
       starredWordsCount: starredCount,
       reviewsDueToday: dueCount,
-      totalWordsRead: prev.totalWordsRead + allStoryWords.length,
     }));
-  }, [vocabularyVault, allStoryWords.length]);
+  }, [vocabularyVault]);
 
   // Export / Import Helpers via StorageService
   const exportVocabularyJson = useCallback(
@@ -479,8 +481,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ttsService.stop();
     setIsPlayingAudio(false);
     setCurrentPlayingSentenceIndex(-1);
-    const story = SAMPLE_STORIES[lang] || SAMPLE_STORIES['ja'];
-    setCurrentStory(localizeStory(story, settings.uiLanguage || 'pt'));
+
+    const savedStory = storageService.loadStoryForLanguage(lang);
+    if (savedStory && savedStory.id !== 'welcome' && savedStory.paragraphs?.length > 0) {
+      setCurrentStory(localizeStory(savedStory, settings.uiLanguage || 'pt'));
+    } else {
+      const welcome = createWelcomeStory(lang, settings.uiLanguage || 'pt');
+      setCurrentStory(welcome);
+    }
   }, [settings.uiLanguage]);
 
   const setProficiency = useCallback((level: ProficiencyLevel) => {
@@ -677,15 +685,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         );
 
         setCurrentStory(newStory);
+        storageService.saveStory(newStory);
+        const storyWords = (newStory.paragraphs || []).reduce(
+          (acc, p) => acc + (p.sentences || []).reduce((sAcc, s) => sAcc + (s.tokens || []).length, 0),
+          0
+        );
+        setUserStats((prev) => ({
+          ...prev,
+          totalStoriesRead: prev.totalStoriesRead + 1,
+          totalWordsRead: prev.totalWordsRead + storyWords,
+        }));
         logService.addLog(
           'SUCCESS',
           'FRONTEND',
           `História "${newStory.title}" recebida com sucesso (${newStory.paragraphs.length} parágrafos, ${newStory.targetVocabulary.length} vocábulos)!`
         );
-        setUserStats((prev) => ({
-          ...prev,
-          totalStoriesRead: prev.totalStoriesRead + 1,
-        }));
       } catch (err) {
         logService.addLog('ERROR', 'FRONTEND', `Erro na geração da história: ${err instanceof Error ? err.message : String(err)}`);
         console.error('Failed to generate story:', err);
@@ -713,6 +727,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         handleSSEEvent
       );
       setCurrentStory(newStory);
+      storageService.saveStory(newStory);
+      const storyWords = (newStory.paragraphs || []).reduce(
+        (acc, p) => acc + (p.sentences || []).reduce((sAcc, s) => sAcc + (s.tokens || []).length, 0),
+        0
+      );
+      setUserStats((prev) => ({
+        ...prev,
+        totalStoriesRead: prev.totalStoriesRead + 1,
+        totalWordsRead: prev.totalWordsRead + storyWords,
+      }));
     } catch (err) {
       console.error('Failed to regenerate with same dictionary:', err);
     } finally {
@@ -741,6 +765,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           handleSSEEvent
         );
         setCurrentStory(newStory);
+        storageService.saveStory(newStory);
+        const storyWords = (newStory.paragraphs || []).reduce(
+          (acc, p) => acc + (p.sentences || []).reduce((sAcc, s) => sAcc + (s.tokens || []).length, 0),
+          0
+        );
+        setUserStats((prev) => ({
+          ...prev,
+          totalStoriesRead: prev.totalStoriesRead + 1,
+          totalWordsRead: prev.totalWordsRead + storyWords,
+        }));
         logService.addLog('SUCCESS', 'FRONTEND', `História expandida gerada com sucesso (+${numNewWords} palavras inseridas)!`);
       } catch (err) {
         logService.addLog('ERROR', 'FRONTEND', `Erro ao injetar palavras: ${err instanceof Error ? err.message : String(err)}`);

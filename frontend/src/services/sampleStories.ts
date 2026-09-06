@@ -2853,3 +2853,23 @@ export const SAMPLE_STORIES: Record<LanguageCode, Story> = {
     ],
   },
 };
+
+export const createWelcomeStory = (lang: LanguageCode = 'ja', uiLanguage: string = 'pt'): Story => {
+  const isPt = uiLanguage === 'pt';
+  return {
+    id: 'welcome',
+    title: isPt ? 'Bem-vindo ao Language Stories' : 'Welcome to Language Stories',
+    titleTranslation: isPt
+      ? 'Crie sua primeira história para iniciar sua leitura imersiva'
+      : 'Create your first story to begin your immersive reading',
+    language: lang,
+    proficiency: 'A1',
+    contextTheme: '',
+    paragraphs: [],
+    targetVocabulary: [],
+    quiz: [],
+    estimatedReadingMinutes: 1,
+    fullText: '',
+    createdAt: new Date().toISOString(),
+  };
+};

@@ -1,4 +1,4 @@
-import { DictionaryEntry, LanguageCode, ProficiencyLevel, UserStats, AppSettings, WordDeepDiveData } from '../types';
+import { DictionaryEntry, LanguageCode, ProficiencyLevel, UserStats, AppSettings, WordDeepDiveData, Story } from '../types';
 import { createDefaultSRSMetrics } from './srsEngine';
 
 const KEYS = {
@@ -7,6 +7,7 @@ const KEYS = {
   PROFICIENCY: 'lang_stories_proficiency',
   VAULT: 'lang_stories_vault',
   STATS: 'lang_stories_stats',
+  STORY: 'lang_stories_story',
 } as const;
 
 export class StorageService {
@@ -109,6 +110,43 @@ export class StorageService {
       localStorage.setItem(KEYS.STATS, JSON.stringify(stats));
     } catch (e) {
       console.error('Failed to save stats to localStorage', e);
+    }
+  }
+
+  public loadStory(defaultStory: Story): Story {
+    try {
+      const saved = localStorage.getItem(KEYS.STORY);
+      return saved ? JSON.parse(saved) : defaultStory;
+    } catch {
+      return defaultStory;
+    }
+  }
+
+  public saveStory(story: Story): void {
+    try {
+      if (story && story.id !== 'welcome') {
+        localStorage.setItem(KEYS.STORY, JSON.stringify(story));
+        localStorage.setItem(`${KEYS.STORY}_${story.language}`, JSON.stringify(story));
+      }
+    } catch (e) {
+      console.error('Failed to save story to localStorage', e);
+    }
+  }
+
+  public loadStoryForLanguage(lang: LanguageCode): Story | null {
+    try {
+      const saved = localStorage.getItem(`${KEYS.STORY}_${lang}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  public clearStory(): void {
+    try {
+      localStorage.removeItem(KEYS.STORY);
+    } catch (e) {
+      console.error('Failed to clear story from localStorage', e);
     }
   }
 
