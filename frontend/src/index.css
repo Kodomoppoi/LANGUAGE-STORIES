@@ -4170,6 +4170,11 @@ body[data-theme='dark'] .book-welcome-input {
   color: #fff;
 }
 
+.book-error-seal.seal-service_unavailable {
+  background: radial-gradient(circle at 35% 35%, #f97316, #c2410c);
+  color: #fff;
+}
+
 .book-error-seal.seal-generation_error {
   background: radial-gradient(circle at 35% 35%, #ef4444, #7f1d1d);
   color: #fff;

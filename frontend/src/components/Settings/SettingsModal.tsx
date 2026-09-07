@@ -72,9 +72,9 @@ export const SettingsModal: React.FC = () => {
       setAvailableModels(result.models);
       if (!result.models.includes(settings.geminiModel)) {
         const preferred = result.models.find((m) => m === 'gemini-3.6-flash') ||
-                          result.models.find((m) => m.includes('3.') && m.includes('flash')) ||
-                          result.models.find((m) => m.includes('flash')) ||
-                          result.models[0];
+          result.models.find((m) => m.includes('3.') && m.includes('flash')) ||
+          result.models.find((m) => m.includes('flash')) ||
+          result.models[0];
         updateSettings({ geminiModel: preferred });
       }
     }

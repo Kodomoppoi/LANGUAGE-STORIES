@@ -198,11 +198,45 @@ function parseErrorToBookErrorInfo(
   }
 
   if (
+    errMsg.includes('503') ||
+    errMsg.includes('high demand') ||
+    errMsg.includes('Spikes in demand') ||
+    errMsg.includes('temporarily unavailable') ||
+    errMsg.includes('service_unavailable') ||
+    err?.errorType === 'service_unavailable' ||
+    err?.statusCode === 503
+  ) {
+    return {
+      type: 'service_unavailable',
+      title: isPt ? 'Servidores do Gemini em Alta Demanda Temporária (Status 503)' : 'Gemini Servers Experiencing High Demand (Status 503)',
+      message: isPt
+        ? 'Os servidores do Google Gemini estão com um pico passageiro de tráfego de usuários. Conforme documentação oficial do Google, esses picos costumam durar poucos instantes.'
+        : 'Google Gemini servers are currently experiencing high demand. According to official Google documentation, these spikes are temporary.',
+      actionInstructions: isPt
+        ? [
+          'Aguarde cerca de 5 a 15 segundos para que a capacidade do Google se normalize.',
+          'Clique no botão "Tentar Novamente" abaixo para reenviar a história.',
+          'Caso persista, você também pode alternar para outro modelo Gemini nas Configurações.'
+        ]
+        : [
+          'Wait about 5 to 15 seconds for Google server capacity to normalize.',
+          'Click the "Try Again" button below to resubmit your story request.',
+          'If it persists, you can also switch to another Gemini model in Settings.'
+        ],
+      actionLabel: isPt ? 'Tentar Novamente' : 'Try Again',
+      actionType: 'retry',
+      rawError: errMsg,
+      language,
+    };
+  }
+
+  if (
     errMsg.includes('429') ||
     errMsg.includes('RESOURCE_EXHAUSTED') ||
     errMsg.includes('Quota') ||
     errMsg.includes('cota') ||
-    err?.errorType === 'quota_exceeded'
+    err?.errorType === 'quota_exceeded' ||
+    err?.statusCode === 429
   ) {
     return {
       type: 'quota_exceeded',
@@ -213,13 +247,13 @@ function parseErrorToBookErrorInfo(
       actionInstructions: isPt
         ? [
           'Aguarde cerca de 30 a 60 segundos para que o Google renove a sua cota temporária.',
-          'Ou alterne o modelo nas Configurações (ex: alternar para Gemini 2.5 Flash ou 1.5 Flash).',
+          'Ou alterne o modelo nas Configurações (ex: alternar para Gemini 3.7 Flash).',
           'Se você tiver outra chave, insira-a nas Configurações.',
           'Assim que aguardar, clique em "Tentar Novamente" abaixo.'
         ]
         : [
           'Wait about 30 to 60 seconds for Google to reset your temporary quota.',
-          'Or switch models in Settings (e.g. switch to Gemini 2.5 Flash or 1.5 Flash).',
+          'Or switch models in Settings (e.g. switch to Gemini 3.7 Flash).',
           'If you have another key, enter it in Settings.',
           'Click "Try Again" below once ready.'
         ],
@@ -310,42 +344,70 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (event.data?.message) {
       logService.addLog('INFO', 'STAGE', `[Etapa SSE] ${event.data.message}`);
     }
-    switch (event.event) {
-      case 'stage_start:curation':
+
+    const eventName = String(event.event || '');
+    const stageType = event.data?.stage || (eventName.startsWith('stage_start:') ? eventName.split(':')[1] : '');
+
+    if (eventName === 'stage_start' || eventName.startsWith('stage_start:')) {
+      if (stageType === 'curation') {
         setMascotState({
           isActive: true,
-          stage: event.event,
+          stage: 'stage_start:curation',
           action: 'searching',
           message: event.data.message || 'Analisando seu cofre e escolhendo novas palavras...',
           progress: 25,
         });
-        break;
+      } else if (stageType === 'generation') {
+        setMascotState((prev) => ({
+          ...prev,
+          isActive: true,
+          stage: 'stage_start:generation',
+          action: 'writing',
+          message: event.data.message || 'Escrevendo a história com repetição calculada...',
+          progress: 75,
+        }));
+      } else if (stageType === 'validation') {
+        setMascotState((prev) => ({
+          ...prev,
+          isActive: true,
+          stage: 'stage_start:generation',
+          action: 'writing',
+          message: event.data.message || 'Validando gramática e hidratação de traços...',
+          progress: 90,
+        }));
+      } else {
+        setMascotState((prev) => ({
+          ...prev,
+          isActive: true,
+          stage: 'stage_start:curation',
+          action: 'searching',
+          message: event.data.message || 'Iniciando narrativa didática...',
+          progress: 20,
+        }));
+      }
+      return;
+    }
+
+    switch (eventName) {
       case 'stage_curation_done':
         setMascotState((prev) => ({
           ...prev,
-          stage: event.event,
+          isActive: true,
+          stage: 'stage_curation_done',
           action: 'celebrating',
           message: event.data.message || 'Vocabulário alvo curado com sucesso!',
           counts: {
-            newWordsCount: event.data.new_words_count || 5,
+            newWordsCount: event.data.count || event.data.new_words_count || 5,
             reviewWordsCount: event.data.review_words_count || 3,
           },
           progress: 50,
         }));
         break;
-      case 'stage_start:generation':
-        setMascotState((prev) => ({
-          ...prev,
-          stage: event.event,
-          action: 'writing',
-          message: event.data.message || 'Escrevendo a história em Mandarim com repetição...',
-          progress: 75,
-        }));
-        break;
       case 'stage_done':
         setMascotState((prev) => ({
           ...prev,
-          stage: event.event,
+          isActive: true,
+          stage: 'stage_done',
           action: 'presenting',
           message: event.data.message || 'História e glossário prontos! Apresentando sua leitura...',
           progress: 100,
@@ -358,14 +420,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       case 'error':
         setMascotState({
           isActive: true,
-          stage: event.event,
+          stage: 'error',
           action: 'alert',
-          message: event.data.error_message || 'Erro durante a geração',
+          message: event.data.error_message || event.data.message || 'Erro durante a geração',
           progress: 100,
         });
         setTimeout(() => {
           setMascotState((prev) => ({ ...prev, isActive: false }));
-        }, 3500);
+        }, 1500);
         break;
     }
   }, []);
@@ -847,6 +909,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } catch (err: any) {
         logService.addLog('ERROR', 'FRONTEND', `Erro na geração da história: ${err instanceof Error ? err.message : String(err)}`);
         console.error('Failed to generate story:', err);
+        setMascotState((prev) => ({ ...prev, isActive: false }));
 
         const errorInfo = parseErrorToBookErrorInfo(err, currentLanguage, (settings.uiLanguage as 'pt' | 'en') || 'pt');
         setBookError(errorInfo);
@@ -863,6 +926,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       } finally {
         setIsGeneratingStory(false);
+        setMascotState((prev) => ({ ...prev, isActive: false }));
       }
     },
     [currentLanguage, currentProficiency, currentStory, settings, vocabularyVault, handleSSEEvent, customStoryTheme]
@@ -905,6 +969,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }));
     } catch (err: any) {
       console.error('Failed to regenerate with same dictionary:', err);
+      setMascotState((prev) => ({ ...prev, isActive: false }));
       const errorInfo = parseErrorToBookErrorInfo(err, currentLanguage, (settings.uiLanguage as 'pt' | 'en') || 'pt');
       setBookError(errorInfo);
       if (
@@ -918,6 +983,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     } finally {
       setIsGeneratingStory(false);
+      setMascotState((prev) => ({ ...prev, isActive: false }));
     }
   }, [currentLanguage, currentProficiency, currentStory, settings, vocabularyVault, handleSSEEvent]);
 
@@ -964,6 +1030,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } catch (err: any) {
         logService.addLog('ERROR', 'FRONTEND', `Erro ao injetar palavras: ${err instanceof Error ? err.message : String(err)}`);
         console.error('Failed to increase dictionary and generate:', err);
+        setMascotState((prev) => ({ ...prev, isActive: false }));
         const errorInfo = parseErrorToBookErrorInfo(err, currentLanguage, (settings.uiLanguage as 'pt' | 'en') || 'pt');
         setBookError(errorInfo);
         if (
@@ -977,6 +1044,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       } finally {
         setIsGeneratingStory(false);
+        setMascotState((prev) => ({ ...prev, isActive: false }));
       }
     },
     [currentLanguage, currentProficiency, currentStory, settings, vocabularyVault, handleSSEEvent, customStoryTheme]

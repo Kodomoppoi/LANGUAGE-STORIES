@@ -222,6 +222,7 @@ export interface MascotState {
 export type BookErrorType =
   | 'api_key_error'
   | 'quota_exceeded'
+  | 'service_unavailable'
   | 'tts_error'
   | 'generation_error';
 

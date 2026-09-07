@@ -1,6 +1,6 @@
 import React from 'react';
 import { BookErrorInfo } from '../../types';
-import { Settings, RefreshCw, X, AlertTriangle, Key, Clock, VolumeX } from 'lucide-react';
+import { Settings, RefreshCw, X, AlertTriangle, Key, Clock, VolumeX, Activity } from 'lucide-react';
 
 interface BookErrorCardProps {
   error: BookErrorInfo;
@@ -25,6 +25,8 @@ export const BookErrorCard: React.FC<BookErrorCardProps> = ({
         return <Key className="book-error-icon" size={28} />;
       case 'quota_exceeded':
         return <Clock className="book-error-icon" size={28} />;
+      case 'service_unavailable':
+        return <Activity className="book-error-icon" size={28} />;
       case 'tts_error':
         return <VolumeX className="book-error-icon" size={28} />;
       case 'generation_error':
@@ -39,6 +41,8 @@ export const BookErrorCard: React.FC<BookErrorCardProps> = ({
         return isPt ? 'Chave de API do Gemini' : 'Gemini API Key';
       case 'quota_exceeded':
         return isPt ? 'Cota Excedida (Rate Limit)' : 'Rate Limit (429)';
+      case 'service_unavailable':
+        return isPt ? 'Alta Demanda do Google (503)' : 'Google High Demand (503)';
       case 'tts_error':
         return isPt ? 'Áudio / Voz TTS' : 'TTS Audio Voice';
       case 'generation_error':

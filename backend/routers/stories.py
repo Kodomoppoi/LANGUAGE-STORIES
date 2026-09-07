@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..services.ai_service import ai_service, AIServiceError
 from ..languages.phonetics import enrich_tokens_phonetics, get_phonetic_reading
+from .logs import emit_log
 
 
 router = APIRouter(prefix="/api/stories", tags=["Stories"])
@@ -329,6 +330,7 @@ async def generate_story_stream(
             error_type = getattr(e, "error_type", "generation_error")
             status_code = getattr(e, "status_code", 500)
             err_msg = str(e)
+            emit_log(f"Falha no fluxo SSE da história ({error_type} {status_code}): {err_msg}", level="ERROR", source="STAGE")
             yield f"event: error\ndata: {json.dumps({'error_type': error_type, 'error_message': err_msg, 'message': err_msg, 'status_code': status_code})}\n\n"
 
     return StreamingResponse(sse_event_generator(), media_type="text/event-stream")

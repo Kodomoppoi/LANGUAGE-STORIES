@@ -165,7 +165,7 @@ Output ONLY valid JSON following this schema:
           try {
             const errJson = JSON.parse(errBody);
             errDetail = errJson?.error?.message || errDetail;
-          } catch {}
+          } catch { }
           logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Modelo ${cleanModel} retornou 404 (${errDetail}). Tentando modelo alternativo...`);
           continue;
         } else if (resp.status === 400) {
