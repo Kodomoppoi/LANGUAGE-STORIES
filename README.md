@@ -1,10 +1,10 @@
-# 📖 Language Stories (📖 语言故事 / 言語の物語)
+#  Language Stories
 
 > **Immersive natural language acquisition platform based on the *Comprehensible Input* principle, featuring 3D open-book reading, full phonetic annotations (100% Ruby / Pinyin / Furigana), Spaced Repetition System (SRS), and real-time synchronized audio.**
 
 ---
 
-## 🌟 Project Overview
+##  Project Overview
 
 **Language Stories** transforms language learning into a continuous literary and sensory experience. Instead of mechanical drills or disconnected flashcard lists, students read original stories crafted by Generative Artificial Intelligence, strictly calibrated to their exact comprehension level (CEFR A1–C2, HSK 1–6, JLPT N5–N1, TOPIK 1–6).
 
@@ -18,7 +18,7 @@ The application integrates an end-to-end learning ecosystem:
 
 ---
 
-## 🚀 Quick Start (1-Click Launch)
+##  Quick Start (1-Click Launch)
 
 To simplify setup and daily practice, the project includes unified automated launchers:
 
@@ -81,37 +81,37 @@ npm run dev
 
 ---
 
-## ✨ Detailed Features
+##  Detailed Features
 
-### 1. 📚 3D Open Book & Content-Aware Pagination
+### 1.  3D Open Book & Content-Aware Pagination
 * **Balanced Spread Distribution**: Eliminates starved or blank pages by balancing sentences and paragraphs across left and right book spreads.
 * **Welcome State**: When no active story exists and there are no errors, the notebook presents a welcoming layout with suggested theme chips (e.g., *Morning Coffee*, *Street Lanterns*, *Train Journey*) and custom prompt input.
 
-### 2. 🀄 100% Phonetic Coverage (Ruby / Pinyin / Furigana)
+### 2.  100% Phonetic Coverage (Ruby / Pinyin / Furigana)
 * **Full Pinyin**: When learning Mandarin, **100% of characters and words** receive official diacritic tone marks above text (e.g., `wǒ`, `kàn`, `hē`), not just new target vocabulary.
 * **Japanese Furigana**: Kanji characters receive corresponding Hiragana readings.
 * **Dual-Layer Guarantee**: Native backend processing via `pypinyin` paired with a client-side auxiliary morphological dictionary (`auxiliaryPhonetics.ts`) ensures phonetic annotations remain consistent in any scenario.
 
-### 3. 🛡️ In-Book Error Diagnostics (`BookErrorCard`)
+### 3.  In-Book Error Diagnostics (`BookErrorCard`)
 No API failures are hidden behind silent fallbacks or dummy mockups. If an error occurs, an ornate diagnostic card is displayed directly on the book's right page:
-* 🔑 **Invalid or Missing Gemini API Key (HTTP 400/403)**: Clear explanation with a 1-click **"Open Settings"** button.
-* ⏳ **Quota Exceeded (HTTP 429 / RESOURCE_EXHAUSTED)**: Helpful instructions regarding rate limits, replenishment periods, and model switching.
-* 🔇 **Missing TTS Voice**: Guidance on installing OS language packs or selecting the backend Edge-TTS engine.
+*  **Invalid or Missing Gemini API Key (HTTP 400/403)**: Clear explanation with a 1-click **"Open Settings"** button.
+*  **Quota Exceeded (HTTP 429 / RESOURCE_EXHAUSTED)**: Helpful instructions regarding rate limits, replenishment periods, and model switching.
+*  **Missing TTS Voice**: Guidance on installing OS language packs or selecting the backend Edge-TTS engine.
 * **Composition Interrupted Left Page**: Informs the reader that the digital scribe paused due to the pending configuration, assuring that existing vocabulary and SRS metrics remain intact.
 
-### 4. 🔍 Interactive Dictionary & Morphological Deep Dive
+### 4.  Interactive Dictionary & Morphological Deep Dive
 * **1-Click Lookup**: Click any token in the story to inspect its translation, phonetic reading, part of speech, and repetition history.
 * **AI Deep Dive ("Raio-X")**: Clicking the robot icon generates a detailed morphological breakdown:
   * Character anatomy (semantic and phonetic radicals).
   * Compound words and related vocabulary.
   * Cultural context and usage nuances.
 
-### 5. 🧠 Spaced Repetition System (SRS - SuperMemo SM-2)
+### 5. Spaced Repetition System (SRS - SuperMemo SM-2)
 * Four continuous mastery stages: `New (0-25%)`, `Learning (26-50%)`, `Review (51-84%)`, and `Mastered (85-100%)`.
 * **Starred Words (⭐)**: Words marked as favorites receive maximum priority in subsequent story generations.
 * **Retention Mini-Quiz**: Upon reaching the last spread of a story, an interactive quiz consolidates target vocabulary retention.
 
-### 6. ⚡ Real-Time Processing Terminal
+### 6. Real-Time Processing Terminal
 * Floating terminal window with live SSE logs streaming every generation phase:
   * `Stage 1`: User history curation and target vocabulary selection.
   * `Stage 2`: Interlinear narrative composition and calculated repetition.
@@ -119,7 +119,7 @@ No API failures are hidden behind silent fallbacks or dummy mockups. If an error
 
 ---
 
-## 🌐 Supported Languages & Proficiency Scales
+## Supported Languages & Proficiency Scales
 
 | Language | Code | Proficiency Framework | Phonetic Support |
 | :--- | :---: | :---: | :---: |
@@ -135,7 +135,7 @@ No API failures are hidden behind silent fallbacks or dummy mockups. If an error
 
 ---
 
-## ⚙️ Step-by-Step Installation
+## Step-by-Step Installation
 
 > [!TIP]
 > **Automated Setup**: When running either `run.bat` or `npm run dev`, the project automatically checks if `node_modules`, the Python virtual environment (`.venv`), or the `.env` configuration file are missing, and installs them automatically before starting the application! The manual steps below are optional if you prefer configuring the environment manually.
@@ -222,7 +222,7 @@ Access in your browser:
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```
 LANGUAGE-STORIES/
@@ -276,7 +276,7 @@ LANGUAGE-STORIES/
 
 ---
 
-## 🔒 Privacy & Data Security
+## Privacy & Data Security
 
 * **Local-First Storage**: Your learned vocabulary vault, reading history, and SRS metrics remain securely stored on your own device (`localStorage` and `language_stories.db`).
 * **Credential Protection**: The project `.gitignore` strictly prevents private API keys (`.env`), cached audio files (`.mp3`), and user databases from ever being committed to Git.
