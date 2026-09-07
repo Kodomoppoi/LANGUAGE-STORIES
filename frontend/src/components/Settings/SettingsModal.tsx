@@ -31,6 +31,7 @@ export const SettingsModal: React.FC = () => {
 
   const [isTestingGemini, setIsTestingGemini] = useState(false);
   const [geminiTestResult, setGeminiTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   if (!isSettingsOpen) return null;
 
@@ -45,8 +46,6 @@ export const SettingsModal: React.FC = () => {
       await apiService.syncGeminiSettings(settings);
     }
   };
-
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   const handleTestGemini = async () => {
     const key = settings.geminiApiKey?.trim();
