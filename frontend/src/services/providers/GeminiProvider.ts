@@ -127,11 +127,12 @@ Output ONLY valid JSON following this schema:
 }
 `;
 
-    const modelName = settings.geminiModel || 'gemini-3.6-flash';
+    let modelName = settings.geminiModel || 'gemini-2.0-flash';
+    if (modelName === 'gemini-3.6-flash') modelName = 'gemini-2.0-flash';
     logService.addLog('INFO', 'GEMINI', `[Cliente Direto] Disparando inferência no modelo ${modelName}...`);
 
     const candidateModels = [modelName];
-    for (const alt of ['gemini-2.5-flash', 'gemini-1.5-flash']) {
+    for (const alt of ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro']) {
       if (!candidateModels.includes(alt)) candidateModels.push(alt);
     }
 
@@ -156,7 +157,13 @@ Output ONLY valid JSON following this schema:
           response = resp;
           break;
         } else if (resp.status === 404) {
-          logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Modelo ${curModel} retornou 404. Tentando modelo alternativo...`);
+          const errBody = await resp.text().catch(() => '');
+          let errDetail = errBody.slice(0, 160);
+          try {
+            const errJson = JSON.parse(errBody);
+            errDetail = errJson?.error?.message || errDetail;
+          } catch {}
+          logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Modelo ${curModel} retornou 404 (${errDetail}). Tentando modelo alternativo...`);
           continue;
         } else if (resp.status === 400) {
           const errText = await resp.text();
@@ -379,7 +386,14 @@ CRITICAL RULES:
   ]
 }`;
 
-    const candidateModels = [settings.geminiModel || 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+    const candidateModels = [
+      settings.geminiModel || 'gemini-2.0-flash',
+      'gemini-2.0-flash',
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
+      'gemini-2.0-flash-lite',
+      'gemini-1.5-pro',
+    ];
     const apiKey = settings.geminiApiKey?.trim();
     if (!apiKey) {
       throw new Error('Chave Gemini API não configurada.');

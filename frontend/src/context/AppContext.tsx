@@ -132,7 +132,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   uiLanguage: 'pt', // Default interface language: Portuguese (BR)
   apiProvider: 'hybrid',
   geminiApiKey: '',
-  geminiModel: 'gemini-3.6-flash',
+  geminiModel: 'gemini-2.0-flash',
   ollamaUrl: 'http://localhost:11434',
   ollamaModel: 'llama3.2',
   backendUrl: 'http://localhost:8000',

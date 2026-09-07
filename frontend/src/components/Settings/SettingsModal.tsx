@@ -46,6 +46,8 @@ export const SettingsModal: React.FC = () => {
     }
   };
 
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+
   const handleTestGemini = async () => {
     const key = settings.geminiApiKey?.trim();
     if (!key) {
@@ -66,6 +68,14 @@ export const SettingsModal: React.FC = () => {
       success: result.success,
       message: result.message,
     });
+
+    if (result.models && result.models.length > 0) {
+      setAvailableModels(result.models);
+      if (!result.models.includes(settings.geminiModel)) {
+        const preferred = result.models.find((m) => m.includes('2.0-flash') || m.includes('flash')) || result.models[0];
+        updateSettings({ geminiModel: preferred });
+      }
+    }
 
     if (result.success && settings.backendUrl) {
       await apiService.syncGeminiSettings(settings);
@@ -278,7 +288,21 @@ export const SettingsModal: React.FC = () => {
                 value={settings.geminiModel}
                 onChange={(e) => updateSettings({ geminiModel: e.target.value })}
               >
-                <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+                {availableModels.length > 0 ? (
+                  availableModels.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recomendado / Mais Rápido)</option>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash-Lite</option>
+                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                  </>
+                )}
               </select>
             </div>
           </div>

@@ -16,8 +16,8 @@ export class StorageService {
       const saved = localStorage.getItem(KEYS.SETTINGS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (!parsed.geminiModel || parsed.geminiModel !== 'gemini-3.6-flash') {
-          parsed.geminiModel = 'gemini-3.6-flash';
+        if (!parsed.geminiModel || parsed.geminiModel === 'gemini-3.6-flash') {
+          parsed.geminiModel = 'gemini-2.0-flash';
         }
         return { ...defaultSettings, ...parsed };
       }

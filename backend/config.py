@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     app_name: str = "Language Stories Backend"
     database_url: str = f"sqlite:///{BASE_DIR / 'language_stories.db'}"
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
     ollama_url: str = os.getenv("OLLAMA_URL", "http://localhost:11434")
     ollama_model: str = "llama3.2"
     tts_cache_dir: str = str(TTS_CACHE_DIR)
