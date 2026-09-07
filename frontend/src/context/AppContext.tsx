@@ -132,7 +132,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   uiLanguage: 'pt', // Default interface language: Portuguese (BR)
   apiProvider: 'hybrid',
   geminiApiKey: '',
-  geminiModel: 'gemini-2.0-flash',
+  geminiModel: 'gemini-3.6-flash',
   ollamaUrl: 'http://localhost:11434',
   ollamaModel: 'llama3.2',
   backendUrl: 'http://localhost:8000',
@@ -179,17 +179,17 @@ function parseErrorToBookErrorInfo(
         : 'The configured API key was rejected by Google (Error 400/403). The AI cannot generate stories without a valid key.',
       actionInstructions: isPt
         ? [
-            'Obtenha uma chave gratuita da API Gemini no Google AI Studio (aistudio.google.com).',
-            'Clique em "Abrir Configurações" no botão abaixo ou no menu lateral.',
-            'Cole a chave no campo "Chave de API Gemini" e clique em Testar Conexão.',
-            'Clique em "Salvar Configurações" e tente gerar a história novamente.'
-          ]
+          'Obtenha uma chave gratuita da API Gemini no Google AI Studio (aistudio.google.com).',
+          'Clique em "Abrir Configurações" no botão abaixo ou no menu lateral.',
+          'Cole a chave no campo "Chave de API Gemini" e clique em Testar Conexão.',
+          'Clique em "Salvar Configurações" e tente gerar a história novamente.'
+        ]
         : [
-            'Get a free Gemini API key from Google AI Studio (aistudio.google.com).',
-            'Click "Open Settings" below or in the sidebar.',
-            'Paste your key into the "Gemini API Key" field and click Test Connection.',
-            'Click "Save Settings" and generate your story again.'
-          ],
+          'Get a free Gemini API key from Google AI Studio (aistudio.google.com).',
+          'Click "Open Settings" below or in the sidebar.',
+          'Paste your key into the "Gemini API Key" field and click Test Connection.',
+          'Click "Save Settings" and generate your story again.'
+        ],
       actionLabel: isPt ? 'Abrir Configurações' : 'Open Settings',
       actionType: 'open_settings',
       rawError: errMsg,
@@ -212,17 +212,17 @@ function parseErrorToBookErrorInfo(
         : 'The per-minute request limit for your free Gemini account was reached (Error 429 RESOURCE_EXHAUSTED).',
       actionInstructions: isPt
         ? [
-            'Aguarde cerca de 30 a 60 segundos para que o Google renove a sua cota temporária.',
-            'Ou alterne o modelo nas Configurações (ex: alternar para Gemini 2.5 Flash ou 1.5 Flash).',
-            'Se você tiver outra chave, insira-a nas Configurações.',
-            'Assim que aguardar, clique em "Tentar Novamente" abaixo.'
-          ]
+          'Aguarde cerca de 30 a 60 segundos para que o Google renove a sua cota temporária.',
+          'Ou alterne o modelo nas Configurações (ex: alternar para Gemini 2.5 Flash ou 1.5 Flash).',
+          'Se você tiver outra chave, insira-a nas Configurações.',
+          'Assim que aguardar, clique em "Tentar Novamente" abaixo.'
+        ]
         : [
-            'Wait about 30 to 60 seconds for Google to reset your temporary quota.',
-            'Or switch models in Settings (e.g. switch to Gemini 2.5 Flash or 1.5 Flash).',
-            'If you have another key, enter it in Settings.',
-            'Click "Try Again" below once ready.'
-          ],
+          'Wait about 30 to 60 seconds for Google to reset your temporary quota.',
+          'Or switch models in Settings (e.g. switch to Gemini 2.5 Flash or 1.5 Flash).',
+          'If you have another key, enter it in Settings.',
+          'Click "Try Again" below once ready.'
+        ],
       actionLabel: isPt ? 'Tentar Novamente' : 'Try Again',
       actionType: 'retry',
       rawError: errMsg,
@@ -236,15 +236,15 @@ function parseErrorToBookErrorInfo(
     message: errMsg || (isPt ? 'Ocorreu um erro inesperado ao redigir a narrativa.' : 'An unexpected error occurred while writing the story.'),
     actionInstructions: isPt
       ? [
-          'Verifique sua conexão com a internet.',
-          'Se estiver usando o Backend Local, certifique-se de que o servidor FastAPI está ativo (porta 8000).',
-          'Tente gerar novamente com outro tema ou clique no botão abaixo.'
-        ]
+        'Verifique sua conexão com a internet.',
+        'Se estiver usando o Backend Local, certifique-se de que o servidor FastAPI está ativo (porta 8000).',
+        'Tente gerar novamente com outro tema ou clique no botão abaixo.'
+      ]
       : [
-          'Check your internet connection.',
-          'If using the Local Backend, verify that the FastAPI server is running (port 8000).',
-          'Try again with a different theme or click the button below.'
-        ],
+        'Check your internet connection.',
+        'If using the Local Backend, verify that the FastAPI server is running (port 8000).',
+        'Try again with a different theme or click the button below.'
+      ],
     actionLabel: isPt ? 'Tentar Novamente' : 'Try Again',
     actionType: 'retry',
     rawError: errMsg,
@@ -746,15 +746,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               : `Your browser has no text-to-speech voice installed for ${currentStory.language.toUpperCase()}.`,
             actionInstructions: isPt
               ? [
-                  'Conecte o Backend FastAPI (porta 8000) para síntese neural de alta definição com Edge-TTS.',
-                  'Ou adicione vozes no sistema operacional (Configurações do Windows > Hora e Idioma > Fala > Adicionar Vozes).',
-                  'Selecione "Edge-TTS (Backend Local)" nas Configurações do app.'
-                ]
+                'Conecte o Backend FastAPI (porta 8000) para síntese neural de alta definição com Edge-TTS.',
+                'Ou adicione vozes no sistema operacional (Configurações do Windows > Hora e Idioma > Fala > Adicionar Vozes).',
+                'Selecione "Edge-TTS (Backend Local)" nas Configurações do app.'
+              ]
               : [
-                  'Connect the FastAPI backend (port 8000) for high-definition neural Edge-TTS.',
-                  'Or add speech voices in OS Settings (Windows Settings > Time & Language > Speech).',
-                  'Select "Edge-TTS (Local Backend)" in the app Settings.'
-                ],
+                'Connect the FastAPI backend (port 8000) for high-definition neural Edge-TTS.',
+                'Or add speech voices in OS Settings (Windows Settings > Time & Language > Speech).',
+                'Select "Edge-TTS (Local Backend)" in the app Settings.'
+              ],
             actionLabel: isPt ? 'Dispensar' : 'Dismiss',
             actionType: 'dismiss',
             language: currentStory.language,

@@ -72,7 +72,10 @@ export const SettingsModal: React.FC = () => {
     if (result.models && result.models.length > 0) {
       setAvailableModels(result.models);
       if (!result.models.includes(settings.geminiModel)) {
-        const preferred = result.models.find((m) => m.includes('2.0-flash') || m.includes('flash')) || result.models[0];
+        const preferred = result.models.find((m) => m === 'gemini-3.6-flash') ||
+                          result.models.find((m) => m.includes('3.') && m.includes('flash')) ||
+                          result.models.find((m) => m.includes('flash')) ||
+                          result.models[0];
         updateSettings({ geminiModel: preferred });
       }
     }
@@ -296,11 +299,12 @@ export const SettingsModal: React.FC = () => {
                   ))
                 ) : (
                   <>
-                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recomendado / Mais Rápido)</option>
+                    <option value="gemini-3.6-flash">Gemini 3.6 Flash (Padrão Estável / Recomendado)</option>
+                    <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+                    <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+                    <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
                     <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                    <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash-Lite</option>
-                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                   </>
                 )}
               </select>

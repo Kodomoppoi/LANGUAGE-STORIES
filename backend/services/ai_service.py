@@ -43,9 +43,7 @@ class AIService:
         Executa a chamada para Gemini API ou Ollama local, com diagnóstico preciso de erros.
         """
         effective_key = (api_key or settings.gemini_api_key or "").strip()
-        effective_model = (model or settings.gemini_model or "gemini-2.0-flash").strip()
-        if effective_model == "gemini-3.6-flash":
-            effective_model = "gemini-2.0-flash"
+        effective_model = (model or settings.gemini_model or "gemini-3.6-flash").strip()
 
         # 1. Tenta Google Gemini API se houver chave configurada
         if effective_key:
@@ -55,21 +53,27 @@ class AIService:
             }
             emit_log(f"Disparando inferência no modelo {effective_model} via Gemini API...", level="INFO", source="GEMINI")
 
+            # Lista oficial de modelos modernos (Família Gemini 3 e Gemini 2.5)
             candidate_models = [effective_model]
-            for alt in ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro"]:
+            for alt in ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.5-pro"]:
                 if alt not in candidate_models:
                     candidate_models.append(alt)
 
             for target_model in candidate_models:
-                endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model}:generateContent?key={effective_key}"
+                clean_model = target_model.replace("models/", "").strip()
+                endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={effective_key}"
+                headers = {
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": effective_key,
+                }
                 try:
                     async with httpx.AsyncClient(timeout=35.0) as client:
-                        resp = await client.post(endpoint, json=payload)
+                        resp = await client.post(endpoint, json=payload, headers=headers)
                         if resp.status_code == 200:
                             data = resp.json()
                             text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text")
                             if text:
-                                emit_log(f"Resposta estruturada recebida da API Gemini [{target_model}] ({len(text)} chars).", level="SUCCESS", source="GEMINI")
+                                emit_log(f"Resposta estruturada recebida da API Gemini [{clean_model}] ({len(text)} chars).", level="SUCCESS", source="GEMINI")
                                 return text
                         elif resp.status_code == 404:
                             err_detail = ""
@@ -77,11 +81,11 @@ class AIService:
                                 err_detail = resp.json().get("error", {}).get("message", resp.text[:180])
                             except Exception:
                                 err_detail = resp.text[:180]
-                            emit_log(f"Modelo {target_model} retornou 404 ({err_detail}). Tentando modelo alternativo...", level="WARN", source="GEMINI")
+                            emit_log(f"Modelo {clean_model} retornou 404 ({err_detail}). Tentando modelo alternativo...", level="WARN", source="GEMINI")
                             continue
                         elif resp.status_code == 400:
                             resp_text = resp.text
-                            emit_log(f"Gemini retornou status 400 [{target_model}]: {resp_text[:150]}", level="WARN", source="GEMINI")
+                            emit_log(f"Gemini retornou status 400 [{clean_model}]: {resp_text[:150]}", level="WARN", source="GEMINI")
                             if "API key not valid" in resp_text or "INVALID_ARGUMENT" in resp_text:
                                 raise AIServiceError(
                                     "A chave da API Gemini fornecida não é válida ou foi recusada pelo Google (Erro 400: API key not valid). Verifique ou gere uma nova chave no Google AI Studio (https://aistudio.google.com/app/apikey).",
@@ -90,48 +94,55 @@ class AIService:
                                 )
                             break
                         elif resp.status_code == 403:
-                            emit_log(f"Gemini retornou status 403 [{target_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
+                            emit_log(f"Gemini retornou status 403 [{clean_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
                             raise AIServiceError(
                                 "Acesso negado para esta chave de API do Gemini (Erro 403). Verifique se a Generative Language API está habilitada no projeto.",
                                 error_type="api_key_error",
                                 status_code=403,
                             )
                         elif resp.status_code == 429:
-                            emit_log(f"Gemini retornou status 429 [{target_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
+                            emit_log(f"Gemini retornou status 429 [{clean_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
                             raise AIServiceError(
                                 "Cota de requisições por minuto do Gemini excedida (Erro 429 RESOURCE_EXHAUSTED). Aguarde 30 a 60 segundos ou alterne o modelo.",
                                 error_type="quota_exceeded",
                                 status_code=429,
                             )
                         else:
-                            emit_log(f"Gemini retornou status {resp.status_code} [{target_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
+                            emit_log(f"Gemini retornou status {resp.status_code} [{clean_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
                 except AIServiceError:
                     raise
                 except Exception as e:
-                    emit_log(f"Falha na requisição Gemini [{target_model}] ({e}).", level="WARN", source="GEMINI")
+                    emit_log(f"Falha na requisição Gemini [{clean_model}] ({e}).", level="WARN", source="GEMINI")
 
-            # Se todos os modelos estáticos falharam com 404, tenta auto-descoberta dinâmica de modelos suportados pela chave
+            # Se todos os modelos estáticos falharam com 404, consulta os modelos autorizados para esta chave
             try:
-                emit_log("Consultando modelos disponíveis autorizados para esta chave...", level="INFO", source="GEMINI")
+                emit_log("Consultando modelos autorizados para esta chave (ListModels)...", level="INFO", source="GEMINI")
                 async with httpx.AsyncClient(timeout=12.0) as client:
-                    list_resp = await client.get(f"https://generativelanguage.googleapis.com/v1beta/models?key={effective_key}")
+                    list_resp = await client.get(
+                        f"https://generativelanguage.googleapis.com/v1beta/models?key={effective_key}",
+                        headers={"x-goog-api-key": effective_key},
+                    )
                     if list_resp.status_code == 200:
                         raw_models = list_resp.json().get("models", [])
                         discovered = [
-                            m.get("name", "").replace("models/", "")
+                            m.get("name", "").replace("models/", "").strip()
                             for m in raw_models
                             if "generateContent" in m.get("supportedGenerationMethods", [])
                         ]
                         if discovered:
-                            emit_log(f"Modelos autorizados encontrados ({len(discovered)}): {', '.join(discovered[:4])}", level="INFO", source="GEMINI")
+                            emit_log(f"Modelos autorizados encontrados na sua conta: {', '.join(discovered[:4])}", level="INFO", source="GEMINI")
                             for disc_model in discovered:
                                 if disc_model not in candidate_models:
                                     alt_endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{disc_model}:generateContent?key={effective_key}"
-                                    alt_resp = await client.post(alt_endpoint, json=payload)
+                                    alt_resp = await client.post(
+                                        alt_endpoint,
+                                        json=payload,
+                                        headers={"Content-Type": "application/json", "x-goog-api-key": effective_key},
+                                    )
                                     if alt_resp.status_code == 200:
                                         alt_text = alt_resp.json().get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text")
                                         if alt_text:
-                                            emit_log(f"Sucesso na geração usando modelo descoberto [{disc_model}]!", level="SUCCESS", source="GEMINI")
+                                            emit_log(f"Sucesso gerando com o modelo descoberto [{disc_model}]!", level="SUCCESS", source="GEMINI")
                                             return alt_text
                     else:
                         err_text = list_resp.text
@@ -141,7 +152,7 @@ class AIService:
                             pass
                         emit_log(f"Diagnóstico do Google para esta chave ({list_resp.status_code}): {err_text}", level="WARN", source="GEMINI")
             except Exception as disc_err:
-                emit_log(f"Falha no diagnóstico de modelos Gemini: {disc_err}", level="WARN", source="GEMINI")
+                emit_log(f"Falha ao executar diagnóstico de modelos: {disc_err}", level="WARN", source="GEMINI")
         else:
             emit_log("Chave Gemini não configurada. Tentando Ollama local...", level="INFO", source="STAGE")
 

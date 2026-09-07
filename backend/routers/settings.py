@@ -75,9 +75,7 @@ def get_settings() -> Dict[str, Any]:
 def update_gemini_settings(req: GeminiSettingsRequest) -> Dict[str, Any]:
     """Sincroniza a chave do Gemini do frontend para a memória do backend e persiste em .env."""
     key = req.resolved_key()
-    model = req.resolved_model() or settings.gemini_model or "gemini-2.0-flash"
-    if model == "gemini-3.6-flash":
-        model = "gemini-2.0-flash"
+    model = req.resolved_model() or settings.gemini_model or "gemini-3.6-flash"
 
     if key:
         settings.gemini_api_key = key
@@ -101,9 +99,7 @@ def update_gemini_settings(req: GeminiSettingsRequest) -> Dict[str, Any]:
 async def test_gemini_connection(req: GeminiSettingsRequest) -> Dict[str, Any]:
     """Testa a conectividade da chave contra a Google Generative Language API em tempo real."""
     key = req.resolved_key() or settings.gemini_api_key
-    model = req.resolved_model() or settings.gemini_model or "gemini-2.0-flash"
-    if model == "gemini-3.6-flash":
-        model = "gemini-2.0-flash"
+    model = req.resolved_model() or settings.gemini_model or "gemini-3.6-flash"
 
     if not key or not key.strip():
         emit_log("Teste Gemini cancelado: nenhuma chave fornecida ou configurada.", level="WARN", source="GEMINI")

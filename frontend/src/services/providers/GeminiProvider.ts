@@ -127,12 +127,11 @@ Output ONLY valid JSON following this schema:
 }
 `;
 
-    let modelName = settings.geminiModel || 'gemini-2.0-flash';
-    if (modelName === 'gemini-3.6-flash') modelName = 'gemini-2.0-flash';
+    const modelName = settings.geminiModel || 'gemini-3.6-flash';
     logService.addLog('INFO', 'GEMINI', `[Cliente Direto] Disparando inferência no modelo ${modelName}...`);
 
     const candidateModels = [modelName];
-    for (const alt of ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro']) {
+    for (const alt of ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro']) {
       if (!candidateModels.includes(alt)) candidateModels.push(alt);
     }
 
@@ -140,13 +139,17 @@ Output ONLY valid JSON following this schema:
     let usedModel = modelName;
 
     for (const curModel of candidateModels) {
-      usedModel = curModel;
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${curModel}:generateContent?key=${settings.geminiApiKey}`;
+      const cleanModel = curModel.replace('models/', '').trim();
+      usedModel = cleanModel;
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${settings.geminiApiKey}`;
 
       try {
         const resp = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': settings.geminiApiKey,
+          },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: { responseMimeType: 'application/json' },
@@ -163,7 +166,7 @@ Output ONLY valid JSON following this schema:
             const errJson = JSON.parse(errBody);
             errDetail = errJson?.error?.message || errDetail;
           } catch {}
-          logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Modelo ${curModel} retornou 404 (${errDetail}). Tentando modelo alternativo...`);
+          logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Modelo ${cleanModel} retornou 404 (${errDetail}). Tentando modelo alternativo...`);
           continue;
         } else if (resp.status === 400) {
           const errText = await resp.text();
@@ -220,27 +223,27 @@ Output ONLY valid JSON following this schema:
     // Defensive parsing for paragraphs
     const paragraphs: StoryParagraph[] = Array.isArray(parsed?.paragraphs)
       ? parsed.paragraphs.map((p: any, pIdx: number) => ({
-          id: p?.id || `p-${pIdx + 1}`,
-          sentences: Array.isArray(p?.sentences)
-            ? p.sentences.map((s: any, sIdx: number) => ({
-                id: s?.id || `s-${pIdx + 1}-${sIdx + 1}`,
-                text: s?.text || '',
-                translation: s?.translation || '',
-                tokens: Array.isArray(s?.tokens)
-                  ? s.tokens.map((t: any, tIdx: number) => ({
-                      id: t?.id || `t-${pIdx + 1}-${sIdx + 1}-${tIdx + 1}`,
-                      text: t?.text || '',
-                      ruby: t?.ruby,
-                      phonetic: t?.phonetic,
-                      translation: t?.translation,
-                      partOfSpeech: t?.partOfSpeech,
-                      explanation: t?.explanation,
-                      isTargetWord: Boolean(t?.isTargetWord),
-                    }))
-                  : [],
+        id: p?.id || `p-${pIdx + 1}`,
+        sentences: Array.isArray(p?.sentences)
+          ? p.sentences.map((s: any, sIdx: number) => ({
+            id: s?.id || `s-${pIdx + 1}-${sIdx + 1}`,
+            text: s?.text || '',
+            translation: s?.translation || '',
+            tokens: Array.isArray(s?.tokens)
+              ? s.tokens.map((t: any, tIdx: number) => ({
+                id: t?.id || `t-${pIdx + 1}-${sIdx + 1}-${tIdx + 1}`,
+                text: t?.text || '',
+                ruby: t?.ruby,
+                phonetic: t?.phonetic,
+                translation: t?.translation,
+                partOfSpeech: t?.partOfSpeech,
+                explanation: t?.explanation,
+                isTargetWord: Boolean(t?.isTargetWord),
               }))
-            : [],
-        }))
+              : [],
+          }))
+          : [],
+      }))
       : [];
 
     const fullText = paragraphs
@@ -251,35 +254,35 @@ Output ONLY valid JSON following this schema:
     // Defensive parsing for target vocabulary
     const targetVocabulary: DictionaryEntry[] = Array.isArray(parsed?.targetVocabulary)
       ? parsed.targetVocabulary.map((v: any, vIdx: number) => ({
-          id: v?.id || `v-${vIdx + 1}`,
-          word: v?.word || '',
-          ruby: v?.ruby,
-          phonetic: v?.phonetic,
-          translation: v?.translation || 'Vocabulary definition',
-          partOfSpeech: v?.partOfSpeech || 'Word',
-          definition: v?.definition || v?.translation || '',
-          exampleSentence: v?.exampleSentence || '',
-          exampleTranslation: v?.exampleTranslation || '',
-          language: params.language,
-          proficiency: params.proficiency,
-          isStarred: false,
-          srsMetrics: createDefaultSRSMetrics(),
-          createdAt: new Date().toISOString(),
-        }))
+        id: v?.id || `v-${vIdx + 1}`,
+        word: v?.word || '',
+        ruby: v?.ruby,
+        phonetic: v?.phonetic,
+        translation: v?.translation || 'Vocabulary definition',
+        partOfSpeech: v?.partOfSpeech || 'Word',
+        definition: v?.definition || v?.translation || '',
+        exampleSentence: v?.exampleSentence || '',
+        exampleTranslation: v?.exampleTranslation || '',
+        language: params.language,
+        proficiency: params.proficiency,
+        isStarred: false,
+        srsMetrics: createDefaultSRSMetrics(),
+        createdAt: new Date().toISOString(),
+      }))
       : [];
 
     // Defensive parsing for quiz questions
     const quiz: QuizQuestion[] = Array.isArray(parsed?.quiz)
       ? parsed.quiz.map((q: any, qIdx: number) => ({
-          id: q?.id || `q-${qIdx + 1}`,
-          type: q?.type || 'mcq',
-          prompt: q?.prompt || 'Meaning of target word?',
-          targetWord: q?.targetWord || '',
-          contextSentence: q?.contextSentence,
-          options: Array.isArray(q?.options) ? q.options : [],
-          correctAnswer: q?.correctAnswer || (q?.options?.[0] ?? ''),
-          explanation: q?.explanation || '',
-        }))
+        id: q?.id || `q-${qIdx + 1}`,
+        type: q?.type || 'mcq',
+        prompt: q?.prompt || 'Meaning of target word?',
+        targetWord: q?.targetWord || '',
+        contextSentence: q?.contextSentence,
+        options: Array.isArray(q?.options) ? q.options : [],
+        correctAnswer: q?.correctAnswer || (q?.options?.[0] ?? ''),
+        explanation: q?.explanation || '',
+      }))
       : [];
 
     return enrichStoryPhonetics({
@@ -387,12 +390,12 @@ CRITICAL RULES:
 }`;
 
     const candidateModels = [
-      settings.geminiModel || 'gemini-2.0-flash',
-      'gemini-2.0-flash',
+      settings.geminiModel || 'gemini-3.6-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash',
+      'gemini-3.7-flash',
       'gemini-2.5-flash',
-      'gemini-1.5-flash',
-      'gemini-2.0-flash-lite',
-      'gemini-1.5-pro',
+      'gemini-2.5-pro',
     ];
     const apiKey = settings.geminiApiKey?.trim();
     if (!apiKey) {
@@ -401,11 +404,15 @@ CRITICAL RULES:
 
     let rawText = '';
     for (const model of candidateModels) {
+      const cleanModel = model.replace('models/', '').trim();
       try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`;
         const response = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
