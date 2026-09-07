@@ -9,6 +9,7 @@ import {
 import { createDefaultSRSMetrics } from '../srsEngine';
 import { GenerateStoryParams, StoryGeneratorProvider } from './types';
 import { logService } from '../logService';
+import { enrichStoryPhonetics } from '../auxiliaryPhonetics';
 
 export class GeminiProvider implements StoryGeneratorProvider {
   public readonly id = 'gemini';
@@ -157,6 +158,27 @@ Output ONLY valid JSON following this schema:
         } else if (resp.status === 404) {
           logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Modelo ${curModel} retornou 404. Tentando modelo alternativo...`);
           continue;
+        } else if (resp.status === 400) {
+          const errText = await resp.text();
+          logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Gemini retornou 400 [${curModel}]: ${errText.slice(0, 160)}`);
+          const err = new Error('A chave da API Gemini fornecida não é válida ou foi recusada pelo Google (Erro 400). Por favor, verifique ou gere uma nova chave no Google AI Studio.');
+          (err as any).errorType = 'api_key_error';
+          (err as any).statusCode = 400;
+          throw err;
+        } else if (resp.status === 403) {
+          const errText = await resp.text();
+          logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Gemini retornou 403 [${curModel}]: ${errText.slice(0, 160)}`);
+          const err = new Error('Acesso negado para esta chave da API Gemini (Erro 403). Verifique se as permissões da Generative Language API estão ativas.');
+          (err as any).errorType = 'api_key_error';
+          (err as any).statusCode = 403;
+          throw err;
+        } else if (resp.status === 429) {
+          const errText = await resp.text();
+          logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Gemini retornou 429 [${curModel}]: ${errText.slice(0, 160)}`);
+          const err = new Error('Cota de requisições por minuto do Gemini excedida (Erro 429 RESOURCE_EXHAUSTED). Aguarde 30 a 60 segundos ou alterne o modelo.');
+          (err as any).errorType = 'quota_exceeded';
+          (err as any).statusCode = 429;
+          throw err;
         } else {
           const errText = await resp.text();
           logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Gemini retornou status ${resp.status}: ${errText.slice(0, 160)}`);
@@ -164,6 +186,7 @@ Output ONLY valid JSON following this schema:
           break;
         }
       } catch (networkErr: any) {
+        if (networkErr?.errorType) throw networkErr;
         logService.addLog('ERROR', 'GEMINI', `[Cliente Direto] Erro de rede ao chamar ${curModel}: ${networkErr?.message}`);
       }
     }
@@ -171,7 +194,9 @@ Output ONLY valid JSON following this schema:
     if (!response || !response.ok) {
       const errStatus = response ? response.status : 'Offline';
       logService.addLog('ERROR', 'GEMINI', `[Cliente Direto] Falha final na requisição à API Gemini (${errStatus}).`);
-      throw new Error(`Gemini API returned status ${errStatus}`);
+      const err = new Error(`Gemini API returned status ${errStatus}`);
+      (err as any).errorType = 'generation_error';
+      throw err;
     }
 
     const data = await response.json();
@@ -250,7 +275,7 @@ Output ONLY valid JSON following this schema:
         }))
       : [];
 
-    return {
+    return enrichStoryPhonetics({
       id: `story-${Date.now()}`,
       title: parsed?.title || 'Generated Story',
       titleTranslation: parsed?.titleTranslation || 'Story Translation',
@@ -266,7 +291,7 @@ Output ONLY valid JSON following this schema:
       createdAt: new Date().toISOString(),
       isRTL: params.language === 'ar',
       fullText,
-    };
+    });
   }
 
   /**

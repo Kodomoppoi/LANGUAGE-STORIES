@@ -21,7 +21,18 @@ def clean_json_response(raw_text: str) -> str:
     return raw_text.strip()
 
 
+class AIServiceError(Exception):
+    """Exceção estruturada para falhas de provedores de IA e cotas."""
+    def __init__(self, message: str, error_type: str = "generation_error", status_code: int = 500):
+        super().__init__(message)
+        self.error_type = error_type
+        self.status_code = status_code
+
+
 class AIService:
+    def __init__(self):
+        self._cache = {}
+
     async def _call_llm(
         self,
         prompt: str,
@@ -29,7 +40,7 @@ class AIService:
         model: Optional[str] = None,
     ) -> str:
         """
-        Executa a chamada para Gemini API ou Ollama local, com fallback defensivo.
+        Executa a chamada para Gemini API ou Ollama local, com diagnóstico preciso de erros.
         """
         effective_key = (api_key or settings.gemini_api_key or "").strip()
         effective_model = (model or settings.gemini_model or "gemini-3.6-flash").strip()
@@ -61,14 +72,40 @@ class AIService:
                         elif resp.status_code == 404:
                             emit_log(f"Modelo {target_model} não encontrado (404) para esta chave. Tentando modelo alternativo...", level="WARN", source="GEMINI")
                             continue
+                        elif resp.status_code == 400:
+                            resp_text = resp.text
+                            emit_log(f"Gemini retornou status 400 [{target_model}]: {resp_text[:150]}", level="WARN", source="GEMINI")
+                            if "API key not valid" in resp_text or "INVALID_ARGUMENT" in resp_text:
+                                raise AIServiceError(
+                                    "A chave da API Gemini fornecida não é válida ou foi recusada pelo Google (Erro 400: API key not valid). Verifique ou gere uma nova chave no Google AI Studio.",
+                                    error_type="api_key_error",
+                                    status_code=400,
+                                )
+                            break
+                        elif resp.status_code == 403:
+                            emit_log(f"Gemini retornou status 403 [{target_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
+                            raise AIServiceError(
+                                "Acesso negado para esta chave de API do Gemini (Erro 403). Verifique se a Generative Language API está habilitada.",
+                                error_type="api_key_error",
+                                status_code=403,
+                            )
+                        elif resp.status_code == 429:
+                            emit_log(f"Gemini retornou status 429 [{target_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
+                            raise AIServiceError(
+                                "Cota de requisições por minuto do Gemini excedida (Erro 429 RESOURCE_EXHAUSTED). Aguarde 30 a 60 segundos ou alterne o modelo.",
+                                error_type="quota_exceeded",
+                                status_code=429,
+                            )
                         else:
                             emit_log(f"Gemini retornou status {resp.status_code} [{target_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
+                except AIServiceError:
+                    raise
                 except Exception as e:
                     emit_log(f"Falha na requisição Gemini [{target_model}] ({e}).", level="WARN", source="GEMINI")
         else:
-            emit_log("Chave Gemini não detectada no backend. Tentando Ollama local...", level="INFO", source="STAGE")
+            emit_log("Chave Gemini não configurada. Tentando Ollama local...", level="INFO", source="STAGE")
 
-        # 2. Tenta Ollama local
+        # 2. Tenta Ollama local se configurado
         if settings.ollama_url:
             endpoint = f"{settings.ollama_url.rstrip('/')}/api/generate"
             payload = {
@@ -86,8 +123,19 @@ class AIService:
             except Exception as e:
                 print(f"[AIService] Ollama API error: {e}")
 
-        # Se nenhum provedor LLM estiver configurado ou online, lança erro para acionar fallback
-        raise RuntimeError("Nenhum provedor de IA (Gemini ou Ollama) respondeu. Verifique sua chave nas Configurações.")
+        # Se não há chave e nem Ollama respondeu
+        if not effective_key:
+            raise AIServiceError(
+                "Chave de API do Gemini não configurada. Acesse as Configurações para inserir sua chave gratuita do Google AI Studio.",
+                error_type="api_key_error",
+                status_code=401,
+            )
+
+        raise AIServiceError(
+            "Nenhum provedor de IA (Gemini ou Ollama) respondeu. Verifique sua conexão e chave nas Configurações.",
+            error_type="generation_error",
+            status_code=500,
+        )
 
     async def curate_vocabulary_stage1(
         self,
@@ -105,7 +153,6 @@ class AIService:
         """
         profile = registry.get(language)
 
-        # Busca palavras fixadas (⭐) e palavras em alerta no cofre do SQLite
         pinned_entries = (
             db.query(VocabularyModel)
             .filter(VocabularyModel.language == language, VocabularyModel.is_pinned == True)
@@ -142,11 +189,13 @@ class AIService:
             if isinstance(vocab, list) and len(vocab) > 0:
                 emit_log(f"Etapa 1 Concluída: {len(vocab)} termos alvo curados com sucesso.", level="SUCCESS", source="STAGE")
                 return vocab
+        except AIServiceError:
+            raise
         except Exception as e:
-            emit_log(f"Erro na Etapa 1 ({e}). Usando perfil inteligente de fallback.", level="WARN", source="STAGE")
+            emit_log(f"Erro na Etapa 1 ({e}).", level="ERROR", source="STAGE")
+            raise AIServiceError(f"Erro durante a curadoria de vocabulário: {e}", error_type="generation_error", status_code=500)
 
-        sample = profile.get_sample_data(proficiency, theme, native_lang=native_lang)
-        return sample.get("story_dictionary", [])
+        raise AIServiceError("A IA não retornou um vocabulário estruturado válido.", error_type="generation_error", status_code=500)
 
     async def generate_interlinear_story_stage2(
         self,
@@ -182,11 +231,14 @@ class AIService:
             if "sentences" in data and len(data["sentences"]) > 0:
                 emit_log(f"Etapa 2 Concluída: História redigida com {len(data['sentences'])} pares de sentenças!", level="SUCCESS", source="STAGE")
                 story_payload = data
+        except AIServiceError:
+            raise
         except Exception as e:
-            emit_log(f"Erro na Etapa 2 ({e}). Usando modelo literário de contingência.", level="WARN", source="STAGE")
+            emit_log(f"Erro na Etapa 2 ({e}).", level="ERROR", source="STAGE")
+            raise AIServiceError(f"Erro durante a redação da narrativa: {e}", error_type="generation_error", status_code=500)
 
-        if not story_payload:
-            story_payload = profile.get_sample_data(proficiency, theme, native_lang=native_lang)
+        if not story_payload or not story_payload.get("sentences"):
+            raise AIServiceError("A IA não retornou sentenças válidas para a narrativa.", error_type="generation_error", status_code=500)
 
         # Normaliza sentences (SentencePair: id, target_text, translation_text)
         sentences_normalized = []

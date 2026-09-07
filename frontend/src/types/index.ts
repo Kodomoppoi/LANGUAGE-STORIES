@@ -215,4 +215,25 @@ export interface MascotState {
   progress: number;
 }
 
+// ---------------------------------------------------------------------------
+// Diagnóstico de Erros no Livro (Book Error Info)
+// ---------------------------------------------------------------------------
+
+export type BookErrorType =
+  | 'api_key_error'
+  | 'quota_exceeded'
+  | 'tts_error'
+  | 'generation_error';
+
+export interface BookErrorInfo {
+  type: BookErrorType;
+  title: string;
+  message: string;
+  actionInstructions: string[];
+  actionLabel: string;
+  actionType: 'open_settings' | 'retry' | 'dismiss';
+  rawError?: string;
+  language?: LanguageCode;
+}
+
 export * from './deepDive';

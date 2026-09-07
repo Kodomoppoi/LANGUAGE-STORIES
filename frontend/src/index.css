@@ -4112,3 +4112,240 @@ body[data-theme='dark'] .book-welcome-input {
   line-height: 1.4;
   margin: 0;
 }
+
+/* ==========================================================================
+   Book Error Diagnostic Card (Diagnóstico de Erros no Livro)
+   ========================================================================== */
+
+.book-error-card-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 8px 4px;
+  animation: fadeInBookError 0.35s ease-out;
+}
+
+@keyframes fadeInBookError {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.book-error-seal-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.book-error-seal {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.book-error-seal.seal-api_key_error {
+  background: radial-gradient(circle at 35% 35%, #e05244, #991b1b);
+  color: #fff;
+}
+
+.book-error-seal.seal-quota_exceeded {
+  background: radial-gradient(circle at 35% 35%, #f59e0b, #b45309);
+  color: #fff;
+}
+
+.book-error-seal.seal-tts_error {
+  background: radial-gradient(circle at 35% 35%, #8b5cf6, #5b21b6);
+  color: #fff;
+}
+
+.book-error-seal.seal-generation_error {
+  background: radial-gradient(circle at 35% 35%, #ef4444, #7f1d1d);
+  color: #fff;
+}
+
+.book-error-icon {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+.book-error-badge {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(180, 80, 60, 0.14);
+  color: #c0392b;
+  border: 1px solid rgba(180, 80, 60, 0.25);
+}
+
+body[data-theme='dark'] .book-error-badge {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.book-error-title {
+  font-family: 'Cinzel', 'Noto Serif', serif;
+  font-size: 1.28rem;
+  font-weight: 700;
+  color: var(--page-text-main);
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+}
+
+.book-error-explanation {
+  background: rgba(180, 100, 60, 0.06);
+  border-left: 3px solid #c0392b;
+  padding: 8px 12px;
+  border-radius: 0 8px 8px 0;
+  margin-bottom: 14px;
+}
+
+body[data-theme='dark'] .book-error-explanation {
+  background: rgba(239, 68, 68, 0.1);
+  border-left-color: #ef4444;
+}
+
+.book-error-explanation p {
+  font-size: 0.82rem;
+  color: var(--page-text-main);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.book-error-resolution-box {
+  background: rgba(160, 120, 80, 0.07);
+  border: 1px solid rgba(160, 120, 80, 0.18);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  flex: 1;
+}
+
+body[data-theme='dark'] .book-error-resolution-box {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.resolution-heading {
+  font-family: 'Cinzel', 'Noto Serif', serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--page-text-main);
+  margin: 0 0 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.resolution-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.resolution-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.78rem;
+  color: var(--page-text-main);
+  line-height: 1.4;
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(160, 100, 50, 0.2);
+  color: var(--page-text-main);
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+body[data-theme='dark'] .step-number {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.step-text {
+  flex: 1;
+}
+
+.book-error-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.book-error-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.book-error-btn.primary-action-btn {
+  background: linear-gradient(135deg, #b45309, #78350f);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(180, 83, 9, 0.3);
+}
+
+.book-error-btn.primary-action-btn:hover {
+  background: linear-gradient(135deg, #d97706, #92400e);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(180, 83, 9, 0.45);
+}
+
+.book-error-btn.secondary-action-btn {
+  background: rgba(160, 120, 80, 0.15);
+  color: var(--page-text-main);
+  border: 1px solid rgba(160, 120, 80, 0.25);
+}
+
+.book-error-btn.secondary-action-btn:hover {
+  background: rgba(160, 120, 80, 0.25);
+}
+
+.book-error-btn.dismiss-action-btn {
+  background: transparent;
+  color: var(--page-text-muted);
+  border: 1px solid rgba(160, 120, 80, 0.2);
+  margin-left: auto;
+}
+
+.book-error-btn.dismiss-action-btn:hover {
+  background: rgba(160, 120, 80, 0.1);
+  color: var(--page-text-main);
+}

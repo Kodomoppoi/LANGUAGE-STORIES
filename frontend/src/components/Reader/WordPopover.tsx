@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { createDefaultSRSMetrics, getStatusColor, getRepetitionWeight } from '../../services/srsEngine';
 import { DictionaryEntry, ChineseTraits } from '../../types';
+import { getAuxiliaryRuby } from '../../services/auxiliaryPhonetics';
 
 export const WordPopover: React.FC = () => {
   const {
@@ -72,6 +73,9 @@ export const WordPopover: React.FC = () => {
   const radicals = traits.radicals || (traits.radicalChar ? `${traits.radicalChar} (${traits.radicalMeaning || ''})` : undefined);
   const hskLevel = traits.hskLevel;
 
+  // Fonética auxiliar se não estiver no token original
+  const effectiveRuby = activeToken.ruby || getAuxiliaryRuby(activeToken.text, currentLanguage);
+
   // Pontuação contínua de saber e cor de status (0% a 100%)
   const masteryScore = vaultEntry?.masteryScore ?? activeToken.masteryScore ?? 25;
   const statusColor = vaultEntry?.statusColor ?? activeToken.statusColor ?? getStatusColor(masteryScore);
@@ -82,7 +86,7 @@ export const WordPopover: React.FC = () => {
     const newEntry: DictionaryEntry = {
       id: `vocab-${Date.now()}`,
       word: activeToken.text,
-      ruby: activeToken.ruby,
+      ruby: effectiveRuby,
       translation: activeToken.translation || 'Target word',
       partOfSpeech: activeToken.partOfSpeech || 'Noun',
       definition: activeToken.explanation || `Usage of ${activeToken.text} in context.`,
@@ -150,8 +154,8 @@ export const WordPopover: React.FC = () => {
         <div className="lateral-word-title-row">
           <div>
             <span className="lateral-word-main">{activeToken.text}</span>
-            {activeToken.ruby && (
-              <span className="lateral-word-ruby">[{activeToken.ruby}]</span>
+            {effectiveRuby && (
+              <span className="lateral-word-ruby">[{effectiveRuby}]</span>
             )}
           </div>
         </div>

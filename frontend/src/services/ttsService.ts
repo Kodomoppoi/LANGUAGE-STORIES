@@ -65,6 +65,14 @@ class TTSService {
       utterance.voice = matchedVoice;
     } else {
       utterance.lang = hints[0] || 'en-US';
+      if (voices.length > 0) {
+        console.warn(`[TTS] Nenhuma voz nativa encontrada para o idioma "${language}".`);
+        callbacks?.onError?.({
+          type: 'voice_unavailable',
+          language,
+          message: `Nenhuma voz instalada para o idioma ${language} neste navegador.`,
+        });
+      }
     }
 
     utterance.onstart = () => {
@@ -91,6 +99,20 @@ class TTSService {
 
     // Workaround for Chromium garbage collection issue with long utterances
     window.speechSynthesis.speak(utterance);
+  }
+
+  public hasVoiceForLanguage(language: LanguageCode): boolean {
+    if (!('speechSynthesis' in window)) return false;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) return true; // Vozes podem ainda estar sendo carregadas
+    const hints = LANGUAGE_VOICE_MAP[language] || [];
+    return voices.some((v) =>
+      hints.some(
+        (hint) =>
+          v.lang.toLowerCase().includes(hint.toLowerCase()) ||
+          v.name.toLowerCase().includes(hint.toLowerCase())
+      )
+    );
   }
 
   public speakToken(tokenText: string, language: LanguageCode, speed: number = 0.9): void {

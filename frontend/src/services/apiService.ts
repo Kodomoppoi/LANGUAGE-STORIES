@@ -142,88 +142,29 @@ class ApiService {
       (settings.apiProvider === 'hybrid' || settings.isBackendConnected) &&
       this.backendProvider.isAvailable(settings)
     ) {
-      try {
-        return await this.backendProvider.generateStoryStream(finalParams, settings, onEvent);
-      } catch (err) {
-        console.warn('Backend SSE stream failed, falling back with mascot events...', err);
-      }
+      // Repassa diretamente a geração e quaisquer erros (chave inválida, cota, rede) para o AppContext
+      return await this.backendProvider.generateStoryStream(finalParams, settings, onEvent);
     }
 
-    // 2. Simulação e Fallback fiel ao Pipeline de 2 Etapas com eventos SSE para o mascote
-    try {
-      // ETAPA 1: Curadoria de Vocabulário Alvo
-      onEvent({
-        event: 'stage_start:curation',
-        data: {
-          message: 'Analisando seu cofre e selecionando vocabulário ideal...',
-        },
-      });
-
-      // Breve pausa para o mascote exibir animação de busca/lupa
-      await new Promise((r) => setTimeout(r, 900));
-
-      const newWordsCount = finalParams.injectNewWordsCount || 5;
-      const reviewWordsCount = finalParams.targetWords?.length || 3;
-
-      onEvent({
-        event: 'stage_curation_done',
-        data: {
-          new_words_count: newWordsCount,
-          review_words_count: reviewWordsCount,
-          message: `Vocabulário curado com sucesso: ${newWordsCount} novas e ${reviewWordsCount} para reforço!`,
-        },
-      });
-
-      await new Promise((r) => setTimeout(r, 700));
-
-      // ETAPA 2: Geração da Narrativa e Glossário
-      const langLabel = finalParams.language === 'zh' ? 'em Mandarim' : '';
-      onEvent({
-        event: 'stage_start:generation',
-        data: {
-          message: `Escrevendo a história ${langLabel} com repetição e dicionário...`.trim(),
-        },
-      });
-
-      let generatedStory: Story;
-
-      // Executa Gemini se configurado
-      if (
-        (settings.apiProvider === 'gemini' || settings.apiProvider === 'hybrid') &&
-        this.geminiProvider.isAvailable(settings)
-      ) {
-        try {
-          generatedStory = await this.geminiProvider.generateStory(finalParams, settings);
-        } catch (geminiErr: any) {
-          console.warn('Gemini failed during stream, using procedural fallback:', geminiErr);
-          logService.addLog('WARN', 'STAGE', `Falha na IA Gemini (${geminiErr?.message || 'erro desconhecido'}). Ativando contingência inteligente...`);
-          generatedStory = await this.proceduralProvider.generateStory(finalParams, settings);
-        }
-      } else {
-        generatedStory = await this.proceduralProvider.generateStory(finalParams, settings);
-      }
-
-      onEvent({
-        event: 'stage_done',
-        data: {
-          story_id: generatedStory.id,
-          title: generatedStory.title,
-          dictionary: generatedStory.targetVocabulary,
-          story: generatedStory,
-          message: 'História e dicionário criados com sucesso!',
-        },
-      });
-
-      return generatedStory;
-    } catch (pipelineErr: any) {
-      onEvent({
-        event: 'error',
-        data: {
-          error_message: pipelineErr?.message || 'Erro inesperado na geração da história',
-        },
-      });
-      throw pipelineErr;
+    // 2. Provedor Gemini direto no cliente (se configurado)
+    if (
+      settings.apiProvider === 'gemini' &&
+      this.geminiProvider.isAvailable(settings)
+    ) {
+      return await this.geminiProvider.generateStory(finalParams, settings);
     }
+
+    // 3. Provedor Procedural apenas se explicitamente selecionado como 'mock' nas configurações
+    if (settings.apiProvider === 'mock') {
+      return await this.proceduralProvider.generateStory(finalParams, settings);
+    }
+
+    // Se nenhum provedor estiver viável, dispara erro explícito para o caderno exibir o diagnóstico
+    throw new Error(
+      settings.uiLanguage === 'pt'
+        ? 'Nenhum provedor de IA (Gemini ou Backend) está disponível. Verifique sua chave de API nas Configurações.'
+        : 'No AI provider (Gemini or Backend) is available. Please check your API key in Settings.'
+    );
   }
 
   /**
@@ -242,32 +183,32 @@ class ApiService {
       nativeLanguage: nativeLang,
     };
 
-    // 1. Try Backend if connected or hybrid
+    // 1. Tenta Backend se conectado ou hybrid
     if (
       (settings.apiProvider === 'hybrid' || settings.isBackendConnected) &&
       this.backendProvider.isAvailable(settings)
     ) {
-      try {
-        return await this.backendProvider.generateStory(finalParams, settings);
-      } catch (err) {
-        console.warn('Backend provider failed, trying next strategy...', err);
-      }
+      return await this.backendProvider.generateStory(finalParams, settings);
     }
 
-    // 2. Try direct Google Gemini API if key is present
+    // 2. Tenta direct Google Gemini API se configurado
     if (
-      (settings.apiProvider === 'gemini' || settings.apiProvider === 'hybrid') &&
+      settings.apiProvider === 'gemini' &&
       this.geminiProvider.isAvailable(settings)
     ) {
-      try {
-        return await this.geminiProvider.generateStory(finalParams, settings);
-      } catch (err) {
-        console.warn('Gemini provider failed, falling back to smart simulation...', err);
-      }
+      return await this.geminiProvider.generateStory(finalParams, settings);
     }
 
-    // 3. Smart Procedural Simulation Fallback (Always available)
-    return await this.proceduralProvider.generateStory(finalParams, settings);
+    // 3. Mock procedural apenas se explicitamente selecionado
+    if (settings.apiProvider === 'mock') {
+      return await this.proceduralProvider.generateStory(finalParams, settings);
+    }
+
+    throw new Error(
+      settings.uiLanguage === 'pt'
+        ? 'Nenhum provedor de IA disponível. Verifique sua chave de API nas Configurações.'
+        : 'No AI provider available. Please check your API key in Settings.'
+    );
   }
 
   /**

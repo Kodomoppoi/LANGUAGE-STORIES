@@ -6,7 +6,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..services.ai_service import ai_service
+from ..services.ai_service import ai_service, AIServiceError
+from ..languages.phonetics import enrich_tokens_phonetics, get_phonetic_reading
 
 
 router = APIRouter(prefix="/api/stories", tags=["Stories"])
@@ -56,13 +57,15 @@ class GenerateStoryRequest(BaseModel):
         return (self.gemini_model or self.geminiModel or "").strip()
 
 
-def _enrich_story_response(story_data: Dict[str, Any]) -> Dict[str, Any]:
+def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] = None) -> Dict[str, Any]:
     """
     Garante máxima compatibilidade de contratos entre frontend legado e
-    nova arquitetura interlinear (sentences, paragraphs, dictionary, full_text).
+    nova arquitetura interlinear (sentences, paragraphs, dictionary, targetVocabulary, full_text).
+    Aplica enriquecimento fonético para 100% de cobertura de Ruby em Mandarim e Japonês.
     """
     sentences = story_data.get("sentences", [])
     story_dict = story_data.get("story_dictionary", [])
+    lang = (language or story_data.get("language") or "zh").lower()
 
     # Cria parágrafos estruturados caso o frontend utilize tokens diretamente
     paragraphs = []
@@ -81,10 +84,11 @@ def _enrich_story_response(story_data: Dict[str, Any]) -> Dict[str, Any]:
 
         for c_idx, unit in enumerate(units):
             matched = next((d for d in story_dict if unit in d.get("word", "")), None)
+            ruby_val = matched.get("ruby") if matched else None
             tokens.append({
                 "id": f"t-{idx}-{c_idx}",
                 "text": unit,
-                "ruby": matched.get("ruby") if matched else None,
+                "ruby": ruby_val,
                 "translation": matched.get("context_translation") if matched else None,
                 "partOfSpeech": matched.get("part_of_speech") if matched else None,
                 "isTargetWord": bool(matched),
@@ -92,6 +96,9 @@ def _enrich_story_response(story_data: Dict[str, Any]) -> Dict[str, Any]:
                 "statusColor": matched.get("status_color", "orange") if matched else "orange",
                 "traits": matched.get("traits", {}) if matched else {},
             })
+
+        # 100% Ruby: Preenche fonética para todos os tokens restantes no idioma
+        tokens = enrich_tokens_phonetics(tokens, lang)
 
         sentences_objects.append({
             "id": f"s-{idx + 1}",
@@ -112,9 +119,36 @@ def _enrich_story_response(story_data: Dict[str, Any]) -> Dict[str, Any]:
             "sentences": chunk,
         })
 
+    # Constrói targetVocabulary estritamente compatível com DictionaryEntry do frontend
+    target_vocabulary = []
+    for idx, item in enumerate(story_dict):
+        traits = item.get("traits", {})
+        word_val = item.get("word") or item.get("lemma") or f"Term-{idx}"
+        ruby_val = item.get("ruby") or item.get("pinyin") or get_phonetic_reading(word_val, lang)
+        target_vocabulary.append({
+            "id": str(item.get("id") or f"dict-{idx}-{Date.now() if 'Date' in locals() else idx}"),
+            "word": word_val,
+            "ruby": ruby_val,
+            "phonetic": ruby_val,
+            "translation": item.get("context_translation") or item.get("translation") or "Termo em contexto",
+            "partOfSpeech": item.get("part_of_speech") or traits.get("part_of_speech") or "Noun",
+            "definition": item.get("context_translation") or item.get("translation") or "Vocabulário alvo",
+            "exampleSentence": item.get("example_sentence") or word_val,
+            "exampleTranslation": item.get("example_translation") or item.get("context_translation") or "",
+            "language": lang,
+            "proficiency": story_data.get("proficiency", "A2"),
+            "isStarred": bool(item.get("is_pinned")),
+            "isPinned": bool(item.get("is_pinned")),
+            "masteryScore": round(item.get("mastery_score", 0.25) * 100),
+            "statusColor": item.get("status_color", "orange"),
+            "repetitionWeight": item.get("repetition_weight", 1.0),
+            "traits": traits,
+        })
+
     enriched = dict(story_data)
     enriched["paragraphs"] = paragraphs
     enriched["dictionary"] = story_dict
+    enriched["targetVocabulary"] = target_vocabulary
     enriched["translations"] = translations
     enriched["paragraph_translations"] = translations
     enriched["titleTranslation"] = story_data.get("title_translation", "")
@@ -145,33 +179,38 @@ async def generate_story(
         if gemini_model:
             settings.gemini_model = gemini_model
 
-    # Estágio 1: Curadoria
-    curated_vocab = await ai_service.curate_vocabulary_stage1(
-        language=req.language,
-        proficiency=req.proficiency,
-        theme=theme,
-        target_count=count,
-        db=db,
-        native_lang=native,
-        api_key=gemini_key,
-        model=gemini_model,
-    )
+    try:
+        # Estágio 1: Curadoria
+        curated_vocab = await ai_service.curate_vocabulary_stage1(
+            language=req.language,
+            proficiency=req.proficiency,
+            theme=theme,
+            target_count=count,
+            db=db,
+            native_lang=native,
+            api_key=gemini_key,
+            model=gemini_model,
+        )
 
-    # Estágio 2: Geração Interlinear e Hidratação SQLite
-    story_data = await ai_service.generate_interlinear_story_stage2(
-        curated_vocab=curated_vocab,
-        language=req.language,
-        proficiency=req.proficiency,
-        theme=theme,
-        story_length=length,
-        repetition_density=rep,
-        db=db,
-        native_lang=native,
-        api_key=gemini_key,
-        model=gemini_model,
-    )
+        # Estágio 2: Geração Interlinear e Hidratação SQLite
+        story_data = await ai_service.generate_interlinear_story_stage2(
+            curated_vocab=curated_vocab,
+            language=req.language,
+            proficiency=req.proficiency,
+            theme=theme,
+            story_length=length,
+            repetition_density=rep,
+            db=db,
+            native_lang=native,
+            api_key=gemini_key,
+            model=gemini_model,
+        )
 
-    return _enrich_story_response(story_data)
+        return _enrich_story_response(story_data, language=req.language)
+    except AIServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro interno: {e}")
 
 
 @router.get("/current")
@@ -245,45 +284,51 @@ async def generate_story_stream(
             settings.gemini_model = gemini_model
 
     async def sse_event_generator():
-        # 1. Início da Curadoria
-        yield f"event: stage_start\ndata: {json.dumps({'stage': 'curation', 'message': 'Analisando histórico e selecionando vocabulário crítico...'})}\n\n"
+        try:
+            # 1. Início da Curadoria
+            yield f"event: stage_start\ndata: {json.dumps({'stage': 'curation', 'message': 'Analisando histórico e selecionando vocabulário crítico...'})}\n\n"
 
-        curated_vocab = await ai_service.curate_vocabulary_stage1(
-            language=req.language,
-            proficiency=req.proficiency,
-            theme=theme,
-            target_count=count,
-            db=db,
-            native_lang=native,
-            api_key=gemini_key,
-            model=gemini_model,
-        )
+            curated_vocab = await ai_service.curate_vocabulary_stage1(
+                language=req.language,
+                proficiency=req.proficiency,
+                theme=theme,
+                target_count=count,
+                db=db,
+                native_lang=native,
+                api_key=gemini_key,
+                model=gemini_model,
+            )
 
-        words_list = [v.get("word") or v.get("lemma") for v in curated_vocab if v.get("word") or v.get("lemma")]
-        yield f"event: stage_curation_done\ndata: {json.dumps({'count': len(words_list), 'words': words_list})}\n\n"
+            words_list = [v.get("word") or v.get("lemma") for v in curated_vocab if v.get("word") or v.get("lemma")]
+            yield f"event: stage_curation_done\ndata: {json.dumps({'count': len(words_list), 'words': words_list})}\n\n"
 
-        # 2. Início da Geração
-        yield f"event: stage_start\ndata: {json.dumps({'stage': 'generation', 'message': 'Criando narrativa interlinear com repetições calculadas...'})}\n\n"
+            # 2. Início da Geração
+            yield f"event: stage_start\ndata: {json.dumps({'stage': 'generation', 'message': 'Criando narrativa interlinear com repetições calculadas...'})}\n\n"
 
-        story_data = await ai_service.generate_interlinear_story_stage2(
-            curated_vocab=curated_vocab,
-            language=req.language,
-            proficiency=req.proficiency,
-            theme=theme,
-            story_length=length,
-            repetition_density=rep,
-            db=db,
-            native_lang=native,
-            api_key=gemini_key,
-            model=gemini_model,
-        )
+            story_data = await ai_service.generate_interlinear_story_stage2(
+                curated_vocab=curated_vocab,
+                language=req.language,
+                proficiency=req.proficiency,
+                theme=theme,
+                story_length=length,
+                repetition_density=rep,
+                db=db,
+                native_lang=native,
+                api_key=gemini_key,
+                model=gemini_model,
+            )
 
-        # 3. Validação e Traços
-        yield f"event: stage_start\ndata: {json.dumps({'stage': 'validation', 'message': 'Validando gramática e hidratação de traços linguísticos...'})}\n\n"
+            # 3. Validação e Traços
+            yield f"event: stage_start\ndata: {json.dumps({'stage': 'validation', 'message': 'Validando gramática e hidratação de traços linguísticos...'})}\n\n"
 
-        enriched = _enrich_story_response(story_data)
+            enriched = _enrich_story_response(story_data, language=req.language)
 
-        # 4. Finalização
-        yield f"event: stage_done\ndata: {json.dumps({'story': enriched})}\n\n"
+            # 4. Finalização
+            yield f"event: stage_done\ndata: {json.dumps({'story': enriched})}\n\n"
+        except Exception as e:
+            error_type = getattr(e, "error_type", "generation_error")
+            status_code = getattr(e, "status_code", 500)
+            err_msg = str(e)
+            yield f"event: error\ndata: {json.dumps({'error_type': error_type, 'error_message': err_msg, 'message': err_msg, 'status_code': status_code})}\n\n"
 
     return StreamingResponse(sse_event_generator(), media_type="text/event-stream")

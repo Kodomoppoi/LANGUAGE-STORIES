@@ -1,6 +1,7 @@
 import { Story, AppSettings, SSEGenerationEvent, DictionaryEntry, StoryParagraph } from '../../types';
 import { GenerateStoryParams, StoryGeneratorProvider } from './types';
 import { createDefaultSRSMetrics, getStatusColor, getRepetitionWeight } from '../srsEngine';
+import { enrichStoryPhonetics } from '../auxiliaryPhonetics';
 
 export class BackendProvider implements StoryGeneratorProvider {
   public readonly id = 'backend';
@@ -30,7 +31,11 @@ export class BackendProvider implements StoryGeneratorProvider {
     });
 
     if (!response.ok) {
-      throw new Error(`Backend request failed with status: ${response.status}`);
+      const errJson = await response.json().catch(() => ({}));
+      const msg = errJson.detail || `Backend request failed with status: ${response.status}`;
+      const err = new Error(msg);
+      (err as any).statusCode = response.status;
+      throw err;
     }
 
     const data = await response.json();
@@ -65,7 +70,11 @@ export class BackendProvider implements StoryGeneratorProvider {
     });
 
     if (!response.ok) {
-      throw new Error(`SSE Backend request failed with status: ${response.status}`);
+      const errJson = await response.json().catch(() => ({}));
+      const msg = errJson.detail || `SSE Backend request failed with status: ${response.status}`;
+      const err = new Error(msg);
+      (err as any).statusCode = response.status;
+      throw err;
     }
 
     if (!response.body) {
@@ -107,6 +116,14 @@ export class BackendProvider implements StoryGeneratorProvider {
 
               onEvent(sseEvent);
 
+              if (eventName === 'error') {
+                const errMsg = payload.error_message || payload.message || 'Erro inesperado no backend ao gerar história';
+                const err = new Error(errMsg);
+                (err as any).errorType = payload.error_type || 'generation_error';
+                (err as any).statusCode = payload.status_code || 500;
+                throw err;
+              }
+
               if (eventName === 'stage_done') {
                 if (payload.story) {
                   completedStory = this.normalizeStoryResponse(payload.story, params);
@@ -115,6 +132,9 @@ export class BackendProvider implements StoryGeneratorProvider {
                 }
               }
             } catch (err) {
+              if (err instanceof Error && (err as any).errorType) {
+                throw err;
+              }
               console.warn('Failed to parse SSE line data:', dataStr, err);
             }
             currentEventName = '';
@@ -129,8 +149,11 @@ export class BackendProvider implements StoryGeneratorProvider {
       return completedStory;
     }
 
-    // Se o stream fechou sem payload final completo, busca a história recém gerada
-    return await this.generateStory(params, settings);
+    throw new Error(
+      settings.uiLanguage === 'pt'
+        ? 'A conexão com o servidor foi encerrada sem finalizar a história.'
+        : 'Connection closed without receiving completed story.'
+    );
   }
 
   /**
@@ -138,15 +161,12 @@ export class BackendProvider implements StoryGeneratorProvider {
    * mapeando traits por idioma (Mandarim: hanzi, pinyin, radicals, hsk_level) e SRS contínuo.
    */
   private normalizeStoryResponse(data: any, params: GenerateStoryParams): Story {
-    if (data.paragraphs && Array.isArray(data.paragraphs)) {
-      return data as Story;
-    }
-
-    const contentText = data.content || data.fullText || '';
-    const rawParagraphs = contentText.split(/\n\s*\n/).filter(Boolean);
+    const rawVocab = Array.isArray(data.targetVocabulary)
+      ? data.targetVocabulary
+      : (Array.isArray(data.dictionary) ? data.dictionary : []);
 
     // Mapeia vocabulário retornado da Tabela vocabulary / story_vocabulary
-    const targetVocabulary: DictionaryEntry[] = (data.dictionary || []).map((item: any, idx: number) => {
+    const targetVocabulary: DictionaryEntry[] = rawVocab.map((item: any, idx: number) => {
       const traits = item.traits || {};
       const hanzi = traits.hanzi || item.hanzi || item.word;
       const pinyin = traits.pinyin || item.pinyin || item.ruby;
@@ -193,6 +213,19 @@ export class BackendProvider implements StoryGeneratorProvider {
       };
     });
 
+    if (data.paragraphs && Array.isArray(data.paragraphs) && data.paragraphs.length > 0) {
+      const fullTextStr = data.fullText || data.content || '';
+      return enrichStoryPhonetics({
+        ...(data as Story),
+        targetVocabulary,
+        fullText: fullTextStr,
+        paragraphs: data.paragraphs,
+      });
+    }
+
+    const contentText = data.content || data.fullText || '';
+    const rawParagraphs = contentText.split(/\n\s*\n/).filter(Boolean);
+
     const rawTranslations = Array.isArray(data.translations)
       ? data.translations
       : (Array.isArray(data.paragraph_translations) ? data.paragraph_translations : []);
@@ -235,7 +268,7 @@ export class BackendProvider implements StoryGeneratorProvider {
       };
     });
 
-    return {
+    return enrichStoryPhonetics({
       id: String(data.id || data.story_id || `story-${Date.now()}`),
       title: data.title || 'Nova História Gerada',
       titleTranslation: data.titleTranslation || data.title_translation || '',
@@ -251,7 +284,7 @@ export class BackendProvider implements StoryGeneratorProvider {
       createdAt: new Date().toISOString(),
       isRTL: params.language === 'ar',
       fullText: contentText,
-    };
+    });
   }
 }
 

@@ -18,6 +18,7 @@ import {
   AppSettings,
   MascotState,
   SSEGenerationEvent,
+  BookErrorInfo,
 } from '../types';
 import { SAMPLE_STORIES, createWelcomeStory } from '../services/sampleStories';
 import {
@@ -53,6 +54,11 @@ interface AppContextType {
   currentStory: Story;
   setCurrentStory: (story: Story) => void;
   isGeneratingStory: boolean;
+
+  // Book Error Diagnostic
+  bookError: BookErrorInfo | null;
+  setBookError: (error: BookErrorInfo | null) => void;
+  clearBookError: () => void;
 
   // Mascote de Carregamento em Tempo Real (SSE)
   mascotState: MascotState;
@@ -149,8 +155,105 @@ const DEFAULT_STATS: UserStats = {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+function parseErrorToBookErrorInfo(
+  err: any,
+  language: LanguageCode,
+  uiLang: 'pt' | 'en'
+): BookErrorInfo {
+  const errMsg = String(err?.message || err || '');
+  const isPt = uiLang === 'pt';
+
+  if (
+    errMsg.includes('API key not valid') ||
+    errMsg.includes('400') ||
+    errMsg.includes('403') ||
+    errMsg.includes('INVALID_ARGUMENT') ||
+    errMsg.includes('Chave de API') ||
+    err?.errorType === 'api_key_error'
+  ) {
+    return {
+      type: 'api_key_error',
+      title: isPt ? 'Chave de API do Gemini Inválida ou Ausente' : 'Gemini API Key Invalid or Missing',
+      message: isPt
+        ? 'A chave de API configurada foi recusada pelo Google (Erro 400/403). Sem uma chave válida e ativa, a IA não consegue redigir histórias.'
+        : 'The configured API key was rejected by Google (Error 400/403). The AI cannot generate stories without a valid key.',
+      actionInstructions: isPt
+        ? [
+            'Obtenha uma chave gratuita da API Gemini no Google AI Studio (aistudio.google.com).',
+            'Clique em "Abrir Configurações" no botão abaixo ou no menu lateral.',
+            'Cole a chave no campo "Chave de API Gemini" e clique em Testar Conexão.',
+            'Clique em "Salvar Configurações" e tente gerar a história novamente.'
+          ]
+        : [
+            'Get a free Gemini API key from Google AI Studio (aistudio.google.com).',
+            'Click "Open Settings" below or in the sidebar.',
+            'Paste your key into the "Gemini API Key" field and click Test Connection.',
+            'Click "Save Settings" and generate your story again.'
+          ],
+      actionLabel: isPt ? 'Abrir Configurações' : 'Open Settings',
+      actionType: 'open_settings',
+      rawError: errMsg,
+      language,
+    };
+  }
+
+  if (
+    errMsg.includes('429') ||
+    errMsg.includes('RESOURCE_EXHAUSTED') ||
+    errMsg.includes('Quota') ||
+    errMsg.includes('cota') ||
+    err?.errorType === 'quota_exceeded'
+  ) {
+    return {
+      type: 'quota_exceeded',
+      title: isPt ? 'Cota do Gemini Excedida (Rate Limit)' : 'Gemini Rate Limit Exceeded (429)',
+      message: isPt
+        ? 'O limite de requisições por minuto da sua conta gratuita no Gemini foi atingido (Erro 429 RESOURCE_EXHAUSTED).'
+        : 'The per-minute request limit for your free Gemini account was reached (Error 429 RESOURCE_EXHAUSTED).',
+      actionInstructions: isPt
+        ? [
+            'Aguarde cerca de 30 a 60 segundos para que o Google renove a sua cota temporária.',
+            'Ou alterne o modelo nas Configurações (ex: alternar para Gemini 2.5 Flash ou 1.5 Flash).',
+            'Se você tiver outra chave, insira-a nas Configurações.',
+            'Assim que aguardar, clique em "Tentar Novamente" abaixo.'
+          ]
+        : [
+            'Wait about 30 to 60 seconds for Google to reset your temporary quota.',
+            'Or switch models in Settings (e.g. switch to Gemini 2.5 Flash or 1.5 Flash).',
+            'If you have another key, enter it in Settings.',
+            'Click "Try Again" below once ready.'
+          ],
+      actionLabel: isPt ? 'Tentar Novamente' : 'Try Again',
+      actionType: 'retry',
+      rawError: errMsg,
+      language,
+    };
+  }
+
+  return {
+    type: 'generation_error',
+    title: isPt ? 'Falha na Geração da História' : 'Story Generation Error',
+    message: errMsg || (isPt ? 'Ocorreu um erro inesperado ao redigir a narrativa.' : 'An unexpected error occurred while writing the story.'),
+    actionInstructions: isPt
+      ? [
+          'Verifique sua conexão com a internet.',
+          'Se estiver usando o Backend Local, certifique-se de que o servidor FastAPI está ativo (porta 8000).',
+          'Tente gerar novamente com outro tema ou clique no botão abaixo.'
+        ]
+      : [
+          'Check your internet connection.',
+          'If using the Local Backend, verify that the FastAPI server is running (port 8000).',
+          'Try again with a different theme or click the button below.'
+        ],
+    actionLabel: isPt ? 'Tentar Novamente' : 'Try Again',
+    actionType: 'retry',
+    rawError: errMsg,
+    language,
+  };
+}
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // State Initialization via StorageService
+  // Navigation
   const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(() => storageService.loadLanguage('ja'));
   const [currentProficiency, setCurrentProficiency] = useState<ProficiencyLevel>(() =>
     storageService.loadProficiencyForLanguage(storageService.loadLanguage('ja'), 'A2')
@@ -165,8 +268,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const lang = storageService.loadLanguage('ja');
     const uiLang = storageService.loadSettings(DEFAULT_SETTINGS).uiLanguage || 'pt';
     const welcome = createWelcomeStory(lang, uiLang);
-    return storageService.loadStory(welcome);
+    const loaded = storageService.loadStory(welcome);
+    if (
+      !loaded ||
+      !loaded.paragraphs ||
+      loaded.paragraphs.length === 0 ||
+      loaded.title?.startsWith('Story in ') ||
+      loaded.fullText?.includes('Sample sentence')
+    ) {
+      return welcome;
+    }
+    return loaded;
   });
+  const [bookError, setBookError] = useState<BookErrorInfo | null>(null);
+  const clearBookError = useCallback(() => setBookError(null), []);
   const [activeTab, setActiveTab] = useState<ActiveTab>('story');
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
@@ -619,15 +734,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         onEnd: () => {
           playSentence(idx + 1);
         },
-        onError: () => {
+        onError: (err: any) => {
           setIsPlayingAudio(false);
           setCurrentPlayingSentenceIndex(-1);
+          const isPt = settings.uiLanguage === 'pt';
+          setBookError({
+            type: 'tts_error',
+            title: isPt ? 'Áudio Indisponível para este Idioma' : 'Audio Unavailable for this Language',
+            message: isPt
+              ? `Seu navegador não possui uma voz de leitura instalada para o idioma selecionado (${currentStory.language.toUpperCase()}).`
+              : `Your browser has no text-to-speech voice installed for ${currentStory.language.toUpperCase()}.`,
+            actionInstructions: isPt
+              ? [
+                  'Conecte o Backend FastAPI (porta 8000) para síntese neural de alta definição com Edge-TTS.',
+                  'Ou adicione vozes no sistema operacional (Configurações do Windows > Hora e Idioma > Fala > Adicionar Vozes).',
+                  'Selecione "Edge-TTS (Backend Local)" nas Configurações do app.'
+                ]
+              : [
+                  'Connect the FastAPI backend (port 8000) for high-definition neural Edge-TTS.',
+                  'Or add speech voices in OS Settings (Windows Settings > Time & Language > Speech).',
+                  'Select "Edge-TTS (Local Backend)" in the app Settings.'
+                ],
+            actionLabel: isPt ? 'Dispensar' : 'Dismiss',
+            actionType: 'dismiss',
+            language: currentStory.language,
+          });
         },
       });
     };
 
     playSentence(currentIdx);
-  }, [isPlayingAudio, currentStory, currentPlayingSentenceIndex, ttsSpeed]);
+  }, [isPlayingAudio, currentStory, currentPlayingSentenceIndex, ttsSpeed, settings.uiLanguage]);
 
   const pauseStoryAudio = useCallback(() => {
     ttsService.pause();
@@ -651,6 +788,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const generateNewStory = useCallback(
     async (contextTheme?: string, customPrompt?: string) => {
       setIsGeneratingStory(true);
+      setBookError(null);
       const effectiveTheme = contextTheme !== undefined ? contextTheme : (customStoryTheme.trim() || undefined);
       logService.addLog(
         'INFO',
@@ -684,8 +822,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           handleSSEEvent
         );
 
+        if (!newStory || !newStory.paragraphs || newStory.paragraphs.length === 0) {
+          throw new Error('A história retornada pela IA está vazia ou incompleta.');
+        }
+
         setCurrentStory(newStory);
         storageService.saveStory(newStory);
+        setBookError(null);
+
         const storyWords = (newStory.paragraphs || []).reduce(
           (acc, p) => acc + (p.sentences || []).reduce((sAcc, s) => sAcc + (s.tokens || []).length, 0),
           0
@@ -698,20 +842,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         logService.addLog(
           'SUCCESS',
           'FRONTEND',
-          `História "${newStory.title}" recebida com sucesso (${newStory.paragraphs.length} parágrafos, ${newStory.targetVocabulary.length} vocábulos)!`
+          `História "${newStory.title}" recebida com sucesso (${(newStory.paragraphs || []).length} parágrafos, ${(newStory.targetVocabulary || []).length} vocábulos)!`
         );
-      } catch (err) {
+      } catch (err: any) {
         logService.addLog('ERROR', 'FRONTEND', `Erro na geração da história: ${err instanceof Error ? err.message : String(err)}`);
         console.error('Failed to generate story:', err);
+
+        const errorInfo = parseErrorToBookErrorInfo(err, currentLanguage, (settings.uiLanguage as 'pt' | 'en') || 'pt');
+        setBookError(errorInfo);
+
+        // Se a história atual for vazia ou dummy, garante que mostre o fallback limpo de boas-vindas ("que mostra que nao tem historias")
+        if (
+          !currentStory.paragraphs ||
+          currentStory.paragraphs.length === 0 ||
+          currentStory.title?.startsWith('Story in ') ||
+          currentStory.fullText?.includes('Sample sentence')
+        ) {
+          const welcome = createWelcomeStory(currentLanguage, settings.uiLanguage || 'pt');
+          setCurrentStory(welcome);
+        }
       } finally {
         setIsGeneratingStory(false);
       }
     },
-    [currentLanguage, currentProficiency, settings, vocabularyVault, handleSSEEvent, customStoryTheme]
+    [currentLanguage, currentProficiency, currentStory, settings, vocabularyVault, handleSSEEvent, customStoryTheme]
   );
 
   const generateWithSameDictionary = useCallback(async () => {
     setIsGeneratingStory(true);
+    setBookError(null);
     try {
       const langVaultWords = vocabularyVault.filter((v) => v.language === currentLanguage);
       const newStory = await apiService.generateStoryStream(
@@ -726,8 +885,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         settings,
         handleSSEEvent
       );
+
+      if (!newStory || !newStory.paragraphs || newStory.paragraphs.length === 0) {
+        throw new Error('A história retornada pela IA está vazia ou incompleta.');
+      }
+
       setCurrentStory(newStory);
       storageService.saveStory(newStory);
+      setBookError(null);
+
       const storyWords = (newStory.paragraphs || []).reduce(
         (acc, p) => acc + (p.sentences || []).reduce((sAcc, s) => sAcc + (s.tokens || []).length, 0),
         0
@@ -737,8 +903,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         totalStoriesRead: prev.totalStoriesRead + 1,
         totalWordsRead: prev.totalWordsRead + storyWords,
       }));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to regenerate with same dictionary:', err);
+      const errorInfo = parseErrorToBookErrorInfo(err, currentLanguage, (settings.uiLanguage as 'pt' | 'en') || 'pt');
+      setBookError(errorInfo);
+      if (
+        !currentStory.paragraphs ||
+        currentStory.paragraphs.length === 0 ||
+        currentStory.title?.startsWith('Story in ') ||
+        currentStory.fullText?.includes('Sample sentence')
+      ) {
+        const welcome = createWelcomeStory(currentLanguage, settings.uiLanguage || 'pt');
+        setCurrentStory(welcome);
+      }
     } finally {
       setIsGeneratingStory(false);
     }
@@ -747,6 +924,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const increaseDictionaryAndGenerate = useCallback(
     async (numNewWords: number) => {
       setIsGeneratingStory(true);
+      setBookError(null);
       const themeSuffix = customStoryTheme.trim() ? ` - Tema: ${customStoryTheme.trim()}` : '';
       logService.addLog('INFO', 'FRONTEND', `Injetando +${numNewWords} palavras no vocabulário e gerando nova história${themeSuffix}...`);
       try {
@@ -764,8 +942,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           settings,
           handleSSEEvent
         );
+
+        if (!newStory || !newStory.paragraphs || newStory.paragraphs.length === 0) {
+          throw new Error('A história retornada pela IA está vazia ou incompleta.');
+        }
+
         setCurrentStory(newStory);
         storageService.saveStory(newStory);
+        setBookError(null);
+
         const storyWords = (newStory.paragraphs || []).reduce(
           (acc, p) => acc + (p.sentences || []).reduce((sAcc, s) => sAcc + (s.tokens || []).length, 0),
           0
@@ -776,9 +961,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           totalWordsRead: prev.totalWordsRead + storyWords,
         }));
         logService.addLog('SUCCESS', 'FRONTEND', `História expandida gerada com sucesso (+${numNewWords} palavras inseridas)!`);
-      } catch (err) {
+      } catch (err: any) {
         logService.addLog('ERROR', 'FRONTEND', `Erro ao injetar palavras: ${err instanceof Error ? err.message : String(err)}`);
         console.error('Failed to increase dictionary and generate:', err);
+        const errorInfo = parseErrorToBookErrorInfo(err, currentLanguage, (settings.uiLanguage as 'pt' | 'en') || 'pt');
+        setBookError(errorInfo);
+        if (
+          !currentStory.paragraphs ||
+          currentStory.paragraphs.length === 0 ||
+          currentStory.title?.startsWith('Story in ') ||
+          currentStory.fullText?.includes('Sample sentence')
+        ) {
+          const welcome = createWelcomeStory(currentLanguage, settings.uiLanguage || 'pt');
+          setCurrentStory(welcome);
+        }
       } finally {
         setIsGeneratingStory(false);
       }
@@ -812,6 +1008,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         currentStory,
         setCurrentStory,
         isGeneratingStory,
+        bookError,
+        setBookError,
+        clearBookError,
         mascotState,
         cancelGeneration,
         allStoryWords,

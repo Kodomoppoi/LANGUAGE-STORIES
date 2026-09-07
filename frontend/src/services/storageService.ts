@@ -113,10 +113,31 @@ export class StorageService {
     }
   }
 
+  private isDummyStory(story: any): boolean {
+    if (!story) return true;
+    const title = String(story.title || '');
+    const fullText = String(story.fullText || '');
+    if (
+      title.startsWith('Story in ') ||
+      fullText.includes('Sample sentence') ||
+      title.startsWith('História em ') ||
+      (story.paragraphs && story.paragraphs.length === 0 && story.id !== 'welcome')
+    ) {
+      return true;
+    }
+    return false;
+  }
+
   public loadStory(defaultStory: Story): Story {
     try {
       const saved = localStorage.getItem(KEYS.STORY);
-      return saved ? JSON.parse(saved) : defaultStory;
+      if (!saved) return defaultStory;
+      const parsed = JSON.parse(saved);
+      if (this.isDummyStory(parsed)) {
+        localStorage.removeItem(KEYS.STORY);
+        return defaultStory;
+      }
+      return parsed;
     } catch {
       return defaultStory;
     }
@@ -124,7 +145,7 @@ export class StorageService {
 
   public saveStory(story: Story): void {
     try {
-      if (story && story.id !== 'welcome') {
+      if (story && story.id !== 'welcome' && !this.isDummyStory(story)) {
         localStorage.setItem(KEYS.STORY, JSON.stringify(story));
         localStorage.setItem(`${KEYS.STORY}_${story.language}`, JSON.stringify(story));
       }
@@ -136,7 +157,13 @@ export class StorageService {
   public loadStoryForLanguage(lang: LanguageCode): Story | null {
     try {
       const saved = localStorage.getItem(`${KEYS.STORY}_${lang}`);
-      return saved ? JSON.parse(saved) : null;
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      if (this.isDummyStory(parsed)) {
+        localStorage.removeItem(`${KEYS.STORY}_${lang}`);
+        return null;
+      }
+      return parsed;
     } catch {
       return null;
     }

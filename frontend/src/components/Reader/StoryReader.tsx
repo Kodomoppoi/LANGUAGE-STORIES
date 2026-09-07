@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { WordPopover } from './WordPopover';
+import { BookErrorCard } from './BookErrorCard';
+import { getAuxiliaryRuby } from '../../services/auxiliaryPhonetics';
 import {
   ChevronLeft,
   ChevronRight,
@@ -50,6 +52,9 @@ export const StoryReader: React.FC = () => {
     stopStoryAudio,
     currentProficiency,
     setProficiency,
+    bookError,
+    clearBookError,
+    setIsSettingsOpen,
     t,
   } = useApp();
 
@@ -292,14 +297,17 @@ export const StoryReader: React.FC = () => {
                     onClick={(e) => openTokenPopover(token, e)}
                     title={t('clickForDetails')}
                   >
-                    {settings.showRuby && token.ruby ? (
-                      <ruby>
-                        {token.text}
-                        <rt>{token.ruby}</rt>
-                      </ruby>
-                    ) : (
-                      token.text
-                    )}
+                    {(() => {
+                      const displayRuby = token.ruby || (langInfo?.hasRuby ? getAuxiliaryRuby(token.text, currentLanguage) : undefined);
+                      return settings.showRuby && displayRuby ? (
+                        <ruby>
+                          {token.text}
+                          <rt>{displayRuby}</rt>
+                        </ruby>
+                      ) : (
+                        token.text
+                      );
+                    })()}
                   </span>
                 );
               })}
@@ -341,15 +349,65 @@ export const StoryReader: React.FC = () => {
           <section className="book-page left-page" aria-label="Left Book Page">
             {/* Running Header */}
             <header className="book-running-header left-header">
-              <span className="running-header-leaf">❦</span>
+              <span className="running-header-leaf">{bookError ? '⚠️' : '❦'}</span>
               <span className="running-header-title">
-                Language Stories • {langInfo?.name || t('reading')}
+                {bookError
+                  ? (settings.uiLanguage === 'pt' ? 'Diagnóstico do Livro' : 'Book Diagnostics')
+                  : `Language Stories • ${langInfo?.name || t('reading')}`}
               </span>
-              <span className="running-header-leaf">❦</span>
+              <span className="running-header-leaf">{bookError ? '⚠️' : '❦'}</span>
             </header>
 
             <div className="page-inner-content">
-              {isWelcomeState ? (
+              {bookError ? (
+                <div className="book-welcome-container">
+                  <div>
+                    <div className="book-fleuron-ornament">⚠️ ❦ ⚠️</div>
+                    <h2 className="book-title-heading" style={{ fontSize: '1.45rem', marginBottom: '6px', color: 'var(--wood-800)' }}>
+                      {settings.uiLanguage === 'pt' ? 'Interrupção na Composição' : 'Composition Interrupted'}
+                    </h2>
+                    <div className="book-title-subheading" style={{ fontSize: '0.9rem', marginBottom: '16px' }}>
+                      {settings.uiLanguage === 'pt'
+                        ? 'A inteligência artificial encontrou uma pendência para gerar o livro'
+                        : 'The AI encountered an issue while composing this book'}
+                    </div>
+                    <div className="book-title-divider" style={{ margin: '0 auto 16px' }} />
+
+                    <div className="book-welcome-description">
+                      <p>
+                        {settings.uiLanguage === 'pt'
+                          ? 'O escriba digital não pôde finalizar o novo capítulo. Veja ao lado os detalhes do diagnóstico e siga as instruções para restabelecer o fluxo das histórias.'
+                          : 'The digital scribe could not complete the new chapter. Please review the diagnostic details on the right page to resolve the issue.'}
+                      </p>
+                    </div>
+
+                    <div className="book-welcome-features-list">
+                      <div className="book-welcome-feature-item">
+                        <span className="welcome-feature-icon">🛡️</span>
+                        <div className="welcome-feature-text">
+                          <strong>{settings.uiLanguage === 'pt' ? 'Nenhum Dado Perdido' : 'No Data Lost'}</strong>
+                          <span>{settings.uiLanguage === 'pt' ? 'Seu cofre de palavras e progresso SRS estão preservados.' : 'Your vocabulary vault and SRS stats remain safe.'}</span>
+                        </div>
+                      </div>
+                      <div className="book-welcome-feature-item">
+                        <span className="welcome-feature-icon">⚙️</span>
+                        <div className="welcome-feature-text">
+                          <strong>{settings.uiLanguage === 'pt' ? 'Ajuste Imediato' : 'Instant Fix'}</strong>
+                          <span>{settings.uiLanguage === 'pt' ? 'Configure sua chave Gemini ou verifique cotas nas configurações.' : 'Configure your Gemini key or check quotas in settings.'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="book-welcome-lang-badge">
+                    <span className="welcome-badge-flag">{langInfo?.flag || '🌐'}</span>
+                    <div className="welcome-badge-info">
+                      <span className="welcome-badge-title">{langInfo?.name || currentLanguage}</span>
+                      <span className="welcome-badge-level">{currentLevelInfo.fullLabel}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : isWelcomeState ? (
                 <div className="book-welcome-container">
                   <div>
                     <div className="book-fleuron-ornament">❧ ❦ ❧</div>
@@ -455,17 +513,27 @@ export const StoryReader: React.FC = () => {
           <section className="book-page right-page" aria-label="Right Book Page">
             {/* Running Header */}
             <header className="book-running-header right-header">
-              <span className="running-header-leaf">✦</span>
+              <span className="running-header-leaf">{bookError ? '⚠️' : '✦'}</span>
               <span className="running-header-title">
-                {isWelcomeState
+                {bookError
+                  ? (settings.uiLanguage === 'pt' ? 'Atenção Necessária' : 'Attention Required')
+                  : isWelcomeState
                   ? (settings.uiLanguage === 'pt' ? 'Novo Conto • Criação com IA' : 'New Story • AI Creation')
                   : `${t('chapterPrefix')} ${currentSpread + 1} • ${currentStory.title}`}
               </span>
-              <span className="running-header-leaf">✦</span>
+              <span className="running-header-leaf">{bookError ? '⚠️' : '✦'}</span>
             </header>
 
             <div className="page-inner-content">
-              {isWelcomeState ? (
+              {bookError ? (
+                <BookErrorCard
+                  error={bookError}
+                  onOpenSettings={() => setIsSettingsOpen(true)}
+                  onRetry={() => generateNewStory(customStoryTheme)}
+                  onDismiss={clearBookError}
+                  uiLanguage={settings.uiLanguage as 'pt' | 'en'}
+                />
+              ) : isWelcomeState ? (
                 <div className="book-welcome-container">
                   <div>
                     <div className="book-fleuron-ornament">✦ ❦ ✦</div>
