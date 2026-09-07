@@ -9,7 +9,7 @@ echo    INICIANDO LANGUAGE STORIES (BACKEND + FRONTEND)
 echo ======================================================
 echo.
 
-:: 1. Checar se Node.js esta instalado
+REM 1. Checar se Node.js esta instalado
 where node >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     echo [ERRO] Node.js nao foi encontrado no sistema!
@@ -18,7 +18,7 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-:: 2. Checar se Python esta instalado
+REM 2. Checar se Python esta instalado
 where python >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     echo [ERRO] Python nao foi encontrado no sistema!
@@ -27,7 +27,7 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-:: 3. Checar e criar .env se nao existir
+REM 3. Checar e criar .env se nao existir
 if not exist ".env" (
     if not exist "backend\.env" (
         echo [INFO] Criando arquivo .env a partir de backend\.env.example...
@@ -38,7 +38,7 @@ if not exist ".env" (
     )
 )
 
-:: 4. Checar e instalar dependencias raiz (concurrently)
+REM 4. Checar e instalar dependencias raiz
 if not exist "node_modules" (
     echo [INFO] Instalando dependencias da raiz do projeto...
     call npm install
@@ -49,9 +49,9 @@ if not exist "node_modules" (
     )
 )
 
-:: 5. Checar e instalar dependencias do Frontend (React + Vite)
+REM 5. Checar e instalar dependencias do Frontend
 if not exist "frontend\node_modules" (
-    echo [INFO] Instalando dependencias do Frontend (npm install)...
+    echo [INFO] Instalando dependencias do Frontend...
     call npm install --prefix frontend
     if %ERRORLEVEL% neq 0 (
         echo [ERRO] Falha ao instalar dependencias do frontend.
@@ -60,16 +60,16 @@ if not exist "frontend\node_modules" (
     )
 )
 
-:: 6. Checar e configurar ambiente virtual Python (.venv)
+REM 6. Checar e configurar ambiente virtual Python
 if not exist ".venv\Scripts\python.exe" (
-    echo [INFO] Criando ambiente virtual Python (.venv)...
+    echo [INFO] Criando ambiente virtual Python .venv...
     python -m venv .venv
     if %ERRORLEVEL% neq 0 (
         echo [ERRO] Falha ao criar ambiente virtual Python.
         pause
         exit /b 1
     )
-    echo [INFO] Instalando bibliotecas Python do backend (requirements.txt)...
+    echo [INFO] Instalando bibliotecas Python do backend...
     call .\.venv\Scripts\pip install -r backend\requirements.txt
     if %ERRORLEVEL% neq 0 (
         echo [ERRO] Falha ao instalar requirements.txt.

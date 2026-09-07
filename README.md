@@ -1,52 +1,52 @@
-#  Language Stories
+# 📖 Language Stories (📖 语言故事 / 言語の物語)
 
-> **Plataforma imersiva de aquisição natural de idiomas baseada no princípio de *Comprehensible Input*, com leitura graduada em livro 3D, fonética integral (100% Ruby/Pinyin/Furigana), repetição espaçada calculada (SRS) e acompanhamento auditivo em tempo real.**
-
----
-
-##  Visão Geral / Project Overview
-
-O **Language Stories** transforma o aprendizado de idiomas em uma experiência literária e sensorial contínua. Em vez de exercícios mecânicos ou listas isoladas de palavras, o estudante lê histórias originais criadas por Inteligência Artificial generativa, estritamente calibradas para o seu nível real de compreensão (CEFR A1–C2, HSK 1–6, JLPT N5–N1, TOPIK 1–6).
-
-A aplicação integra um ecossistema completo:
-1. **Caderno Literário 3D**: Apresentação skeuomórfica com textura de pergaminho, encadernação em couro entalhado e calha central com sombreamento realista.
-2. **Fonética Total (100% Ruby)**: Todo caractere ou ideograma recebe anotação de pronúncia (Pinyin com tons diacríticos em Mandarim e Furigana em Japonês).
-3. **Diagnóstico Visível no Caderno**: Nenhuma falha é mascarada. Erros de chave, limite de cota ou voz são apresentados como cartões de pergaminho com selos de cera e passos claros para correção, sem criar histórias fictícias aleatórias.
-4. **Áudio Sincronizado**: Leitura frase a frase com destaque tipo karaokê via Edge-TTS (vozes neurais) e Web Speech API.
-5. **Dicionário & Raio-X Morfológico**: Consulta instantânea com análise etimológica e decomposição de radicais ideográficos.
-6. **SRS (SuperMemo SM-2)**: Algoritmo de repetição espaçada que injeta vocabulário prioritário em novas histórias e realiza micro-quizzes de retenção.
+> **Immersive natural language acquisition platform based on the *Comprehensible Input* principle, featuring 3D open-book reading, full phonetic annotations (100% Ruby / Pinyin / Furigana), Spaced Repetition System (SRS), and real-time synchronized audio.**
 
 ---
 
-##  Início Rápido (Execução em 1 Clique)
+## 🌟 Project Overview
 
-Para facilitar o desenvolvimento e uso diário, o projeto conta com inicialização unificada:
+**Language Stories** transforms language learning into a continuous literary and sensory experience. Instead of mechanical drills or disconnected flashcard lists, students read original stories crafted by Generative Artificial Intelligence, strictly calibrated to their exact comprehension level (CEFR A1–C2, HSK 1–6, JLPT N5–N1, TOPIK 1–6).
 
-### Opção A: Executável Windows (Mais Rápido)
-Dê um duplo clique no arquivo:
+The application integrates an end-to-end learning ecosystem:
+1. **3D Literary Notebook & Open Book**: Skeuomorphic presentation featuring organic parchment textures, debossed hardcover stitching, sewn fabric headbands, and realistic central spine shading.
+2. **100% Phonetic Coverage (Ruby)**: Every character or ideogram receives phonetic reading annotations (Pinyin with official tone diacritics for Mandarin, and Furigana in Hiragana for Japanese).
+3. **In-Book Error Diagnostics**: Zero silent failures or fake mockups. API key issues, quota limits, and missing voice packs render directly on parchment pages with wax seals and actionable resolution steps.
+4. **Synchronized Audio**: Sentence-by-sentence karaoke highlighting powered by Edge-TTS (neural voices) and the browser Web Speech API.
+5. **Interactive Lexicon & Morphological Deep Dive**: Instant lookup with etymological analysis, semantic/phonetic radical breakdown, and contextual examples.
+6. **Spaced Repetition System (SRS - SuperMemo SM-2)**: Adaptive spaced repetition intervals that inject prioritized vocabulary into upcoming chapters and provide retention mini-quizzes.
+
+---
+
+## 🚀 Quick Start (1-Click Launch)
+
+To simplify setup and daily practice, the project includes unified automated launchers:
+
+### Option A: Windows Executable (Fastest)
+Double-click the launcher:
 ```bat
 run.bat
 ```
-*(Localizado na raiz da pasta do projeto. Ele abre e gerencia o Backend FastAPI na porta 8000 e o Frontend Vite na porta 5173 simultaneamente).*
+*(Located in the project root. It checks dependencies, installs anything missing automatically, and launches both the FastAPI Backend on port 8000 and the Vite Frontend on port 5173).*
 
 ---
 
-### Opção B: Comando Unificado via Terminal
-Na pasta `LANGUAGE-STORIES`:
+### Option B: Unified Terminal Command
+In the `LANGUAGE-STORIES` root directory:
 ```bash
 npm run dev
 ```
-*(Utiliza `concurrently` para rodar o backend Python e o frontend React no mesmo terminal com logs coloridos).*
+*(Uses `concurrently` and automated setup hooks to verify dependencies and run Python backend and React frontend together with colored logs).*
 
 ---
 
-##  Tecnologias e Arquitetura
+## 🛠️ Architecture & Tech Stack
 
 ```
                             ┌─────────────────────────────────────────┐
                             │        FRONTEND (React 18 + Vite)       │
-                            │  • Livro 3D • BookErrorCard • SRS Local │
-                            │  • Dicionário Auxiliar de Fonética      │
+                            │  • 3D Open Book • BookErrorCard • SRS   │
+                            │  • Auxiliary Phonetics Lookup Table     │
                             └────────────────────┬────────────────────┘
                                                  │
                                 ┌────────────────┴────────────────┐
@@ -55,90 +55,90 @@ npm run dev
                                                  │
                             ┌────────────────────▼────────────────────┐
                             │        BACKEND (FastAPI + Python)       │
-                            │  • Curadoria em 2 Etapas (AI Service)   │
-                            │  • Pypinyin Tonal (100% Ruby)           │
+                            │  • 2-Stage Story Pipeline (AI Service)  │
+                            │  • Pypinyin Tonal (100% Ruby Annotator) │
                             │  • Edge-TTS Neural Audio Cache          │
-                            │  • SQLite Persistente Local             │
+                            │  • Local Persistent SQLite Database     │
                             └────────────────────┬────────────────────┘
                                                  │
                         ┌────────────────────────┴────────────────────────┐
                         │                                                 │
             ┌───────────▼───────────┐                         ┌───────────▼───────────┐
-            │   Google Gemini API   │                         │  Ollama Local (Opt.)  │
+            │   Google Gemini API   │                         │  Local Ollama (Opt.)  │
             │ (2.5 / 3.6 Flash LLM) │                         │      (llama3.2)       │
             └───────────────────────┘                         └───────────────────────┘
 ```
 
-| Componente | Tecnologia | Papel no Sistema |
+| Layer | Technology | Role in System |
 | :--- | :--- | :--- |
-| **Frontend Core** | React 18, TypeScript, Vite | Interface responsiva, controle de estado via Context API |
-| **Design System** | Vanilla CSS Tokens | Skeuomorfismo imersivo, pergaminho orgânico, couro entalhado |
-| **Backend API** | FastAPI, Uvicorn, Pydantic | Orquestração da IA, SSE streaming, rotas de vocabulário e TTS |
-| **Inteligência Artificial** | Google GenAI SDK (`google-genai`) | Modelos Gemini 2.5/3.6 Flash para redação interlinear calibrada |
-| **Motor Fonético** | `pypinyin` + `auxiliaryPhonetics.ts` | Pinyin com marcas de tom diacríticas oficiais e Furigana |
-| **Síntese de Voz (TTS)**| `edge-tts` (Microsoft Azure Neural) | Narração humana em alta fidelidade com fallback no navegador |
-| **Banco de Dados** | SQLite (`language_stories.db`) | Persistência do cofre de vocabulário global e histórico de contos |
+| **Frontend Core** | React 18, TypeScript, Vite | Reactive user interface, Context API state management |
+| **Design System** | Vanilla CSS Design Tokens | Immersive skeuomorphic aesthetics, parchment texture, custom fonts |
+| **Backend API** | FastAPI, Uvicorn, Pydantic | AI orchestration, SSE streaming, vocabulary routes, neural TTS |
+| **Artificial Intelligence** | Google GenAI SDK (`google-genai`) | Gemini 2.5/3.6 Flash models for calibrated interlinear generation |
+| **Phonetic Engine** | `pypinyin` + `auxiliaryPhonetics.ts` | Pinyin with tone diacritics and Japanese Furigana dictionary |
+| **Voice Synthesis (TTS)**| `edge-tts` (Microsoft Azure Neural) | High-fidelity natural voice narration with browser fallback |
+| **Database** | SQLite (`language_stories.db`) | Local persistence for user vocabulary vault, SRS metrics, and story history |
 
 ---
 
-## Recursos Detalhados
+## ✨ Detailed Features
 
-### 1. Livro Aberto 3D & Paginação Inteligente
-* **Paginação Balanceada**: Evita páginas órfãs ou textos vazios distribuindo parágrafos harmoniosamente entre a página esquerda e direita.
-* **Modo Boas-Vindas Didático**: Quando não há histórias criadas e não há erros, a página exibe o estado de boas-vindas com chips de temas populares (ex: *Café Matinal*, *Festival de Rua*, *Viagem de Trem*) e campo para tema personalizado.
+### 1. 📚 3D Open Book & Content-Aware Pagination
+* **Balanced Spread Distribution**: Eliminates starved or blank pages by balancing sentences and paragraphs across left and right book spreads.
+* **Welcome State**: When no active story exists and there are no errors, the notebook presents a welcoming layout with suggested theme chips (e.g., *Morning Coffee*, *Street Lanterns*, *Train Journey*) and custom prompt input.
 
-### 2. 100% de Cobertura Fonética (Ruby / Pinyin / Furigana)
-* **Pinyin Integral**: Ao aprender Mandarim, **todas as palavras e ideogramas** do texto recebem anotação de Pinyin tonal sobre os caracteres (ex: `wǒ`, `kàn`, `hē`).
-* **Furigana para Kanjis**: Ideogramas japoneses recebem a leitura correspondente em Hiragana.
-* **Dupla Camada de Garantia**: Processamento nativo no backend aliado a um dicionário morfológico auxiliar no cliente (`auxiliaryPhonetics.ts`).
+### 2. 🀄 100% Phonetic Coverage (Ruby / Pinyin / Furigana)
+* **Full Pinyin**: When learning Mandarin, **100% of characters and words** receive official diacritic tone marks above text (e.g., `wǒ`, `kàn`, `hē`), not just new target vocabulary.
+* **Japanese Furigana**: Kanji characters receive corresponding Hiragana readings.
+* **Dual-Layer Guarantee**: Native backend processing via `pypinyin` paired with a client-side auxiliary morphological dictionary (`auxiliaryPhonetics.ts`) ensures phonetic annotations remain consistent in any scenario.
 
-### 3.  Diagnóstico Visível no Caderno (`BookErrorCard`)
-Nenhuma falha de API é encoberta com dados falsos. Se ocorrer um problema, um cartão de pergaminho é exibido diretamente na página direita do livro:
-*  **Chave Gemini Inválida ou Ausente (HTTP 400/403)**: Explica o motivo e fornece botão de atalho para abrir as Configurações.
-*  **Cota Excedida (HTTP 429 / RESOURCE_EXHAUSTED)**: Informa sobre o limite de requisições por minuto/dia e instruções de espera ou troca de modelo.
-*  **Voz TTS Indisponível**: Alerta quando o navegador não possui o pacote de voz instalado para a língua da história, orientando o uso do Edge-TTS do backend.
-* **Página Esquerda de Salvaguarda**: Apresenta a notificação *"Interrupção na Composição"*, assegurando ao estudante que seu progresso e cofre de vocabulário continuam 100% preservados.
+### 3. 🛡️ In-Book Error Diagnostics (`BookErrorCard`)
+No API failures are hidden behind silent fallbacks or dummy mockups. If an error occurs, an ornate diagnostic card is displayed directly on the book's right page:
+* 🔑 **Invalid or Missing Gemini API Key (HTTP 400/403)**: Clear explanation with a 1-click **"Open Settings"** button.
+* ⏳ **Quota Exceeded (HTTP 429 / RESOURCE_EXHAUSTED)**: Helpful instructions regarding rate limits, replenishment periods, and model switching.
+* 🔇 **Missing TTS Voice**: Guidance on installing OS language packs or selecting the backend Edge-TTS engine.
+* **Composition Interrupted Left Page**: Informs the reader that the digital scribe paused due to the pending configuration, assuring that existing vocabulary and SRS metrics remain intact.
 
-### 4. Dicionário Interativo & Raio-X Morfológico
-* **Consulta com 1 Clique**: Clique em qualquer vocábulo do livro para ver tradução, pronúncia fonética, classe gramatical e métricas de aprendizado.
-* **Raio-X IA**: Ao clicar no ícone de robô, o sistema gera uma explicação detalhada da anatomia da palavra:
-  * Decomposição de ideogramas (radicais semânticos e fonéticos).
-  * Palavras compostas e vocábulos correlatos.
-  * Contexto cultural e nuances de uso.
+### 4. 🔍 Interactive Dictionary & Morphological Deep Dive
+* **1-Click Lookup**: Click any token in the story to inspect its translation, phonetic reading, part of speech, and repetition history.
+* **AI Deep Dive ("Raio-X")**: Clicking the robot icon generates a detailed morphological breakdown:
+  * Character anatomy (semantic and phonetic radicals).
+  * Compound words and related vocabulary.
+  * Cultural context and usage nuances.
 
-### 5. Repetição Espaçada (SRS - SuperMemo SM-2)
-* Classificação em quatro estágios contínuos: `Novo (0-25%)`, `Aprendendo (26-50%)`, `Revisão (51-84%)` e `Dominado (85-100%)`.
-* **Fixação por Estrela (⭐)**: Palavras marcadas como favoritas recebem peso máximo de repetição nas próximas narrativas geradas.
-* **Micro-Quiz**: Ao virar a última página de uma história, um questionário dinâmico consolida a retenção imediata das novas palavras.
+### 5. 🧠 Spaced Repetition System (SRS - SuperMemo SM-2)
+* Four continuous mastery stages: `New (0-25%)`, `Learning (26-50%)`, `Review (51-84%)`, and `Mastered (85-100%)`.
+* **Starred Words (⭐)**: Words marked as favorites receive maximum priority in subsequent story generations.
+* **Retention Mini-Quiz**: Upon reaching the last spread of a story, an interactive quiz consolidates target vocabulary retention.
 
-### 6. Terminal de Processamento em Tempo Real
-* Janela flutuante com logs e streaming SSE que acompanha cada fase da criação da narrativa:
-  * `Etapa 1`: Curadoria de vocabulário e histórico do usuário.
-  * `Etapa 2`: Redação interlinear e cálculo de repetições.
-  * `Etapa 3`: Validação gramatical e hidratação de traços fonéticos.
+### 6. ⚡ Real-Time Processing Terminal
+* Floating terminal window with live SSE logs streaming every generation phase:
+  * `Stage 1`: User history curation and target vocabulary selection.
+  * `Stage 2`: Interlinear narrative composition and calculated repetition.
+  * `Stage 3`: Grammar validation and phonetic trait enrichment.
 
 ---
 
-## Idiomas Suportados e Escalas de Proficiência
+## 🌐 Supported Languages & Proficiency Scales
 
-| Idioma | Código | Escala de Proficiência | Suporte Fonético |
+| Language | Code | Proficiency Framework | Phonetic Support |
 | :--- | :---: | :---: | :---: |
-| **Mandarim** (中文) | `zh` | HSK 1, HSK 2, HSK 3, HSK 4, HSK 5, HSK 6 | 100% Pinyin Tonal (`pypinyin`) |
-| **Japonês** (日本語) | `ja` | JLPT N5, JLPT N4, JLPT N3, JLPT N2, JLPT N1 | Furigana em Hiragana |
-| **Coreano** (한국어) | `ko` | TOPIK 1, TOPIK 2, TOPIK 3, TOPIK 4, TOPIK 5, TOPIK 6 | Hangul e Romanização |
-| **Espanhol** (Español) | `es` | CEFR A1, A2, B1, B2, C1, C2 | Tradução interlinear contextual |
-| **Francês** (Français) | `fr` | CEFR A1, A2, B1, B2, C1, C2 | Tradução interlinear contextual |
-| **Alemão** (Deutsch) | `de` | CEFR A1, A2, B1, B2, C1, C2 | Tradução interlinear contextual |
-| **Italiano** (Italiano) | `it` | CEFR A1, A2, B1, B2, C1, C2 | Tradução interlinear contextual |
-| **Inglês** (English) | `en` | CEFR A1, A2, B1, B2, C1, C2 | Tradução interlinear contextual |
-| **Português** | `pt` | CEFR A1, A2, B1, B2, C1, C2 | Tradução interlinear contextual |
+| **Mandarin Chinese** (中文) | `zh` | HSK 1, HSK 2, HSK 3, HSK 4, HSK 5, HSK 6 | 100% Pinyin with Tones (`pypinyin`) |
+| **Japanese** (日本語) | `ja` | JLPT N5, JLPT N4, JLPT N3, JLPT N2, JLPT N1 | Furigana in Hiragana |
+| **Korean** (한국어) | `ko` | TOPIK 1, TOPIK 2, TOPIK 3, TOPIK 4, TOPIK 5, TOPIK 6 | Hangul & Romanization |
+| **Spanish** (Español) | `es` | CEFR A1, A2, B1, B2, C1, C2 | Contextual interlinear translation |
+| **French** (Français) | `fr` | CEFR A1, A2, B1, B2, C1, C2 | Contextual interlinear translation |
+| **German** (Deutsch) | `de` | CEFR A1, A2, B1, B2, C1, C2 | Contextual interlinear translation |
+| **Italian** (Italiano) | `it` | CEFR A1, A2, B1, B2, C1, C2 | Contextual interlinear translation |
+| **English** (English) | `en` | CEFR A1, A2, B1, B2, C1, C2 | Contextual interlinear translation |
+| **Portuguese** (Português) | `pt` | CEFR A1, A2, B1, B2, C1, C2 | Contextual interlinear translation |
 
 ---
 
 ## ⚙️ Step-by-Step Installation
 
 > [!TIP]
-> **Automatic Setup**: When running either `run.bat` or `npm run dev`, the project automatically checks if `node_modules`, the Python virtual environment (`.venv`), or the `.env` configuration file are missing, and installs them automatically before starting the application! The manual steps below are optional if you prefer configuring the environment manually.
+> **Automated Setup**: When running either `run.bat` or `npm run dev`, the project automatically checks if `node_modules`, the Python virtual environment (`.venv`), or the `.env` configuration file are missing, and installs them automatically before starting the application! The manual steps below are optional if you prefer configuring the environment manually.
 
 ### Prerequisites
 * **Node.js**: v18.0.0 or higher ([nodejs.org](https://nodejs.org/))
@@ -222,63 +222,67 @@ Access in your browser:
 
 ---
 
-## 📂 Estrutura do Projeto
+## 📂 Project Structure
 
 ```
 LANGUAGE-STORIES/
-├── run.bat                       # Inicializador rápido em 1 clique (Windows)
-├── package.json                  # Scripts unificados de orquestração (concurrently)
-├── .gitignore                    # Bloqueio de chaves .env, caches e bancos locais
-├── README.md                     # Documentação oficial do projeto
+├── run.bat                       # 1-Click smart auto-installing launcher (Windows)
+├── package.json                  # Root orchestration & predev hook (concurrently)
+├── .gitignore                    # Protects .env keys, caches, and local databases
+├── README.md                     # Official project documentation
 │
-├── backend/                      # Servidor FastAPI e Inteligência Artificial
+├── scripts/
+│   ├── setup.js                  # Cross-platform automated setup script
+│   └── start-backend.js          # Helper that executes Python from .venv automatically
+│
+├── backend/                      # FastAPI server & AI generation engine
 │   ├── languages/
-│   │   ├── base.py               # Estrutura base de perfis de idiomas
-│   │   ├── chinese.py            # Regras fonéticas, radicais e HSK do Mandarim
-│   │   ├── phonetics.py          # Enriquecimento com pypinyin (marcas de tom diacríticas)
-│   │   └── profiles.py           # Registro dinâmico de todos os idiomas
+│   │   ├── base.py               # Language profile base classes
+│   │   ├── chinese.py            # Mandarin phonetics, radicals, and HSK metadata
+│   │   ├── phonetics.py          # 100% Ruby enrichment with pypinyin & Furigana
+│   │   └── profiles.py           # Language registry for all supported locales
 │   ├── routers/
-│   │   ├── stories.py            # Geração de narrativas com streaming SSE
-│   │   ├── vocabulary.py         # Raio-X morfológico e gestão de vocabulário
-│   │   └── tts.py                # Síntese neural de áudio com Edge-TTS
+│   │   ├── stories.py            # SSE streaming story generation endpoints
+│   │   ├── vocabulary.py         # Morphological Deep Dive and vocabulary routes
+│   │   └── tts.py                # Edge-TTS neural voice synthesis routes
 │   ├── services/
-│   │   ├── ai_service.py         # Integração com Gemini API e tratamento estrito de erros
-│   │   └── tts_service.py        # Cache e conversão de áudio para streaming
-│   ├── config.py                 # Leitura dinâmica de variáveis de ambiente (.env)
-│   ├── database.py               # Modelos SQLAlchemy e SQLite local
-│   ├── main.py                   # Ponto de entrada FastAPI com CORS configurado
-│   └── requirements.txt          # Dependências Python (fastapi, google-genai, pypinyin, edge-tts)
+│   │   ├── ai_service.py         # Gemini API integration & strict error handling
+│   │   └── tts_service.py        # Audio caching and streaming conversion
+│   ├── config.py                 # Dynamic environment variable loader (.env)
+│   ├── database.py               # SQLAlchemy models and local SQLite database
+│   ├── main.py                   # FastAPI entrypoint with CORS configuration
+│   └── requirements.txt          # Python dependencies (fastapi, google-genai, pypinyin, edge-tts)
 │
-└── frontend/                     # Aplicação Web SPA (React + TypeScript + Vite)
+└── frontend/                     # Single-Page Web Application (React + TypeScript + Vite)
     ├── src/
     │   ├── components/
-    │   │   ├── Reader/           # StoryReader (livro 3D), BookErrorCard, WordPopover
-    │   │   ├── Dictionary/       # Visualização e filtro do cofre de vocabulário
-    │   │   ├── Quiz/             # Mini-quizzes de retenção pós-leitura
-    │   │   ├── Terminal/         # Terminal flutuante de processamento em tempo real
-    │   │   └── Settings/         # Painel de chaves de API, modelos e temas
+    │   │   ├── Reader/           # StoryReader (3D book), BookErrorCard, WordPopover
+    │   │   ├── Dictionary/       # Vocabulary vault views and filters
+    │   │   ├── Quiz/             # Post-reading retention mini-quizzes
+    │   │   ├── Terminal/         # Floating real-time processing terminal
+    │   │   └── Settings/         # API key configurations, models, and themes
     │   ├── context/
-    │   │   └── AppContext.tsx    # Gerenciamento de estado global, SRS e controle de áudio
+    │   │   └── AppContext.tsx    # Global state management, SRS engine, audio controls
     │   ├── services/
-    │   │   ├── auxiliaryPhonetics.ts # Tabela fonética auxiliar de Pinyin e Furigana
-    │   │   ├── apiService.ts     # Orquestrador de requisições e estratégias de IA
-    │   │   ├── storageService.ts # Armazenamento e sanitização de dados no localStorage
-    │   │   └── ttsService.ts     # Síntese de áudio no cliente com Web Speech API
-    │   ├── types/                # Interfaces TypeScript unificadas
-    │   └── index.css             # Design tokens e folhas de estilo skeuomórficas
+    │   │   ├── auxiliaryPhonetics.ts # Client-side auxiliary phonetics lookup table
+    │   │   ├── apiService.ts     # Request orchestrator & AI strategies
+    │   │   ├── storageService.ts # LocalStorage management & sanitization
+    │   │   └── ttsService.ts     # Client-side audio playback with Web Speech API
+    │   ├── types/                # Unified TypeScript interfaces
+    │   └── index.css             # Skeuomorphic styling and CSS design tokens
     ├── package.json
     └── vite.config.ts
 ```
 
 ---
 
-## Privacidade e Segurança de Dados
+## 🔒 Privacy & Data Security
 
-* **Armazenamento Local**: Todo o seu cofre de palavras aprendidas, histórico e notas SRS são armazenados de forma privada no seu próprio computador (`localStorage` e `language_stories.db`).
-* **Proteção de Credenciais**: O arquivo `.gitignore` impede que chaves privadas (`.env`), caches de áudio (`.mp3`) ou dados de usuário sejam enviados para versionamento Git.
+* **Local-First Storage**: Your learned vocabulary vault, reading history, and SRS metrics remain securely stored on your own device (`localStorage` and `language_stories.db`).
+* **Credential Protection**: The project `.gitignore` strictly prevents private API keys (`.env`), cached audio files (`.mp3`), and user databases from ever being committed to Git.
 
 ---
 
-## 📄 Licença
+## 📄 License
 
-Distribuído sob a licença **MIT**. Sinta-se livre para usar, estudar e aprimorar o código.
+Distributed under the **MIT License**. Feel free to use, study, and enhance the codebase.
