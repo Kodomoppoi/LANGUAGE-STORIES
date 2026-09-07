@@ -2,9 +2,10 @@
   "name": "language-stories-root",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"cyan,magenta\" \"python -m uvicorn backend.main:app --reload --port 8000\" \"npm run dev --prefix frontend\"",
+    "predev": "node scripts/setup.js",
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"cyan,magenta\" \"npm run backend\" \"npm run frontend\"",
     "start": "npm run dev",
-    "backend": "python -m uvicorn backend.main:app --reload --port 8000",
+    "backend": "node scripts/start-backend.js",
     "frontend": "npm run dev --prefix frontend",
     "build": "npm run build --prefix frontend",
     "preview": "npm run preview --prefix frontend"

@@ -135,29 +135,32 @@ Nenhuma falha de API é encoberta com dados falsos. Se ocorrer um problema, um c
 
 ---
 
-## ⚙️ Instalação Passo a Passo
+## ⚙️ Step-by-Step Installation
 
-### Pré-requisitos
-* **Node.js**: v18.0.0 ou superior ([nodejs.org](https://nodejs.org/))
-* **Python**: v3.10 ou superior ([python.org](https://www.python.org/))
-* **Git** instalado
+> [!TIP]
+> **Automatic Setup**: When running either `run.bat` or `npm run dev`, the project automatically checks if `node_modules`, the Python virtual environment (`.venv`), or the `.env` configuration file are missing, and installs them automatically before starting the application! The manual steps below are optional if you prefer configuring the environment manually.
+
+### Prerequisites
+* **Node.js**: v18.0.0 or higher ([nodejs.org](https://nodejs.org/))
+* **Python**: v3.10 or higher ([python.org](https://www.python.org/))
+* **Git** installed
 
 ---
 
-### Passo 1: Clonar o Repositório
+### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/seu-usuario/LANGUAGE-STORIES.git
+git clone https://github.com/your-username/LANGUAGE-STORIES.git
 cd LANGUAGE-STORIES
 ```
 
 ---
 
-### Passo 2: Instalar Dependências Gerais
-Na raiz do projeto (`LANGUAGE-STORIES`):
+### Step 2: Install General Dependencies
+At the root of the project (`LANGUAGE-STORIES`):
 ```bash
 npm install
 ```
-Em seguida, instale as dependências do frontend:
+Then, install the frontend dependencies:
 ```bash
 cd frontend
 npm install
@@ -166,12 +169,12 @@ cd ..
 
 ---
 
-### Passo 3: Configurar o Ambiente Python do Backend
-1. Navegue até a pasta `backend`:
+### Step 3: Set Up the Backend Python Environment
+1. Navigate to the `backend` directory:
    ```bash
    cd backend
    ```
-2. Crie e ative o ambiente virtual:
+2. Create and activate a virtual environment:
    * **Windows (PowerShell)**:
      ```powershell
      python -m venv venv
@@ -182,38 +185,38 @@ cd ..
      python3 -m venv venv
      source venv/bin/activate
      ```
-3. Instale as bibliotecas Python:
+3. Install Python libraries:
    ```bash
    pip install -r requirements.txt
    ```
-4. Volte à raiz do projeto:
+4. Return to the root directory:
    ```bash
    cd ..
    ```
 
 ---
 
-### Passo 4: Configurar a Chave da API Gemini
+### Step 4: Configure the Gemini API Key
 
-1. Acesse gratuitamente o [Google AI Studio](https://aistudio.google.com/).
-2. Faça login com sua conta Google e clique em **"Create API Key"**.
-3. Crie um arquivo `.env` na raiz do projeto (ou dentro de `backend/.env`):
+1. Access [Google AI Studio](https://aistudio.google.com/) for free.
+2. Sign in with your Google account and click **"Create API Key"**.
+3. Create a `.env` file at the root of the project (or inside `backend/.env`):
    ```env
-   GEMINI_API_KEY=AIzaSy...sua_chave_aqui
+   GEMINI_API_KEY=AIzaSy...your_key_here
    GEMINI_MODEL=gemini-3.6-flash
    ```
-   *(Você também pode inserir e testar a chave diretamente pela interface gráfica nas Configurações ⚙️).*
+   *(You can also enter and test the key directly through the GUI in Settings ⚙️).*
 
 ---
 
-### Passo 5: Iniciar a Aplicação
-Basta executar na raiz:
+### Step 5: Start the Application
+Simply run at the root:
 ```bash
 npm run dev
 ```
-Ou dê um duplo clique no executável [run.bat](file:///e:/Projects/Coding/Personal/LANGUAGE%20STORIES/run.bat).
+Or double-click the [run.bat](file:///e:/Projects/Coding/Personal/LANGUAGE%20STORIES/run.bat) executable.
 
-Acesse no navegador:
+Access in your browser:
 * **Frontend**: `http://localhost:5173`
 * **API Backend (Swagger Docs)**: `http://localhost:8000/docs`
 
