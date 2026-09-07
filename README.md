@@ -1,10 +1,10 @@
-# 📖 Language Stories (📖 语言故事 / 言語の物語)
+#  Language Stories
 
 > **Plataforma imersiva de aquisição natural de idiomas baseada no princípio de *Comprehensible Input*, com leitura graduada em livro 3D, fonética integral (100% Ruby/Pinyin/Furigana), repetição espaçada calculada (SRS) e acompanhamento auditivo em tempo real.**
 
 ---
 
-## 🌟 Visão Geral / Project Overview
+##  Visão Geral / Project Overview
 
 O **Language Stories** transforma o aprendizado de idiomas em uma experiência literária e sensorial contínua. Em vez de exercícios mecânicos ou listas isoladas de palavras, o estudante lê histórias originais criadas por Inteligência Artificial generativa, estritamente calibradas para o seu nível real de compreensão (CEFR A1–C2, HSK 1–6, JLPT N5–N1, TOPIK 1–6).
 
@@ -18,7 +18,7 @@ A aplicação integra um ecossistema completo:
 
 ---
 
-## 🚀 Início Rápido (Execução em 1 Clique)
+##  Início Rápido (Execução em 1 Clique)
 
 Para facilitar o desenvolvimento e uso diário, o projeto conta com inicialização unificada:
 
@@ -40,7 +40,7 @@ npm run dev
 
 ---
 
-## 🛠️ Tecnologias e Arquitetura
+##  Tecnologias e Arquitetura
 
 ```
                             ┌─────────────────────────────────────────┐
@@ -81,37 +81,37 @@ npm run dev
 
 ---
 
-## ✨ Recursos Detalhados
+## Recursos Detalhados
 
-### 1. 📚 Livro Aberto 3D & Paginação Inteligente
+### 1. Livro Aberto 3D & Paginação Inteligente
 * **Paginação Balanceada**: Evita páginas órfãs ou textos vazios distribuindo parágrafos harmoniosamente entre a página esquerda e direita.
 * **Modo Boas-Vindas Didático**: Quando não há histórias criadas e não há erros, a página exibe o estado de boas-vindas com chips de temas populares (ex: *Café Matinal*, *Festival de Rua*, *Viagem de Trem*) e campo para tema personalizado.
 
-### 2. 🀄 100% de Cobertura Fonética (Ruby / Pinyin / Furigana)
+### 2. 100% de Cobertura Fonética (Ruby / Pinyin / Furigana)
 * **Pinyin Integral**: Ao aprender Mandarim, **todas as palavras e ideogramas** do texto recebem anotação de Pinyin tonal sobre os caracteres (ex: `wǒ`, `kàn`, `hē`).
 * **Furigana para Kanjis**: Ideogramas japoneses recebem a leitura correspondente em Hiragana.
 * **Dupla Camada de Garantia**: Processamento nativo no backend aliado a um dicionário morfológico auxiliar no cliente (`auxiliaryPhonetics.ts`).
 
-### 3. 🛡️ Diagnóstico Visível no Caderno (`BookErrorCard`)
+### 3.  Diagnóstico Visível no Caderno (`BookErrorCard`)
 Nenhuma falha de API é encoberta com dados falsos. Se ocorrer um problema, um cartão de pergaminho é exibido diretamente na página direita do livro:
-* 🔑 **Chave Gemini Inválida ou Ausente (HTTP 400/403)**: Explica o motivo e fornece botão de atalho para abrir as Configurações.
-* ⏳ **Cota Excedida (HTTP 429 / RESOURCE_EXHAUSTED)**: Informa sobre o limite de requisições por minuto/dia e instruções de espera ou troca de modelo.
-* 🔇 **Voz TTS Indisponível**: Alerta quando o navegador não possui o pacote de voz instalado para a língua da história, orientando o uso do Edge-TTS do backend.
+*  **Chave Gemini Inválida ou Ausente (HTTP 400/403)**: Explica o motivo e fornece botão de atalho para abrir as Configurações.
+*  **Cota Excedida (HTTP 429 / RESOURCE_EXHAUSTED)**: Informa sobre o limite de requisições por minuto/dia e instruções de espera ou troca de modelo.
+*  **Voz TTS Indisponível**: Alerta quando o navegador não possui o pacote de voz instalado para a língua da história, orientando o uso do Edge-TTS do backend.
 * **Página Esquerda de Salvaguarda**: Apresenta a notificação *"Interrupção na Composição"*, assegurando ao estudante que seu progresso e cofre de vocabulário continuam 100% preservados.
 
-### 4. 🔍 Dicionário Interativo & Raio-X Morfológico
+### 4. Dicionário Interativo & Raio-X Morfológico
 * **Consulta com 1 Clique**: Clique em qualquer vocábulo do livro para ver tradução, pronúncia fonética, classe gramatical e métricas de aprendizado.
 * **Raio-X IA**: Ao clicar no ícone de robô, o sistema gera uma explicação detalhada da anatomia da palavra:
   * Decomposição de ideogramas (radicais semânticos e fonéticos).
   * Palavras compostas e vocábulos correlatos.
   * Contexto cultural e nuances de uso.
 
-### 5. 🧠 Repetição Espaçada (SRS - SuperMemo SM-2)
+### 5. Repetição Espaçada (SRS - SuperMemo SM-2)
 * Classificação em quatro estágios contínuos: `Novo (0-25%)`, `Aprendendo (26-50%)`, `Revisão (51-84%)` e `Dominado (85-100%)`.
 * **Fixação por Estrela (⭐)**: Palavras marcadas como favoritas recebem peso máximo de repetição nas próximas narrativas geradas.
 * **Micro-Quiz**: Ao virar a última página de uma história, um questionário dinâmico consolida a retenção imediata das novas palavras.
 
-### 6. ⚡ Terminal de Processamento em Tempo Real
+### 6. Terminal de Processamento em Tempo Real
 * Janela flutuante com logs e streaming SSE que acompanha cada fase da criação da narrativa:
   * `Etapa 1`: Curadoria de vocabulário e histórico do usuário.
   * `Etapa 2`: Redação interlinear e cálculo de repetições.
@@ -119,7 +119,7 @@ Nenhuma falha de API é encoberta com dados falsos. Se ocorrer um problema, um c
 
 ---
 
-## 🌐 Idiomas Suportados e Escalas de Proficiência
+## Idiomas Suportados e Escalas de Proficiência
 
 | Idioma | Código | Escala de Proficiência | Suporte Fonético |
 | :--- | :---: | :---: | :---: |
@@ -269,7 +269,7 @@ LANGUAGE-STORIES/
 
 ---
 
-## 🔒 Privacidade e Segurança de Dados
+## Privacidade e Segurança de Dados
 
 * **Armazenamento Local**: Todo o seu cofre de palavras aprendidas, histórico e notas SRS são armazenados de forma privada no seu próprio computador (`localStorage` e `language_stories.db`).
 * **Proteção de Credenciais**: O arquivo `.gitignore` impede que chaves privadas (`.env`), caches de áudio (`.mp3`) ou dados de usuário sejam enviados para versionamento Git.
