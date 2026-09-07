@@ -22,6 +22,9 @@ export class BackendProvider implements StoryGeneratorProvider {
       nativeLanguage: nativeLang,
       gemini_api_key: settings.geminiApiKey?.trim() || undefined,
       gemini_model: settings.geminiModel || undefined,
+      openrouter_api_key: settings.openRouterApiKey?.trim() || undefined,
+      openrouter_model: settings.openRouterModel || undefined,
+      api_provider: settings.apiProvider || undefined,
     };
 
     const response = await fetch(`${settings.backendUrl}/api/stories/generate`, {
@@ -58,6 +61,9 @@ export class BackendProvider implements StoryGeneratorProvider {
       nativeLanguage: nativeLang,
       gemini_api_key: settings.geminiApiKey?.trim() || undefined,
       gemini_model: settings.geminiModel || undefined,
+      openrouter_api_key: settings.openRouterApiKey?.trim() || undefined,
+      openrouter_model: settings.openRouterModel || undefined,
+      api_provider: settings.apiProvider || undefined,
     };
 
     const response = await fetch(streamUrl, {

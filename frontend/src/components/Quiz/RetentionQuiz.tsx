@@ -19,6 +19,7 @@ export const RetentionQuiz: React.FC = () => {
     setIsQuizOpen,
     submitQuiz,
     speakSingleToken,
+    t,
   } = useApp();
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -82,7 +83,7 @@ export const RetentionQuiz: React.FC = () => {
         <div className="modal-header">
           <div className="modal-title">
             <Sparkles size={18} color="var(--flower-500)" />
-            <span>Story Retention & SRS Calibration</span>
+            <span>{t('quizHeaderTitle')}</span>
           </div>
           <button className="tts-btn-icon" onClick={handleClose}>
             <X size={17} />
@@ -94,10 +95,10 @@ export const RetentionQuiz: React.FC = () => {
             {/* Progress Badge */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span className="quiz-badge">
-                Question {currentQuestionIndex + 1} of {currentStory.quiz.length}
+                {t('questionPrefix')} {currentQuestionIndex + 1} {t('ofPrefix')} {currentStory.quiz.length}
               </span>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Target: <strong>{currentQ.targetWord}</strong>
+                {t('quizTargetPrefix')} <strong>{currentQ.targetWord}</strong>
               </span>
             </div>
 
@@ -157,7 +158,7 @@ export const RetentionQuiz: React.FC = () => {
             {currentQ.type === 'confidence-rating' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                  How easily did you recall this target vocabulary during the narrative?
+                  {t('quizRecallQuestion')}
                 </p>
                 <div className="sm2-rating-grid">
                   <div
@@ -165,28 +166,28 @@ export const RetentionQuiz: React.FC = () => {
                     onClick={() => handleSM2Rating(1)}
                   >
                     <span className="rate-num" style={{ color: '#ef4444' }}>1</span>
-                    <span className="rate-label">Blackout</span>
+                    <span className="rate-label">{t('quizSm2Blackout')}</span>
                   </div>
                   <div
                     className="sm2-rate-btn"
                     onClick={() => handleSM2Rating(3)}
                   >
                     <span className="rate-num" style={{ color: '#ff7b60' }}>3</span>
-                    <span className="rate-label">Hard</span>
+                    <span className="rate-label">{t('quizSm2Hard')}</span>
                   </div>
                   <div
                     className="sm2-rate-btn"
                     onClick={() => handleSM2Rating(4)}
                   >
                     <span className="rate-num" style={{ color: '#ffb703' }}>4</span>
-                    <span className="rate-label">Good</span>
+                    <span className="rate-label">{t('quizSm2Good')}</span>
                   </div>
                   <div
                     className="sm2-rate-btn"
                     onClick={() => handleSM2Rating(5)}
                   >
                     <span className="rate-num" style={{ color: '#22c55e' }}>5</span>
-                    <span className="rate-label">Instant</span>
+                    <span className="rate-label">{t('quizSm2Instant')}</span>
                   </div>
                 </div>
               </div>
@@ -204,7 +205,7 @@ export const RetentionQuiz: React.FC = () => {
                   animation: 'fadeIn 0.2s ease',
                 }}
               >
-                <strong style={{ color: 'var(--flower-500)' }}>Explanation: </strong>
+                <strong style={{ color: 'var(--flower-500)' }}>{t('quizExplanation')} </strong>
                 {currentQ.explanation}
               </div>
             )}
@@ -216,7 +217,7 @@ export const RetentionQuiz: React.FC = () => {
                 style={{ marginTop: '6px' }}
                 onClick={handleNext}
               >
-                <span>{isLastQuestion ? 'Complete Quiz & Update SRS Curve' : 'Next Question'}</span>
+                <span>{isLastQuestion ? t('quizCompleteBtn') : t('nextQuestion')}</span>
                 <ArrowRight size={16} />
               </button>
             )}
@@ -242,10 +243,10 @@ export const RetentionQuiz: React.FC = () => {
             </div>
 
             <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.35rem', fontWeight: 800 }}>
-              Retention Mini-Quiz Complete! 🌸
+              {t('quizCompleteCelebrationTitle')}
             </h3>
             <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-              Memory curves for these words have been updated and will be intelligently scheduled into your next story generations.
+              {t('quizCompleteCelebrationDesc')}
             </p>
 
             <button
@@ -253,7 +254,7 @@ export const RetentionQuiz: React.FC = () => {
               style={{ marginTop: '12px' }}
               onClick={handleClose}
             >
-              Return to Story & Dictionary
+              {t('quizReturnBtn')}
             </button>
           </div>
         )}

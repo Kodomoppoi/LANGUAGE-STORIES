@@ -34,6 +34,9 @@ class DeepDiveRequest(BaseModel):
     nativeLanguage: Optional[str] = None
     gemini_api_key: Optional[str] = None
     gemini_model: Optional[str] = None
+    openrouter_api_key: Optional[str] = None
+    openrouter_model: Optional[str] = None
+    api_provider: Optional[str] = None
 
 
 class RecordClickRequest(BaseModel):
@@ -171,6 +174,9 @@ async def get_word_deep_dive(
         native_lang=native,
         api_key=req.gemini_api_key,
         model=req.gemini_model,
+        openrouter_key=req.openrouter_api_key,
+        openrouter_model=req.openrouter_model,
+        api_provider=req.api_provider,
     )
 
 

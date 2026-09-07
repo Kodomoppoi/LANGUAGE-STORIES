@@ -185,7 +185,7 @@ export const WordPopover: React.FC = () => {
               border: '1px solid var(--flower-500)',
             }}
           >
-            Story Target 🎯
+            {t('readerStoryTargetBadge')}
           </span>
         )}
 
@@ -209,7 +209,7 @@ export const WordPopover: React.FC = () => {
       <div className="lateral-translation-box">
         <div className="lateral-translation-label">{t('contextMeaningLabel')}</div>
         <div className="lateral-translation-text">
-          {traits.contextMeaning || activeToken.translation || 'Tradução em contexto'}
+          {traits.contextMeaning || activeToken.translation || t('popoverContextTranslation')}
         </div>
         {activeToken.explanation && (
           <div className="lateral-explanation-text">
@@ -225,7 +225,7 @@ export const WordPopover: React.FC = () => {
             {t('masteryLabel')} SRS
           </span>
           <span className={`srs-status-badge ${statusColor}`} style={{ fontSize: '0.7rem' }}>
-            {masteryScore}% • {statusColor === 'orange' ? 'Crítico (3-4x)' : statusColor === 'yellow' ? 'Em Progresso (2x)' : 'Dominada (1x)'}
+            {masteryScore}% • {statusColor === 'orange' ? t('popoverCriticalStatus') : statusColor === 'yellow' ? t('popoverInProgressStatus') : t('popoverMasteredStatus')}
           </span>
         </div>
         <div className="retention-meter-bar">
@@ -242,7 +242,7 @@ export const WordPopover: React.FC = () => {
             closeTokenPopover();
             openDeepDive(activeToken.text, activeToken.explanation || activeToken.translation);
           }}
-          title="Raio-X IA: Explicação detalhada (radicais, fonética, componentes, sinônimos)"
+          title={t('popoverDeepDiveTooltip')}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -257,7 +257,7 @@ export const WordPopover: React.FC = () => {
           }}
         >
           <Bot size={15} color="var(--flower-500)" />
-          <span>Raio-X IA</span>
+          <span>{t('popoverDeepDiveBtn')}</span>
         </button>
 
         <button

@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Zap,
 } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 
@@ -33,6 +34,9 @@ export const SettingsModal: React.FC = () => {
   const [geminiTestResult, setGeminiTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
 
+  const [isTestingOpenRouter, setIsTestingOpenRouter] = useState(false);
+  const [openRouterTestResult, setOpenRouterTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
   if (!isSettingsOpen) return null;
 
   const handleTestBackend = async () => {
@@ -50,7 +54,7 @@ export const SettingsModal: React.FC = () => {
   const handleTestGemini = async () => {
     const key = settings.geminiApiKey?.trim();
     if (!key) {
-      setGeminiTestResult({ success: false, message: 'Insira sua chave de API Gemini primeiro.' });
+      setGeminiTestResult({ success: false, message: t('settingsEnterKeyFirst') });
       return;
     }
     setIsTestingGemini(true);
@@ -81,6 +85,32 @@ export const SettingsModal: React.FC = () => {
 
     if (result.success && settings.backendUrl) {
       await apiService.syncGeminiSettings(settings);
+    }
+  };
+
+  const handleTestOpenRouter = async () => {
+    const key = settings.openRouterApiKey?.trim();
+    if (!key) {
+      setOpenRouterTestResult({ success: false, message: t('openRouterEnterKeyFirst') });
+      return;
+    }
+    setIsTestingOpenRouter(true);
+    setOpenRouterTestResult(null);
+
+    const result = await apiService.testOpenRouterConnection(
+      key,
+      settings.openRouterModel || 'openrouter/free',
+      settings.backendUrl
+    );
+
+    setIsTestingOpenRouter(false);
+    setOpenRouterTestResult({
+      success: result.success,
+      message: result.message,
+    });
+
+    if (result.success && settings.backendUrl) {
+      await apiService.syncOpenRouterSettings(settings);
     }
   };
 
@@ -191,7 +221,218 @@ export const SettingsModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 2: Backend FastAPI Connection */}
+          {/* Section 2: Active AI Generation Mode / Provider */}
+          <div className="sidebar-panel" style={{ padding: '14px 16px' }}>
+            <div className="panel-header-title">
+              <Zap size={16} color="var(--flower-500)" />
+              <span>{t('providerSelectionLabel')}</span>
+            </div>
+
+            <div className="control-group">
+              <select
+                className="control-select"
+                value={settings.apiProvider}
+                onChange={(e) => {
+                  const newProvider = e.target.value as any;
+                  updateSettings({ apiProvider: newProvider });
+                  if (settings.backendUrl) {
+                    apiService.syncProvider(newProvider, settings.backendUrl);
+                  }
+                }}
+              >
+                <option value="hybrid">{t('providerHybrid')}</option>
+                <option value="gemini">{t('providerGeminiOnly')}</option>
+                <option value="openrouter">{t('providerOpenRouterOnly')}</option>
+                <option value="mock">{t('providerMockOnly')}</option>
+              </select>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                {settings.apiProvider === 'hybrid' && t('providerHybridDesc')}
+                {settings.apiProvider === 'gemini' && t('providerGeminiOnlyDesc')}
+                {settings.apiProvider === 'openrouter' && t('providerOpenRouterOnlyDesc')}
+                {settings.apiProvider === 'mock' && t('mockModeNotice')}
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: OpenRouter Free Tier Integration (Exibido apenas em modo Hybrid ou OpenRouter Only) */}
+          {(settings.apiProvider === 'hybrid' || settings.apiProvider === 'openrouter') && (
+            <div className="sidebar-panel" style={{ padding: '14px 16px' }}>
+              <div className="panel-header-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Zap size={16} color="#38bdf8" />
+                  <span>{t('openRouterSection')}</span>
+                </div>
+                <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                  {t('rateLimit80Badge')}
+                </span>
+              </div>
+
+              <div className="control-group">
+                <label className="control-label">{t('openRouterKeyLabel')}</label>
+                <input
+                  type="password"
+                  className="control-input"
+                  value={settings.openRouterApiKey || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    updateSettings({ openRouterApiKey: val });
+                    setOpenRouterTestResult(null);
+                  }}
+                  onBlur={() => {
+                    if (settings.openRouterApiKey?.trim() && settings.isBackendConnected) {
+                      apiService.syncOpenRouterSettings(settings);
+                    }
+                  }}
+                  placeholder="sk-or-v1-..."
+                />
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  {t('openRouterKeyDesc')}
+                </span>
+
+                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={handleTestOpenRouter}
+                    disabled={isTestingOpenRouter || !settings.openRouterApiKey?.trim()}
+                    style={{ padding: '6px 12px', fontSize: '0.8rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    {isTestingOpenRouter ? <Loader2 size={13} className="spin" /> : <Zap size={13} color="#38bdf8" />}
+                    <span>{t('openRouterTestBtn')}</span>
+                  </button>
+                </div>
+
+                {openRouterTestResult && (
+                  <div style={{
+                    fontSize: '0.78rem',
+                    color: openRouterTestResult.success ? '#22c55e' : '#f87171',
+                    marginTop: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}>
+                    {openRouterTestResult.success ? <CheckCircle2 size={14} color="#22c55e" /> : <AlertCircle size={14} color="#f87171" />}
+                    <span>{openRouterTestResult.message}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="control-group">
+                <label className="control-label">{t('openRouterModelLabel')}</label>
+                <select
+                  className="control-select"
+                  value={settings.openRouterModel || 'openrouter/free'}
+                  onChange={(e) => updateSettings({ openRouterModel: e.target.value })}
+                >
+                  <option value="openrouter/free">{t('modelOpenRouterFree')}</option>
+                  <option value="google/gemma-4-26b-a4b-it:free">{t('modelGemma426b')}</option>
+                  <option value="google/gemma-4-31b-it:free">{t('modelGemma431b')}</option>
+                  <option value="nvidia/nemotron-3.5-lightning:free">{t('modelNemotron')}</option>
+                  <option value="liquid/lfm-2.5-2.6b:free">{t('modelLiquid')}</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Section 4: Direct Google Gemini API Integration (Exibido apenas em modo Hybrid ou Gemini Only) */}
+          {(settings.apiProvider === 'hybrid' || settings.apiProvider === 'gemini') && (
+            <div className="sidebar-panel" style={{ padding: '14px 16px' }}>
+              <div className="panel-header-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={16} />
+                  <span>{t('geminiSection')}</span>
+                </div>
+                <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: 'rgba(200, 90, 43, 0.15)', color: 'var(--flower-500)' }}>
+                  {t('rateLimit80Badge')}
+                </span>
+              </div>
+
+              <div className="control-group">
+                <label className="control-label">{t('geminiKeyLabel')}</label>
+                <input
+                  type="password"
+                  className="control-input"
+                  value={settings.geminiApiKey}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    updateSettings({ geminiApiKey: val });
+                    setGeminiTestResult(null);
+                  }}
+                  onBlur={() => {
+                    if (settings.geminiApiKey?.trim() && settings.isBackendConnected) {
+                      apiService.syncGeminiSettings(settings);
+                    }
+                  }}
+                  placeholder="AIzaSy..."
+                />
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  {t('geminiKeyDesc')}
+                </span>
+
+                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={handleTestGemini}
+                    disabled={isTestingGemini || !settings.geminiApiKey?.trim()}
+                    style={{ padding: '6px 12px', fontSize: '0.8rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    {isTestingGemini ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} color="var(--flower-400)" />}
+                    <span>{t('settingsTestGeminiBtn')}</span>
+                  </button>
+                </div>
+
+                {geminiTestResult && (
+                  <div style={{
+                    fontSize: '0.78rem',
+                    color: geminiTestResult.success ? '#22c55e' : '#f87171',
+                    marginTop: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}>
+                    {geminiTestResult.success ? <CheckCircle2 size={14} color="#22c55e" /> : <AlertCircle size={14} color="#f87171" />}
+                    <span>{geminiTestResult.message}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="control-group">
+                <label className="control-label">{t('modelSelectionLabel')}</label>
+                <select
+                  className="control-select"
+                  value={settings.geminiModel}
+                  onChange={(e) => updateSettings({ geminiModel: e.target.value })}
+                >
+                  {availableModels.length > 0 ? (
+                    availableModels.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recomendado)</option>
+                      <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                      <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
+                      <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                      <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Modo Mock Offline Notice */}
+          {settings.apiProvider === 'mock' && (
+            <div className="sidebar-panel" style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>ℹ️</span>
+              <span>{t('mockModeNotice')}</span>
+            </div>
+          )}
+
+          {/* Section 5: Backend FastAPI Connection */}
           <div className="sidebar-panel" style={{ padding: '14px 16px' }}>
             <div className="panel-header-title">
               <Server size={16} />
@@ -226,91 +467,7 @@ export const SettingsModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 3: Direct Google Gemini API Integration */}
-          <div className="sidebar-panel" style={{ padding: '14px 16px' }}>
-            <div className="panel-header-title">
-              <Sparkles size={16} />
-              <span>{t('geminiSection')}</span>
-            </div>
-
-            <div className="control-group">
-              <label className="control-label">{t('geminiKeyLabel')}</label>
-              <input
-                type="password"
-                className="control-input"
-                value={settings.geminiApiKey}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  updateSettings({ geminiApiKey: val });
-                  setGeminiTestResult(null);
-                }}
-                onBlur={() => {
-                  if (settings.geminiApiKey?.trim() && settings.isBackendConnected) {
-                    apiService.syncGeminiSettings(settings);
-                  }
-                }}
-                placeholder="AIzaSy..."
-              />
-              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                {t('geminiKeyDesc')}
-              </span>
-
-              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={handleTestGemini}
-                  disabled={isTestingGemini || !settings.geminiApiKey?.trim()}
-                  style={{ padding: '6px 12px', fontSize: '0.8rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                >
-                  {isTestingGemini ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} color="var(--flower-400)" />}
-                  <span>Testar Conexão Gemini</span>
-                </button>
-              </div>
-
-              {geminiTestResult && (
-                <div style={{
-                  fontSize: '0.78rem',
-                  color: geminiTestResult.success ? '#22c55e' : '#f87171',
-                  marginTop: 6,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}>
-                  {geminiTestResult.success ? <CheckCircle2 size={14} color="#22c55e" /> : <AlertCircle size={14} color="#f87171" />}
-                  <span>{geminiTestResult.message}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="control-group">
-              <label className="control-label">{t('modelSelectionLabel')}</label>
-              <select
-                className="control-select"
-                value={settings.geminiModel}
-                onChange={(e) => updateSettings({ geminiModel: e.target.value })}
-              >
-                {availableModels.length > 0 ? (
-                  availableModels.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="gemini-3.6-flash">Gemini 3.6 Flash (Padrão Estável / Recomendado)</option>
-                    <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
-                    <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
-                    <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                  </>
-                )}
-              </select>
-            </div>
-          </div>
-
-          {/* Section 4: TTS & Display Options */}
+          {/* Section 6: TTS & Display Options */}
           <div className="sidebar-panel" style={{ padding: '14px 16px' }}>
             <div className="panel-header-title">
               <Volume2 size={16} />

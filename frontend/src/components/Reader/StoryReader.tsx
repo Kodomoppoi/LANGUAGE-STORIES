@@ -21,13 +21,22 @@ import { SUPPORTED_LANGUAGES } from '../../services/sampleStories';
 import { StoryToken, SRSStage, StoryParagraph, StorySentence, DictionaryEntry } from '../../types';
 import { getProficiencyNativeInfo, getProficiencyOptions } from '../../services/proficiencyUtils';
 
-const WELCOME_THEMES = [
+const WELCOME_THEMES_PT = [
   { icon: '☕', label: 'Café Matinal', text: 'Uma conversa tranquila em uma cafeteria charmosa' },
   { icon: '🏮', label: 'Festival de Rua', text: 'Cores, comidas e lanternas em uma noite festiva' },
   { icon: '🚆', label: 'Viagem de Trem', text: 'Um passageiro viajando de trem descobrindo novas cidades' },
   { icon: '🐈', label: 'Gato Curioso', text: 'Um gato curioso que entra em uma antiga livraria' },
   { icon: '🍜', label: 'Restaurante Local', text: 'Pedindo comida deliciosa em um restaurante tradicional' },
   { icon: '🌿', label: 'Passeio no Parque', text: 'Um passeio relaxante sob as árvores em um dia ensolarado' },
+];
+
+const WELCOME_THEMES_EN = [
+  { icon: '☕', label: 'Morning Coffee', text: 'A quiet conversation in a cozy charming café' },
+  { icon: '🏮', label: 'Street Festival', text: 'Colors, foods, and glowing lanterns on a festive night' },
+  { icon: '🚆', label: 'Train Journey', text: 'A passenger traveling by train discovering new towns' },
+  { icon: '🐈', label: 'Curious Cat', text: 'A curious cat wandering into an old antique bookstore' },
+  { icon: '🍜', label: 'Local Eatery', text: 'Ordering delicious comfort food in a traditional restaurant' },
+  { icon: '🌿', label: 'Park Stroll', text: 'A relaxing stroll under shady trees on a sunny afternoon' },
 ];
 
 export const StoryReader: React.FC = () => {
@@ -65,8 +74,9 @@ export const StoryReader: React.FC = () => {
   const [isDifficultyPopoverOpen, setIsDifficultyPopoverOpen] = useState(false);
 
   const langInfo = SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage);
-  const currentLevelInfo = getProficiencyNativeInfo(currentLanguage, currentProficiency);
-  const difficultyOptions = getProficiencyOptions(currentLanguage);
+  const currentLevelInfo = getProficiencyNativeInfo(currentLanguage, currentProficiency, settings.uiLanguage);
+  const difficultyOptions = getProficiencyOptions(currentLanguage, settings.uiLanguage);
+  const welcomeThemes = settings.uiLanguage === 'en' ? WELCOME_THEMES_EN : WELCOME_THEMES_PT;
 
   const isWelcomeState =
     currentStory.id === 'welcome' || !currentStory.paragraphs || currentStory.paragraphs.length === 0;
@@ -548,7 +558,7 @@ export const StoryReader: React.FC = () => {
 
                     {/* Suggested theme quick chips */}
                     <div className="book-welcome-theme-chips">
-                      {WELCOME_THEMES.map((themeItem) => (
+                      {welcomeThemes.map((themeItem) => (
                         <button
                           key={themeItem.text}
                           type="button"
@@ -556,7 +566,7 @@ export const StoryReader: React.FC = () => {
                           onClick={() =>
                             setCustomStoryTheme(customStoryTheme === themeItem.text ? '' : themeItem.text)
                           }
-                          title={`Selecionar tema: ${themeItem.label}`}
+                          title={settings.uiLanguage === 'en' ? `Select theme: ${themeItem.label}` : `Selecionar tema: ${themeItem.label}`}
                         >
                           <span>{themeItem.icon}</span>
                           <span>{themeItem.label}</span>
@@ -716,7 +726,7 @@ export const StoryReader: React.FC = () => {
               key={idx}
               className={`book-dot-indicator ${idx === currentSpread ? 'active' : ''}`}
               onClick={() => setCurrentSpread(idx)}
-              title={`Ir para páginas ${idx * 2 + 1}-${idx * 2 + 2}`}
+              title={`${t('readerGoToPages')} ${idx * 2 + 1}-${idx * 2 + 2}`}
             />
           ))}
         </div>
@@ -792,7 +802,7 @@ export const StoryReader: React.FC = () => {
               </div>
 
               <div className="dock-theme-presets">
-                <span className="dock-theme-presets-label">Sugestões rápidas:</span>
+                <span className="dock-theme-presets-label">{t('readerQuickSuggestions')}</span>
                 <div className="dock-theme-presets-list">
                   <button
                     type="button"
@@ -804,30 +814,30 @@ export const StoryReader: React.FC = () => {
                   <button
                     type="button"
                     className="dock-theme-preset-tag"
-                    onClick={() => setCustomStoryTheme('Café e Conversa')}
+                    onClick={() => setCustomStoryTheme(settings.uiLanguage === 'en' ? 'Coffee & Conversation' : 'Café e Conversa')}
                   >
-                    ☕ Café & Conversa
+                    ☕ {t('presetCoffeeChat')}
                   </button>
                   <button
                     type="button"
                     className="dock-theme-preset-tag"
-                    onClick={() => setCustomStoryTheme('Viagem de Trem')}
+                    onClick={() => setCustomStoryTheme(settings.uiLanguage === 'en' ? 'Train Journey' : 'Viagem de Trem')}
                   >
-                    🚆 Viagem de Trem
+                    🚆 {t('presetTrainJourney')}
                   </button>
                   <button
                     type="button"
                     className="dock-theme-preset-tag"
-                    onClick={() => setCustomStoryTheme('Feira e Culinária')}
+                    onClick={() => setCustomStoryTheme(settings.uiLanguage === 'en' ? 'Street Market & Food' : 'Feira e Culinária')}
                   >
-                    🍜 Feira & Comida
+                    🍜 {t('presetStreetMarket')}
                   </button>
                   <button
                     type="button"
                     className="dock-theme-preset-tag"
-                    onClick={() => setCustomStoryTheme('Mistério Leve')}
+                    onClick={() => setCustomStoryTheme(settings.uiLanguage === 'en' ? 'Light Mystery' : 'Mistério Leve')}
                   >
-                    🔍 Mistério Leve
+                    🔍 {t('presetLightMystery')}
                   </button>
                 </div>
               </div>
@@ -835,15 +845,15 @@ export const StoryReader: React.FC = () => {
               <div className="dock-theme-footer">
                 <span className="dock-theme-hint">
                   {customStoryTheme.trim()
-                    ? 'A próxima história gerada seguirá este tema.'
-                    : 'Deixe em branco para tema didático automático.'}
+                    ? t('readerThemeHintActive')
+                    : t('readerThemeHintBlank')}
                 </span>
                 <button
                   type="button"
                   className="dock-theme-apply-btn"
                   onClick={() => setIsThemePopoverOpen(false)}
                 >
-                  Confirmar
+                  {t('readerApplyTheme')}
                 </button>
               </div>
             </div>
@@ -858,10 +868,10 @@ export const StoryReader: React.FC = () => {
               setIsDifficultyPopoverOpen((prev) => !prev);
               setIsThemePopoverOpen(false);
             }}
-            title="Alterar nível e dificuldade da história"
+            title={t('changeDifficultyTitle')}
           >
             <Gauge size={13} style={{ color: currentLevelInfo.color }} />
-            <span>Nível: {currentLevelInfo.badgeLabel}</span>
+            <span>{t('readerLevelPrefix')} {currentLevelInfo.badgeLabel}</span>
           </button>
 
           {isDifficultyPopoverOpen && (
@@ -869,7 +879,7 @@ export const StoryReader: React.FC = () => {
               <div className="dock-difficulty-popover-header">
                 <span className="dock-difficulty-popover-title">
                   <Gauge size={15} color="var(--flower-500)" />
-                  Dificuldade da História
+                  {t('readerDifficultyPopoverTitle')}
                 </span>
                 <button
                   type="button"
@@ -936,7 +946,7 @@ export const StoryReader: React.FC = () => {
             className="dock-action-text-btn"
             onClick={handleIncreaseWords}
             disabled={isGeneratingStory || isWelcomeState}
-            title={isWelcomeState ? 'Gere uma história antes de expandir o vocabulário' : t('addWordsTooltip')}
+            title={isWelcomeState ? t('readerExpandBeforeWarning') : t('addWordsTooltip')}
           >
             {t('addWordsBtn')}
           </button>
@@ -951,7 +961,7 @@ export const StoryReader: React.FC = () => {
           disabled={isWelcomeState || isGeneratingStory}
           title={
             isWelcomeState
-              ? (settings.uiLanguage === 'pt' ? 'Gere uma história para ouvir' : 'Generate a story to listen')
+              ? t('readerAudioStoryWarning')
               : isPlayingAudio
               ? t('pauseAudioTooltip')
               : t('listenAudioTooltip')
@@ -990,7 +1000,7 @@ export const StoryReader: React.FC = () => {
           disabled={isWelcomeState}
           title={
             isWelcomeState
-              ? (settings.uiLanguage === 'pt' ? 'Gere uma história para acessar o quiz' : 'Generate a story to access quiz')
+              ? t('readerQuizStoryWarning')
               : t('miniQuizTooltip')
           }
         >

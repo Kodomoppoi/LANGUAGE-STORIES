@@ -131,7 +131,7 @@ Output ONLY valid JSON following this schema:
     logService.addLog('INFO', 'GEMINI', `[Cliente Direto] Disparando inferência no modelo ${modelName}...`);
 
     const candidateModels = [modelName];
-    for (const alt of ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro']) {
+    for (const alt of ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash', 'gemini-3.5-flash']) {
       if (!candidateModels.includes(alt)) candidateModels.push(alt);
     }
 
@@ -185,7 +185,11 @@ Output ONLY valid JSON following this schema:
         } else if (resp.status === 429) {
           const errText = await resp.text();
           logService.addLog('WARN', 'GEMINI', `[Cliente Direto] Gemini retornou 429 [${curModel}]: ${errText.slice(0, 160)}`);
-          const err = new Error('Cota de requisições por minuto do Gemini excedida (Erro 429 RESOURCE_EXHAUSTED). Aguarde 30 a 60 segundos ou alterne o modelo.');
+          const isPlanQuota = errText.includes('billing details') || errText.includes('plan and billing');
+          const errMsg = isPlanQuota
+            ? 'Cota diária ou plano gratuito do Gemini esgotado no Google AI Studio (Erro 429). Utilize o OpenRouter (Free Tier) ou adicione outra chave.'
+            : 'Cota de requisições por minuto do Gemini excedida (Erro 429 RESOURCE_EXHAUSTED). Aguarde 30 a 60 segundos antes de tentar novamente.';
+          const err = new Error(errMsg);
           (err as any).errorType = 'quota_exceeded';
           (err as any).statusCode = 429;
           throw err;

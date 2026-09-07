@@ -33,6 +33,14 @@ class GenerateStoryRequest(BaseModel):
     gemini_model: Optional[str] = None
     geminiModel: Optional[str] = None
 
+    openrouter_api_key: Optional[str] = None
+    openRouterApiKey: Optional[str] = None
+    openrouter_model: Optional[str] = None
+    openRouterModel: Optional[str] = None
+
+    api_provider: Optional[str] = None
+    apiProvider: Optional[str] = None
+
     def resolved_theme(self) -> str:
         val = (self.theme or self.contextTheme or "").strip()
         if not val or val.lower() in ["general", "auto", "none", "automatic", "automático"]:
@@ -56,6 +64,15 @@ class GenerateStoryRequest(BaseModel):
 
     def resolved_gemini_model(self) -> str:
         return (self.gemini_model or self.geminiModel or "").strip()
+
+    def resolved_openrouter_key(self) -> str:
+        return (self.openrouter_api_key or self.openRouterApiKey or "").strip()
+
+    def resolved_openrouter_model(self) -> str:
+        return (self.openrouter_model or self.openRouterModel or "").strip()
+
+    def resolved_api_provider(self) -> str:
+        return (self.api_provider or self.apiProvider or "").strip()
 
 
 def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] = None) -> Dict[str, Any]:
@@ -173,12 +190,21 @@ async def generate_story(
     native = req.resolved_native_lang()
     gemini_key = req.resolved_gemini_key()
     gemini_model = req.resolved_gemini_model()
+    or_key = req.resolved_openrouter_key()
+    or_model = req.resolved_openrouter_model()
+    provider = req.resolved_api_provider()
 
+    from ..config import settings
     if gemini_key:
-        from ..config import settings
         settings.gemini_api_key = gemini_key
         if gemini_model:
             settings.gemini_model = gemini_model
+    if or_key:
+        settings.openrouter_api_key = or_key
+        if or_model:
+            settings.openrouter_model = or_model
+    if provider:
+        settings.api_provider = provider
 
     try:
         # Estágio 1: Curadoria
@@ -191,6 +217,9 @@ async def generate_story(
             native_lang=native,
             api_key=gemini_key,
             model=gemini_model,
+            openrouter_key=or_key,
+            openrouter_model=or_model,
+            api_provider=provider,
         )
 
         # Estágio 2: Geração Interlinear e Hidratação SQLite
@@ -205,6 +234,9 @@ async def generate_story(
             native_lang=native,
             api_key=gemini_key,
             model=gemini_model,
+            openrouter_key=or_key,
+            openrouter_model=or_model,
+            api_provider=provider,
         )
 
         return _enrich_story_response(story_data, language=req.language)
@@ -277,12 +309,21 @@ async def generate_story_stream(
     native = req.resolved_native_lang()
     gemini_key = req.resolved_gemini_key()
     gemini_model = req.resolved_gemini_model()
+    or_key = req.resolved_openrouter_key()
+    or_model = req.resolved_openrouter_model()
+    provider = req.resolved_api_provider()
 
+    from ..config import settings
     if gemini_key:
-        from ..config import settings
         settings.gemini_api_key = gemini_key
         if gemini_model:
             settings.gemini_model = gemini_model
+    if or_key:
+        settings.openrouter_api_key = or_key
+        if or_model:
+            settings.openrouter_model = or_model
+    if provider:
+        settings.api_provider = provider
 
     async def sse_event_generator():
         try:
@@ -298,6 +339,9 @@ async def generate_story_stream(
                 native_lang=native,
                 api_key=gemini_key,
                 model=gemini_model,
+                openrouter_key=or_key,
+                openrouter_model=or_model,
+                api_provider=provider,
             )
 
             words_list = [v.get("word") or v.get("lemma") for v in curated_vocab if v.get("word") or v.get("lemma")]
@@ -317,6 +361,9 @@ async def generate_story_stream(
                 native_lang=native,
                 api_key=gemini_key,
                 model=gemini_model,
+                openrouter_key=or_key,
+                openrouter_model=or_model,
+                api_provider=provider,
             )
 
             # 3. Validação e Traços

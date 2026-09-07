@@ -49,7 +49,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
   );
   const isStarred = vaultEntry?.isStarred || false;
 
-  const levelInfo = getProficiencyNativeInfo(currentLanguage, currentProficiency);
+  const levelInfo = getProficiencyNativeInfo(currentLanguage, currentProficiency, settings.uiLanguage || 'pt');
   const isCJK = currentLanguage === 'zh' || currentLanguage === 'ja';
 
   const loadData = useCallback(
@@ -67,7 +67,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
         );
         setData(result);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Falha ao carregar Raio-X');
+        setError(err instanceof Error ? err.message : (settings.uiLanguage === 'en' ? 'Failed to load Deep Dive' : 'Falha ao carregar Raio-X'));
       } finally {
         setLoading(false);
       }
@@ -157,7 +157,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
 
             <span className="deep-dive-subtitle">
               <Bot size={13} color="var(--flower-400)" />
-              Raio-X Anatômico & Didático
+              {t('deepDiveSubtitle')}
             </span>
           </div>
 
@@ -166,7 +166,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
               type="button"
               className="deep-dive-action-btn"
               onClick={() => speakSingleToken({ id: word, text: word })}
-              title="Ouvir pronúncia"
+              title={t('deepDiveListenTitle')}
             >
               <Volume2 size={16} />
             </button>
@@ -175,7 +175,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
               type="button"
               className="deep-dive-action-btn"
               onClick={handleToggleStar}
-              title={isStarred ? 'Remover estrela' : 'Fixar no Cofre'}
+              title={isStarred ? t('deepDiveRemoveStarTitle') : t('deepDivePinToVaultTitle')}
               style={{ color: isStarred ? '#ffb703' : 'inherit' }}
             >
               <Star size={16} fill={isStarred ? '#ffb703' : 'none'} />
@@ -186,7 +186,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
               className="deep-dive-action-btn"
               onClick={() => loadData(true)}
               disabled={loading}
-              title="Regenerar análise com IA"
+              title={t('deepDiveRegenerateTitle')}
             >
               <RotateCcw size={16} className={loading ? 'spin-animation' : ''} />
             </button>
@@ -195,7 +195,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
               type="button"
               className="deep-dive-close-btn"
               onClick={onClose}
-              title="Fechar (Esc)"
+              title={t('deepDiveCloseEsc')}
             >
               <X size={18} />
             </button>
@@ -208,7 +208,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
             <div className="deep-dive-loading-state">
               <Loader2 size={32} className="spin-animation" color="var(--flower-500)" />
               <p className="deep-dive-loading-text">
-                Analisando caracteres, radicais e nuances didáticas com IA...
+                {t('deepDiveLoadingText')}
               </p>
             </div>
           )}
@@ -223,7 +223,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
                 onClick={() => loadData(true)}
                 style={{ marginTop: '10px' }}
               >
-                Tentar Novamente
+                {t('deepDiveTryAgain')}
               </button>
             </div>
           )}
@@ -234,11 +234,11 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
               <div className="deep-dive-card">
                 <div className="deep-dive-card-header">
                   <BookOpen size={16} color="var(--flower-500)" />
-                  <h4 className="deep-dive-card-title">Sentido em Contexto</h4>
+                  <h4 className="deep-dive-card-title">{t('deepDiveMeaningInContext')}</h4>
                 </div>
                 <div className="deep-dive-card-content">
                   <p className="deep-dive-context-meaning">
-                    {data.context_meaning || 'Uso padrão na narrativa.'}
+                    {data.context_meaning || t('deepDiveStandardUsage')}
                   </p>
                   {contextSentence && (
                     <blockquote className="deep-dive-sentence-quote">
@@ -254,7 +254,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
                   <div className="deep-dive-card">
                     <div className="deep-dive-card-header">
                       <Puzzle size={16} color="#3b82f6" />
-                      <h4 className="deep-dive-card-title">Anatomia do Caractere & Radicais (部首)</h4>
+                      <h4 className="deep-dive-card-title">{t('deepDiveCharAnatomy')}</h4>
                     </div>
                     <div className="deep-dive-card-content">
                       <div className="deep-dive-anatomy-grid">
@@ -285,7 +285,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
                   <div className="deep-dive-card">
                     <div className="deep-dive-card-header">
                       <Puzzle size={16} color="#3b82f6" />
-                      <h4 className="deep-dive-card-title">Raízes & Etimologia</h4>
+                      <h4 className="deep-dive-card-title">{t('deepDiveRootsEtymology')}</h4>
                     </div>
                     <div className="deep-dive-card-content">
                       <p className="deep-dive-etymology-text">{data.etymology_roots}</p>
@@ -300,7 +300,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
                   <div className="deep-dive-card">
                     <div className="deep-dive-card-header">
                       <Network size={16} color="#10b981" />
-                      <h4 className="deep-dive-card-title">Família de Palavras & Ideogramas Compartilhados</h4>
+                      <h4 className="deep-dive-card-title">{t('deepDiveWordFamily')}</h4>
                     </div>
                     <div className="deep-dive-card-content">
                       <div className="deep-dive-tags-list">
@@ -322,7 +322,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
                   <div className="deep-dive-card">
                     <div className="deep-dive-card-header">
                       <Network size={16} color="#10b981" />
-                      <h4 className="deep-dive-card-title">Colocações & Parcerias Comuns</h4>
+                      <h4 className="deep-dive-card-title">{t('deepDiveCollocations')}</h4>
                     </div>
                     <div className="deep-dive-card-content">
                       <div className="deep-dive-tags-list">
@@ -344,7 +344,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
                   <div className="deep-dive-card">
                     <div className="deep-dive-card-header">
                       <Volume2 size={16} color="#f59e0b" />
-                      <h4 className="deep-dive-card-title">Fonética & Homófonos</h4>
+                      <h4 className="deep-dive-card-title">{t('deepDivePhonetics')}</h4>
                     </div>
                     <div className="deep-dive-card-content">
                       {(data.phonetics_homophones.pinyin_tone_tip || data.phonetics_homophones.tip) && (
@@ -354,7 +354,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
                       )}
                       {data.phonetics_homophones.homophones && data.phonetics_homophones.homophones.length > 0 && (
                         <div className="deep-dive-homophones-wrap">
-                          <span className="deep-dive-sub-label">Sons semelhantes / Mesma pronúncia:</span>
+                          <span className="deep-dive-sub-label">{t('deepDiveSimilarSounds')}</span>
                           <div className="deep-dive-pills-list">
                             {data.phonetics_homophones.homophones.map((h, idx) => (
                               <span key={idx} className="deep-dive-homophone-pill">
@@ -372,7 +372,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
                   <div className="deep-dive-card">
                     <div className="deep-dive-card-header">
                       <AlertTriangle size={16} color="#f59e0b" />
-                      <h4 className="deep-dive-card-title">Falsos Cognatos & Pronúncia</h4>
+                      <h4 className="deep-dive-card-title">{t('deepDiveFalseFriends')}</h4>
                     </div>
                     <div className="deep-dive-card-content">
                       <p className="deep-dive-phonetics-tip">
@@ -388,7 +388,7 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
                 <div className="deep-dive-card">
                   <div className="deep-dive-card-header">
                     <Scale size={16} color="#8b5cf6" />
-                    <h4 className="deep-dive-card-title">Sinônimos & Diferenças de Uso</h4>
+                    <h4 className="deep-dive-card-title">{t('deepDiveSynonyms')}</h4>
                   </div>
                   <div className="deep-dive-card-content">
                     <div className="deep-dive-synonyms-list">
@@ -409,10 +409,10 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
         {/* Rodapé informativo discreto */}
         <div className="deep-dive-footer">
           <span className="deep-dive-footer-text">
-            ✨ Síntese didática gerada sob demanda • Memorizada em cache para acesso instantâneo
+            {t('deepDiveFooter')}
           </span>
           <button type="button" className="btn-secondary" onClick={onClose}>
-            Fechar
+            {t('closeBtn')}
           </button>
         </div>
       </div>

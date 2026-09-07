@@ -146,9 +146,11 @@ export type UILanguage = 'en' | 'pt';
 export interface AppSettings {
   theme: 'light' | 'dark';
   uiLanguage: UILanguage;
-  apiProvider: 'hybrid' | 'gemini' | 'ollama' | 'mock';
+  apiProvider: 'hybrid' | 'gemini' | 'openrouter' | 'ollama' | 'mock';
   geminiApiKey: string;
   geminiModel: string;
+  openRouterApiKey?: string;
+  openRouterModel?: string;
   ollamaUrl: string;
   ollamaModel: string;
   backendUrl: string;

@@ -1,5 +1,5 @@
 export type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS';
-export type LogSource = 'BACKEND' | 'FRONTEND' | 'GEMINI' | 'STAGE' | 'SYSTEM';
+export type LogSource = 'BACKEND' | 'FRONTEND' | 'GEMINI' | 'OPENROUTER' | 'STAGE' | 'SYSTEM';
 
 export interface LogEntry {
   id: string;

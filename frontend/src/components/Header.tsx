@@ -29,8 +29,8 @@ export const Header: React.FC = () => {
   } = useApp();
 
   const langInfo = SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage);
-  const currentLevelInfo = getProficiencyNativeInfo(currentLanguage, currentProficiency);
-  const proficiencyOptions = getProficiencyOptions(currentLanguage);
+  const currentLevelInfo = getProficiencyNativeInfo(currentLanguage, currentProficiency, settings.uiLanguage || 'pt');
+  const proficiencyOptions = getProficiencyOptions(currentLanguage, settings.uiLanguage || 'pt');
 
   return (
     <header className="book-top-bar">
@@ -80,13 +80,13 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Dedicated Native Level / Difficulty Selector */}
-        <div className="book-level-picker-wrapper" title={`Dificuldade atual: ${currentLevelInfo.fullLabel}`}>
+        <div className="book-level-picker-wrapper" title={`${t('currentDifficultyTooltip')} ${currentLevelInfo.fullLabel}`}>
           <Gauge size={14} style={{ color: currentLevelInfo.color }} />
           <select
             className="book-level-select"
             value={currentProficiency}
             onChange={(e) => setProficiency(e.target.value as ProficiencyLevel)}
-            title="Alterar nível e dificuldade da história"
+            title={t('changeDifficultyTitle')}
           >
             {proficiencyOptions.map((opt) => (
               <option key={opt.level} value={opt.level}>

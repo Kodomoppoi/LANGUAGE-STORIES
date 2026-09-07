@@ -64,7 +64,7 @@ export const TerminalDrawer: React.FC = () => {
     return logs.filter((log) => {
       // Source / Error filter
       if (filterSource === 'BACKEND' && log.source !== 'BACKEND') return false;
-      if (filterSource === 'FRONTEND' && log.source !== 'FRONTEND' && log.source !== 'GEMINI' && log.source !== 'STAGE') return false;
+      if (filterSource === 'FRONTEND' && log.source !== 'FRONTEND' && log.source !== 'GEMINI' && log.source !== 'OPENROUTER' && log.source !== 'STAGE') return false;
       if (filterSource === 'ERRORS' && log.level !== 'ERROR' && log.level !== 'WARN') return false;
 
       // Text search filter
@@ -113,6 +113,8 @@ export const TerminalDrawer: React.FC = () => {
         return 'source-backend';
       case 'GEMINI':
         return 'source-gemini';
+      case 'OPENROUTER':
+        return 'source-openrouter';
       case 'STAGE':
         return 'source-stage';
       case 'SYSTEM':
@@ -139,7 +141,13 @@ export const TerminalDrawer: React.FC = () => {
               </span>
               <span className="status-pill model">
                 <Cpu size={12} />
-                Gemini 3.6 Flash
+                {settings.apiProvider === 'gemini'
+                  ? (settings.geminiModel || 'Gemini 3.6 Flash')
+                  : settings.apiProvider === 'openrouter'
+                  ? (settings.openRouterModel || 'openrouter/free')
+                  : settings.apiProvider === 'hybrid'
+                  ? '⚡ Auto-Fallback (Gemini + OpenRouter)'
+                  : (settings.ollamaModel || 'Procedural')}
               </span>
             </div>
           </div>
@@ -147,7 +155,7 @@ export const TerminalDrawer: React.FC = () => {
           <button
             className="terminal-close-btn"
             onClick={() => setIsTerminalOpen(false)}
-            title="Fechar (Esc)"
+            title={t('terminalCloseEsc')}
           >
             <X size={18} />
           </button>
@@ -186,7 +194,7 @@ export const TerminalDrawer: React.FC = () => {
             <input
               type="text"
               className="terminal-search-input"
-              placeholder="Filtrar logs..."
+              placeholder={t('terminalFilterLogsPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -196,7 +204,7 @@ export const TerminalDrawer: React.FC = () => {
             <button
               className={`term-action-btn ${autoScroll ? 'active' : ''}`}
               onClick={() => setAutoScroll((prev) => !prev)}
-              title="Rolar automaticamente para os logs mais recentes"
+              title={t('terminalAutoScrollTooltip')}
             >
               <ArrowDown size={14} />
               <span>Auto-scroll</span>
@@ -227,7 +235,7 @@ export const TerminalDrawer: React.FC = () => {
           {filteredLogs.length === 0 ? (
             <div className="terminal-empty">
               <Activity size={24} style={{ opacity: 0.4 }} />
-              <p>Nenhum log para exibir no filtro atual.</p>
+              <p>{t('terminalNoLogs')}</p>
             </div>
           ) : (
             <div className="terminal-log-list">

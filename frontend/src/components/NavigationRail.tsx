@@ -44,7 +44,7 @@ export const NavigationRail: React.FC = () => {
         <button
           className={`nav-rail-btn ${activeTab === 'story' ? 'active-pill' : ''}`}
           onClick={() => setActiveTab('story')}
-          title="Reader Home (Interactive Story)"
+          title={t('navRailReader')}
         >
           <BookOpen size={20} />
         </button>
@@ -53,7 +53,7 @@ export const NavigationRail: React.FC = () => {
         <button
           className={`nav-rail-btn ${activeTab === 'dictionary' ? 'active-pill' : ''}`}
           onClick={() => setActiveTab('dictionary')}
-          title="Vocabulary Table & Dictionary"
+          title={t('navRailDictionary')}
         >
           <BookMarked size={20} />
         </button>
@@ -62,7 +62,7 @@ export const NavigationRail: React.FC = () => {
         <button
           className={`nav-rail-btn ${activeTab === 'starred' ? 'active-pill' : ''}`}
           onClick={() => setActiveTab('starred')}
-          title={`Palavras Favoritas (${starredCount} salvas)`}
+          title={`${t('navRailStarred')} (${starredCount} ${t('navRailSaved')})`}
         >
           <Star size={20} />
           {starredCount > 0 && <span className="nav-badge-dot" />}
@@ -81,7 +81,7 @@ export const NavigationRail: React.FC = () => {
         <button
           className="nav-rail-btn"
           onClick={() => setIsSettingsOpen(true)}
-          title="Engine & Profile Settings"
+          title={t('profileSettings')}
         >
           <Settings size={20} />
         </button>
@@ -95,7 +95,7 @@ export const NavigationRail: React.FC = () => {
             setActiveTab('story');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
-          title="Scroll to Top"
+          title={t('navRailScrollTop')}
         >
           <RotateCcw size={18} />
         </button>

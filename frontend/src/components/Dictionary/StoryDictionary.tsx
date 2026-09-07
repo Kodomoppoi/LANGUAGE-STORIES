@@ -25,6 +25,7 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
     importVocabularyJson,
     openDeepDive,
     t,
+    settings,
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -173,10 +174,10 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
             className="btn-secondary"
             style={{ width: 'auto', padding: '6px 14px', borderRadius: 'var(--radius-full)' }}
             onClick={() => fileInputRef.current?.click()}
-            title="Import JSON"
+            title={t('dictImportJsonTitle')}
           >
             <Upload size={15} color="var(--text-secondary)" />
-            <span>Import</span>
+            <span>{t('dictImportBtn')}</span>
           </button>
           <input
             ref={fileInputRef}
@@ -204,7 +205,7 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
           }}
         >
           <CheckCircle2 size={16} />
-          <span>Arquivo JSON de vocabulário importado com sucesso!</span>
+          <span>{t('dictImportSuccessMsg')}</span>
         </div>
       )}
 
@@ -278,13 +279,13 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
               <thead>
                 <tr>
                   <th style={{ width: '3%' }}>#</th>
-                  <th style={{ width: '22%' }}>Term & Reading</th>
-                  <th style={{ width: '10%' }}>Type</th>
-                  <th style={{ width: '20%' }}>Translation / Meaning</th>
-                  <th style={{ width: '15%' }}>Retenção SRS</th>
-                  <th style={{ width: '6%', textAlign: 'center' }}>Freq</th>
-                  <th style={{ width: '17%' }}>Story Context</th>
-                  <th style={{ width: '7%', textAlign: 'center' }}>Actions</th>
+                  <th style={{ width: '22%' }}>{t('dictColTerm')}</th>
+                  <th style={{ width: '10%' }}>{t('dictColType')}</th>
+                  <th style={{ width: '20%' }}>{t('dictColTranslation')}</th>
+                  <th style={{ width: '15%' }}>{t('dictColSRS')}</th>
+                  <th style={{ width: '6%', textAlign: 'center' }}>{t('dictColFreq')}</th>
+                  <th style={{ width: '17%' }}>{t('dictColContext')}</th>
+                  <th style={{ width: '7%', textAlign: 'center' }}>{t('dictColActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -316,8 +317,8 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span className="dict-term-text">{entry.word}</span>
                             {isPinned && (
-                              <span className="pinned-star-badge" title="Palavra Fixada: prioridade máxima no tema">
-                                ⭐ Fixada
+                              <span className="pinned-star-badge" title={t('dictPinnedTooltip')}>
+                                {t('dictPinnedBadge')}
                               </span>
                             )}
                           </div>
@@ -328,7 +329,7 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
                           {(radicals || hskLevel) && (
                             <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
                               {hskLevel && (
-                                <span className="trait-hsk-badge" title="Nível HSK">
+                                <span className="trait-hsk-badge" title={settings.uiLanguage === 'en' ? 'HSK Level' : 'Nível HSK'}>
                                   {hskLevel}
                                 </span>
                               )}
@@ -372,9 +373,9 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
                                 fontWeight: 700,
                                 color: statusColor === 'orange' ? '#ea580c' : statusColor === 'yellow' ? '#d97706' : '#16a34a',
                               }}
-                              title={`Peso de repetição na IA: ${repetitionWeight}x`}
+                              title={`${t('dictRepetitionWeightTooltip')} ${repetitionWeight}x`}
                             >
-                              Peso {repetitionWeight}x
+                              {t('dictRepetitionWeightPrefix')} {repetitionWeight}x
                             </span>
                           </div>
                           <div className="retention-meter-bar">
@@ -398,7 +399,11 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
                             color: (entry.occurrences || 1) > 1 ? 'var(--flower-400)' : 'var(--text-muted)',
                             border: (entry.occurrences || 1) > 1 ? '1px solid var(--border-subtle)' : 'none',
                           }}
-                          title={`Aparece ${entry.occurrences || 1}x nesta história (Acumulado: ${vaultWord?.lifetimeOccurrences || entry.occurrences || 1}x no banco JSON)`}
+                          title={
+                            settings.uiLanguage === 'en'
+                              ? `Appears ${entry.occurrences || 1}x in this story (Total: ${vaultWord?.lifetimeOccurrences || entry.occurrences || 1}x in vault)`
+                              : `Aparece ${entry.occurrences || 1}x nesta história (Acumulado: ${vaultWord?.lifetimeOccurrences || entry.occurrences || 1}x no banco JSON)`
+                          }
                         >
                           {entry.occurrences || 1}x
                         </span>
@@ -417,14 +422,14 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
                           <button
                             className="tts-btn-icon"
                             onClick={() => speakSingleToken({ id: entry.id, text: entry.word })}
-                            title="Ouvir pronúncia"
+                            title={t('deepDiveListenTitle')}
                           >
                             <Volume2 size={15} />
                           </button>
                           <button
                             className="tts-btn-icon"
                             onClick={() => openDeepDive(entry.word, entry.exampleSentence || entry.definition || entry.translation)}
-                            title="Raio-X IA: Explicação profunda (radicais, componentes, fonética, sinônimos)"
+                            title={t('dictDeepDiveTooltip')}
                             style={{ color: 'var(--flower-400)' }}
                           >
                             <Bot size={15} />
@@ -438,7 +443,7 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
                                 addWordToVault({ ...entry, isStarred: true, isPinned: true });
                               }
                             }}
-                            title={isStarred ? 'Remover Fixação / Estrela' : 'Fixar Palavra ⭐ (Prioridade Máxima no Tema)'}
+                            title={isStarred ? t('dictUnpinWordTooltip') : t('dictPinWordTooltip')}
                           >
                             <Star
                               size={15}

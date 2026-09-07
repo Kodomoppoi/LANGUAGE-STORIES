@@ -21,6 +21,7 @@ export const TTSPlayer: React.FC = () => {
     stopStoryAudio,
     ttsSpeed,
     setTtsSpeed,
+    t,
   } = useApp();
 
   const allSentences = currentStory.paragraphs.flatMap((p) => p.sentences);
@@ -34,7 +35,7 @@ export const TTSPlayer: React.FC = () => {
         <button
           className="tts-btn-round"
           onClick={isPlayingAudio ? pauseStoryAudio : playStoryAudio}
-          title={isPlayingAudio ? 'Pause Narration' : 'Start Narration'}
+          title={isPlayingAudio ? t('ttsPauseNarration') : t('ttsStartNarration')}
         >
           {isPlayingAudio ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: 2 }} />}
         </button>
@@ -42,7 +43,7 @@ export const TTSPlayer: React.FC = () => {
         <button
           className="tts-btn-icon"
           onClick={stopStoryAudio}
-          title="Restart from beginning"
+          title={t('ttsRestart')}
         >
           <RotateCcw size={16} />
         </button>
@@ -51,11 +52,11 @@ export const TTSPlayer: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Volume2 size={14} color="var(--flower-500)" />
             <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>
-              {isPlayingAudio ? 'Playing Narration' : 'Interactive TTS Audio'}
+              {isPlayingAudio ? t('ttsPlaying') : t('ttsInteractive')}
             </span>
           </div>
           <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-            Sentence {currentSentenceNum} of {allSentences.length}
+            {t('ttsSentencePrefix')} {currentSentenceNum} {t('ofPrefix')} {allSentences.length}
           </span>
         </div>
       </div>
@@ -69,7 +70,7 @@ export const TTSPlayer: React.FC = () => {
               type="button"
               className={`speed-chip ${ttsSpeed === speed ? 'active' : ''}`}
               onClick={() => setTtsSpeed(speed)}
-              title={`Narration speed: ${speed}x`}
+              title={`${t('ttsSpeedTooltip')} ${speed}x`}
             >
               {speed}x
             </button>

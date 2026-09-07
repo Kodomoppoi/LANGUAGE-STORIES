@@ -133,6 +133,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   apiProvider: 'hybrid',
   geminiApiKey: '',
   geminiModel: 'gemini-3.6-flash',
+  openRouterApiKey: '',
+  openRouterModel: 'openrouter/free',
   ollamaUrl: 'http://localhost:11434',
   ollamaModel: 'llama3.2',
   backendUrl: 'http://localhost:8000',
@@ -173,21 +175,21 @@ function parseErrorToBookErrorInfo(
   ) {
     return {
       type: 'api_key_error',
-      title: isPt ? 'Chave de API do Gemini Inválida ou Ausente' : 'Gemini API Key Invalid or Missing',
+      title: isPt ? 'Chave de API Inválida ou Ausente' : 'API Key Invalid or Missing',
       message: isPt
-        ? 'A chave de API configurada foi recusada pelo Google (Erro 400/403). Sem uma chave válida e ativa, a IA não consegue redigir histórias.'
-        : 'The configured API key was rejected by Google (Error 400/403). The AI cannot generate stories without a valid key.',
+        ? 'A chave de API configurada foi recusada pelo provedor de IA (Erro 400/401/403). Sem uma chave válida e ativa, a IA não consegue redigir histórias.'
+        : 'The configured API key was rejected by the AI provider (Error 400/401/403). The AI cannot generate stories without a valid key.',
       actionInstructions: isPt
         ? [
-          'Obtenha uma chave gratuita da API Gemini no Google AI Studio (aistudio.google.com).',
+          'Obtenha uma chave gratuita da API Gemini (aistudio.google.com) ou do OpenRouter (openrouter.ai).',
           'Clique em "Abrir Configurações" no botão abaixo ou no menu lateral.',
-          'Cole a chave no campo "Chave de API Gemini" e clique em Testar Conexão.',
+          'Cole sua chave no campo correspondente e clique em Testar Conexão.',
           'Clique em "Salvar Configurações" e tente gerar a história novamente.'
         ]
         : [
-          'Get a free Gemini API key from Google AI Studio (aistudio.google.com).',
+          'Get a free API key from Google AI Studio (aistudio.google.com) or OpenRouter (openrouter.ai).',
           'Click "Open Settings" below or in the sidebar.',
-          'Paste your key into the "Gemini API Key" field and click Test Connection.',
+          'Paste your key into the corresponding field and click Test Connection.',
           'Click "Save Settings" and generate your story again.'
         ],
       actionLabel: isPt ? 'Abrir Configurações' : 'Open Settings',
@@ -208,20 +210,20 @@ function parseErrorToBookErrorInfo(
   ) {
     return {
       type: 'service_unavailable',
-      title: isPt ? 'Servidores do Gemini em Alta Demanda Temporária (Status 503)' : 'Gemini Servers Experiencing High Demand (Status 503)',
+      title: isPt ? 'Servidores em Alta Demanda Temporária (Status 503)' : 'Servers Experiencing High Demand (Status 503)',
       message: isPt
-        ? 'Os servidores do Google Gemini estão com um pico passageiro de tráfego de usuários. Conforme documentação oficial do Google, esses picos costumam durar poucos instantes.'
-        : 'Google Gemini servers are currently experiencing high demand. According to official Google documentation, these spikes are temporary.',
+        ? 'Os servidores de IA estão com um pico temporário de demanda. Se você tiver tanto o Gemini quanto o OpenRouter configurados, o sistema aciona o Auto-Fallback automaticamente.'
+        : 'The AI servers are experiencing temporary high demand spikes. If you have both Gemini and OpenRouter configured, Auto-Fallback switches automatically.',
       actionInstructions: isPt
         ? [
-          'Aguarde cerca de 5 a 15 segundos para que a capacidade do Google se normalize.',
-          'Clique no botão "Tentar Novamente" abaixo para reenviar a história.',
-          'Caso persista, você também pode alternar para outro modelo Gemini nas Configurações.'
+          'Aguarde cerca de 5 a 15 segundos para que a capacidade se normalize.',
+          'Ative o modo Auto-Fallback nas Configurações com uma chave OpenRouter gratuita para redundância instantânea.',
+          'Clique no botão "Tentar Novamente" abaixo para reenviar a história.'
         ]
         : [
-          'Wait about 5 to 15 seconds for Google server capacity to normalize.',
-          'Click the "Try Again" button below to resubmit your story request.',
-          'If it persists, you can also switch to another Gemini model in Settings.'
+          'Wait about 5 to 15 seconds for server capacity to normalize.',
+          'Enable Auto-Fallback in Settings with a free OpenRouter key for instant redundancy.',
+          'Click the "Try Again" button below to resubmit your story request.'
         ],
       actionLabel: isPt ? 'Tentar Novamente' : 'Try Again',
       actionType: 'retry',
@@ -240,21 +242,19 @@ function parseErrorToBookErrorInfo(
   ) {
     return {
       type: 'quota_exceeded',
-      title: isPt ? 'Cota do Gemini Excedida (Rate Limit)' : 'Gemini Rate Limit Exceeded (429)',
+      title: isPt ? 'Cota de Requisições Excedida (Rate Limit 429)' : 'Rate Limit Exceeded (429)',
       message: isPt
-        ? 'O limite de requisições por minuto da sua conta gratuita no Gemini foi atingido (Erro 429 RESOURCE_EXHAUSTED).'
-        : 'The per-minute request limit for your free Gemini account was reached (Error 429 RESOURCE_EXHAUSTED).',
+        ? 'O limite de requisições por minuto do provedor gratuito foi atingido. Nosso sistema já aplica pacing a 80% da capacidade para protegê-lo.'
+        : 'The per-minute request limit for your free tier was reached. Our system applies 80% pacing protection to keep requests safe.',
       actionInstructions: isPt
         ? [
-          'Aguarde cerca de 30 a 60 segundos para que o Google renove a sua cota temporária.',
-          'Ou alterne o modelo nas Configurações (ex: alternar para Gemini 3.7 Flash).',
-          'Se você tiver outra chave, insira-a nas Configurações.',
+          'Aguarde cerca de 30 a 60 segundos para que a janela de requisições seja renovada.',
+          'Configure também sua chave gratuita do OpenRouter nas Configurações para ter Auto-Fallback com redundância.',
           'Assim que aguardar, clique em "Tentar Novamente" abaixo.'
         ]
         : [
-          'Wait about 30 to 60 seconds for Google to reset your temporary quota.',
-          'Or switch models in Settings (e.g. switch to Gemini 3.7 Flash).',
-          'If you have another key, enter it in Settings.',
+          'Wait about 30 to 60 seconds for the rate limit window to reset.',
+          'Configure your free OpenRouter key in Settings to enjoy seamless Auto-Fallback.',
           'Click "Try Again" below once ready.'
         ],
       actionLabel: isPt ? 'Tentar Novamente' : 'Try Again',

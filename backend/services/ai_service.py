@@ -13,6 +13,9 @@ from .srs_engine import get_status_info
 from ..routers.logs import emit_log
 
 
+import time
+
+
 def clean_json_response(raw_text: str) -> str:
     """Extrai bloco JSON caso a LLM retorne envolto em ```json ... ```."""
     pattern = r"```(?:json)?\s*([\s\S]*?)\s*```"
@@ -30,158 +33,334 @@ class AIServiceError(Exception):
         self.status_code = status_code
 
 
+class ProviderRateLimiter:
+    """
+    Controlador de cadência por janela deslizante (sliding window) e intervalo mínimo
+    forçando as requisições a operarem em no MÁXIMO 80% da capacidade nominal (RPM).
+    - Gemini Free: 15 RPM nominal -> 80% = 12 RPM (mínimo 5.0s entre chamadas consecutivas)
+    - OpenRouter Free: 20 RPM nominal -> 80% = 16 RPM (mínimo 3.75s entre chamadas consecutivas)
+    """
+    def __init__(self, provider_name: str, max_rpm: int, target_utilization: float = 0.80):
+        self.provider_name = provider_name
+        self.max_rpm = max_rpm
+        self.effective_rpm = max(1.0, max_rpm * target_utilization)
+        self.min_interval = 60.0 / self.effective_rpm
+        self.timestamps: List[float] = []
+        self._lock = asyncio.Lock()
+
+    async def acquire(self):
+        async with self._lock:
+            now = time.monotonic()
+            self.timestamps = [t for t in self.timestamps if now - t < 60.0]
+
+            # 1. Se atingiu 80% da cota nominal por minuto, aguarda janela rolar
+            if len(self.timestamps) >= self.effective_rpm:
+                oldest = self.timestamps[0]
+                sleep_needed = 60.0 - (now - oldest) + 0.15
+                if sleep_needed > 0:
+                    emit_log(
+                        f"Pacing de proteção [{self.provider_name}]: atingiu 80% da capacidade ({len(self.timestamps)}/{self.max_rpm} RPM). Pausando {sleep_needed:.1f}s para evitar cota 429...",
+                        level="INFO",
+                        source=self.provider_name.upper(),
+                    )
+                    await asyncio.sleep(sleep_needed)
+                    now = time.monotonic()
+                    self.timestamps = [t for t in self.timestamps if now - t < 60.0]
+
+            # 2. Espaçamento mínimo entre chamadas consecutivas
+            if self.timestamps:
+                last_req = self.timestamps[-1]
+                elapsed = now - last_req
+                if elapsed < self.min_interval:
+                    delay = self.min_interval - elapsed
+                    await asyncio.sleep(delay)
+                    now = time.monotonic()
+
+            self.timestamps.append(now)
+
+
+gemini_limiter = ProviderRateLimiter("GEMINI", max_rpm=15, target_utilization=0.80)
+openrouter_limiter = ProviderRateLimiter("OPENROUTER", max_rpm=20, target_utilization=0.80)
+
+
 class AIService:
     def __init__(self):
         self._cache = {}
+
+    async def _call_gemini(
+        self,
+        prompt: str,
+        api_key: str,
+        model: str,
+    ) -> str:
+        """Executa chamada direta para o Google Gemini com pacing de no máximo 80% da capacidade."""
+        effective_key = api_key.strip()
+        effective_model = model.strip() or "gemini-3.6-flash"
+
+        # Pacing: máximo 80% da capacidade (12 RPM, mín 5.0s entre reqs)
+        await gemini_limiter.acquire()
+
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"},
+        }
+        emit_log(f"Disparando inferência no modelo {effective_model} via Gemini API (pacing 80% ativo)...", level="INFO", source="GEMINI")
+
+        candidate_models = [effective_model]
+        fallback_model = "gemini-3.7-flash" if effective_model != "gemini-3.7-flash" else "gemini-3.6-flash"
+        if fallback_model not in candidate_models:
+            candidate_models.append(fallback_model)
+
+        for target_model in candidate_models:
+            clean_model = target_model.replace("models/", "").strip()
+            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={effective_key}"
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": effective_key,
+            }
+
+            async with httpx.AsyncClient(timeout=18.0) as client:
+                for attempt in range(2):
+                    try:
+                        resp = await client.post(endpoint, json=payload, headers=headers)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text")
+                            if text:
+                                emit_log(f"Resposta estruturada recebida da API Gemini [{clean_model}] ({len(text)} chars).", level="SUCCESS", source="GEMINI")
+                                return text
+
+                        elif resp.status_code == 503:
+                            emit_log(f"Gemini 503 (Servidores em alta demanda) [{clean_model}].", level="WARN", source="GEMINI")
+                            if attempt == 0:
+                                await asyncio.sleep(2.5)
+                                continue
+                            break
+
+                        elif resp.status_code == 404:
+                            err_detail = ""
+                            try:
+                                err_detail = resp.json().get("error", {}).get("message", resp.text[:180])
+                            except Exception:
+                                err_detail = resp.text[:180]
+                            emit_log(f"Modelo {clean_model} retornou 404 ({err_detail}).", level="WARN", source="GEMINI")
+                            break
+
+                        elif resp.status_code == 400:
+                            resp_text = resp.text
+                            emit_log(f"Gemini retornou status 400 [{clean_model}]: {resp_text[:150]}", level="WARN", source="GEMINI")
+                            if "API key not valid" in resp_text or "INVALID_ARGUMENT" in resp_text:
+                                raise AIServiceError(
+                                    "A chave da API Gemini fornecida não é válida ou foi recusada pelo Google (Erro 400).",
+                                    error_type="api_key_error",
+                                    status_code=400,
+                                )
+                            break
+
+                        elif resp.status_code == 403:
+                            emit_log(f"Gemini retornou status 403 [{clean_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
+                            raise AIServiceError(
+                                "Acesso negado para esta chave de API do Gemini (Erro 403).",
+                                error_type="api_key_error",
+                                status_code=403,
+                            )
+
+                        elif resp.status_code == 429:
+                            resp_text = resp.text
+                            emit_log(f"Gemini retornou status 429 [{clean_model}]: {resp_text[:150]}", level="WARN", source="GEMINI")
+                            if "billing details" in resp_text or "plan and billing" in resp_text:
+                                raise AIServiceError(
+                                    "Cota diária ou plano gratuito do Gemini esgotado no Google AI Studio (Erro 429). Utilize o OpenRouter (Free Tier) ou adicione outra chave.",
+                                    error_type="quota_exceeded",
+                                    status_code=429,
+                                )
+                            raise AIServiceError(
+                                "Cota de requisições por minuto do Gemini excedida (Erro 429 RESOURCE_EXHAUSTED).",
+                                error_type="quota_exceeded",
+                                status_code=429,
+                            )
+
+                        else:
+                            emit_log(f"Gemini retornou status {resp.status_code} [{clean_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
+                            break
+
+                    except AIServiceError:
+                        raise
+                    except httpx.TimeoutException:
+                        emit_log(f"Timeout (18s) na requisição Gemini [{clean_model}].", level="WARN", source="GEMINI")
+                        break
+                    except Exception as e:
+                        emit_log(f"Falha na requisição Gemini [{clean_model}] ({e}).", level="WARN", source="GEMINI")
+                        break
+
+        raise AIServiceError(
+            "Os servidores do Google Gemini estão enfrentando alta demanda temporária (Erro 503).",
+            error_type="service_unavailable",
+            status_code=503,
+        )
+
+    async def _call_openrouter(
+        self,
+        prompt: str,
+        api_key: str,
+        model: str,
+    ) -> str:
+        """Executa chamada para o OpenRouter (Free Tier) com pacing de no máximo 80% da capacidade."""
+        effective_key = api_key.strip()
+        effective_model = model.strip() or "openrouter/free"
+
+        # Pacing: máximo 80% da capacidade (16 RPM, mín 3.75s entre reqs)
+        await openrouter_limiter.acquire()
+
+        emit_log(f"Disparando inferência no OpenRouter [{effective_model}] (pacing 80% ativo)...", level="INFO", source="OPENROUTER")
+        endpoint = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {effective_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:5173",
+            "X-Title": "Language Stories",
+        }
+        payload = {
+            "model": effective_model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are an expert language pedagogue creating interactive graded reader content. You must output ONLY valid parseable JSON adhering strictly to the user schema without any commentary or markdown outside the JSON."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "response_format": {"type": "json_object"},
+        }
+
+        async with httpx.AsyncClient(timeout=35.0) as client:
+            try:
+                resp = await client.post(endpoint, json=payload, headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        content = choices[0].get("message", {}).get("content", "")
+                        if content:
+                            emit_log(f"Resposta estruturada recebida do OpenRouter [{effective_model}] ({len(content)} chars).", level="SUCCESS", source="OPENROUTER")
+                            return content
+                    raise AIServiceError("OpenRouter retornou resposta sem conteúdo de texto.", error_type="empty_response", status_code=500)
+
+                elif resp.status_code in (401, 403):
+                    err_msg = resp.text[:150]
+                    emit_log(f"OpenRouter retornou status {resp.status_code}: {err_msg}", level="ERROR", source="OPENROUTER")
+                    raise AIServiceError(
+                        f"Chave de API do OpenRouter inválida ou recusada ({resp.status_code}). Verifique sua chave no painel do OpenRouter.",
+                        error_type="api_key_error",
+                        status_code=resp.status_code,
+                    )
+
+                elif resp.status_code == 429:
+                    emit_log(f"OpenRouter 429 (Cota de requisições excedida): {resp.text[:150]}", level="WARN", source="OPENROUTER")
+                    raise AIServiceError(
+                        "Cota de requisições do OpenRouter excedida (Erro 429).",
+                        error_type="quota_exceeded",
+                        status_code=429,
+                    )
+
+                elif resp.status_code == 503:
+                    emit_log(f"OpenRouter 503 (Serviço temporariamente indisponível): {resp.text[:150]}", level="WARN", source="OPENROUTER")
+                    raise AIServiceError(
+                        "OpenRouter temporariamente indisponível (Erro 503).",
+                        error_type="service_unavailable",
+                        status_code=503,
+                    )
+
+                else:
+                    emit_log(f"OpenRouter retornou status {resp.status_code}: {resp.text[:150]}", level="WARN", source="OPENROUTER")
+                    raise AIServiceError(
+                        f"OpenRouter retornou status {resp.status_code}: {resp.text[:150]}",
+                        error_type="generation_error",
+                        status_code=resp.status_code,
+                    )
+            except AIServiceError:
+                raise
+            except httpx.TimeoutException:
+                emit_log(f"Timeout (35s) na requisição ao OpenRouter [{effective_model}].", level="WARN", source="OPENROUTER")
+                raise AIServiceError("Timeout na requisição ao OpenRouter.", error_type="timeout", status_code=504)
+            except Exception as e:
+                emit_log(f"Falha de conexão com OpenRouter [{effective_model}]: {e}", level="ERROR", source="OPENROUTER")
+                raise AIServiceError(f"Falha na comunicação com OpenRouter: {e}", error_type="connection_error", status_code=500)
 
     async def _call_llm(
         self,
         prompt: str,
         api_key: Optional[str] = None,
         model: Optional[str] = None,
+        openrouter_key: Optional[str] = None,
+        openrouter_model: Optional[str] = None,
+        api_provider: Optional[str] = None,
     ) -> str:
         """
-        Executa a chamada para Gemini API ou Ollama local, com diagnóstico preciso e rápido de erros.
+        Executa a chamada para Gemini, OpenRouter ou Ollama, com auto-fallback inteligente
+        e respeito rigoroso ao teto de 80% da capacidade por provedor.
         """
-        effective_key = (api_key or settings.gemini_api_key or "").strip()
-        effective_model = (model or settings.gemini_model or "gemini-3.6-flash").strip()
+        gemini_key = (api_key or settings.gemini_api_key or "").strip()
+        gemini_model = (model or settings.gemini_model or "gemini-3.6-flash").strip()
+        or_key = (openrouter_key or settings.openrouter_api_key or "").strip()
+        or_model = (openrouter_model or settings.openrouter_model or "openrouter/free").strip()
+        provider = (api_provider or settings.api_provider or "hybrid").lower().strip()
 
-        # 1. Tenta Google Gemini API se houver chave configurada
-        if effective_key:
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"responseMimeType": "application/json"},
-            }
-            emit_log(f"Disparando inferência no modelo {effective_model} via Gemini API...", level="INFO", source="GEMINI")
+        # 1. Provedor explicitamente OpenRouter
+        if provider == "openrouter":
+            if not or_key:
+                raise AIServiceError(
+                    "Chave de API do OpenRouter não configurada. Insira sua chave gratuita nas Configurações.",
+                    error_type="api_key_error",
+                    status_code=401,
+                )
+            return await self._call_openrouter(prompt, or_key, or_model)
 
-            # Modelos ativos oficiais da família Gemini 3 (prioriza o modelo escolhido e no máximo 1 alternativo ativo)
-            candidate_models = [effective_model]
-            fallback_model = "gemini-3.7-flash" if effective_model != "gemini-3.7-flash" else "gemini-3.6-flash"
-            if fallback_model not in candidate_models:
-                candidate_models.append(fallback_model)
+        # 2. Provedor explicitamente Gemini
+        elif provider == "gemini":
+            if not gemini_key:
+                raise AIServiceError(
+                    "Chave de API do Gemini não configurada. Insira sua chave do Google AI Studio nas Configurações.",
+                    error_type="api_key_error",
+                    status_code=401,
+                )
+            return await self._call_gemini(prompt, gemini_key, gemini_model)
 
-            for target_model in candidate_models:
-                clean_model = target_model.replace("models/", "").strip()
-                endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={effective_key}"
-                headers = {
-                    "Content-Type": "application/json",
-                    "x-goog-api-key": effective_key,
-                }
-
-                # Tentativa com timeout enxuto (18s) para evitar bloquear o usuário
-                async with httpx.AsyncClient(timeout=18.0) as client:
-                    for attempt in range(2):  # Até 2 tentativas no modelo atual (para lidar com picos 503)
-                        try:
-                            resp = await client.post(endpoint, json=payload, headers=headers)
-                            if resp.status_code == 200:
-                                data = resp.json()
-                                text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text")
-                                if text:
-                                    emit_log(f"Resposta estruturada recebida da API Gemini [{clean_model}] ({len(text)} chars).", level="SUCCESS", source="GEMINI")
-                                    return text
-
-                            elif resp.status_code == 503:
-                                # Diretriz oficial: Alta demanda temporária / Spikes in demand
-                                resp_text = resp.text
-                                emit_log(f"Gemini 503 (Servidores em alta demanda) [{clean_model}].", level="WARN", source="GEMINI")
-                                if attempt == 0:
-                                    emit_log("Aguardando 2.5s para retry automático (backoff recomendado pelo Google)...", level="INFO", source="GEMINI")
-                                    await asyncio.sleep(2.5)
-                                    continue
-                                else:
-                                    emit_log(f"Modelo {clean_model} continua em alta demanda.", level="WARN", source="GEMINI")
-                                    break  # Passa para o modelo alternativo ou encerra com 503 explícito
-
-                            elif resp.status_code == 404:
-                                err_detail = ""
-                                try:
-                                    err_detail = resp.json().get("error", {}).get("message", resp.text[:180])
-                                except Exception:
-                                    err_detail = resp.text[:180]
-                                emit_log(f"Modelo {clean_model} retornou 404 ({err_detail}).", level="WARN", source="GEMINI")
-                                break  # Não adianta tentar o mesmo modelo de novo se for 404
-
-                            elif resp.status_code == 400:
-                                resp_text = resp.text
-                                emit_log(f"Gemini retornou status 400 [{clean_model}]: {resp_text[:150]}", level="WARN", source="GEMINI")
-                                if "API key not valid" in resp_text or "INVALID_ARGUMENT" in resp_text:
-                                    raise AIServiceError(
-                                        "A chave da API Gemini fornecida não é válida ou foi recusada pelo Google (Erro 400: API key not valid). Verifique ou gere uma nova chave no Google AI Studio (https://aistudio.google.com/app/apikey).",
-                                        error_type="api_key_error",
-                                        status_code=400,
-                                    )
-                                break
-
-                            elif resp.status_code == 403:
-                                emit_log(f"Gemini retornou status 403 [{clean_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
-                                raise AIServiceError(
-                                    "Acesso negado para esta chave de API do Gemini (Erro 403). Verifique se a Generative Language API está habilitada no projeto.",
-                                    error_type="api_key_error",
-                                    status_code=403,
-                                )
-
-                            elif resp.status_code == 429:
-                                emit_log(f"Gemini retornou status 429 [{clean_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
-                                raise AIServiceError(
-                                    "Cota de requisições por minuto do Gemini excedida (Erro 429 RESOURCE_EXHAUSTED). Aguarde 30 a 60 segundos antes de tentar novamente.",
-                                    error_type="quota_exceeded",
-                                    status_code=429,
-                                )
-
-                            else:
-                                emit_log(f"Gemini retornou status {resp.status_code} [{clean_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
-                                break
-
-                        except AIServiceError:
-                            raise
-                        except httpx.TimeoutException:
-                            emit_log(f"Timeout (18s) na requisição Gemini [{clean_model}].", level="WARN", source="GEMINI")
-                            break
-                        except Exception as e:
-                            emit_log(f"Falha na requisição Gemini [{clean_model}] ({e}).", level="WARN", source="GEMINI")
-                            break
-
-            # Se chegamos aqui com chave Gemini válida configurada, significa que os modelos ativos falharam
-            emit_log("Os servidores do Gemini estão temporariamente sobrecarregados ou indisponíveis.", level="WARN", source="GEMINI")
-            raise AIServiceError(
-                "Os servidores do Google Gemini estão enfrentando alta demanda temporária (Erro 503). Por favor, aguarde alguns instantes e tente novamente.",
-                error_type="service_unavailable",
-                status_code=503,
-            )
+        # 3. Modo Híbrido (Auto-Fallback de ambos os provedores)
         else:
-            emit_log("Chave Gemini não configurada. Tentando Ollama local...", level="INFO", source="STAGE")
+            # Prioriza Gemini se configurado com fallback transparente para OpenRouter
+            if gemini_key:
+                try:
+                    return await self._call_gemini(prompt, gemini_key, gemini_model)
+                except AIServiceError as e:
+                    if e.status_code in (503, 429) and or_key:
+                        emit_log(f"Gemini retornou status {e.status_code}. Acionando Auto-Fallback inteligente para OpenRouter Free Tier [{or_model}]...", level="WARN", source="STAGE")
+                        return await self._call_openrouter(prompt, or_key, or_model)
+                    elif or_key:
+                        emit_log(f"Gemini falhou ({e.message}). Tentando OpenRouter...", level="WARN", source="STAGE")
+                        return await self._call_openrouter(prompt, or_key, or_model)
+                    raise
+            elif or_key:
+                return await self._call_openrouter(prompt, or_key, or_model)
+            elif settings.ollama_url:
+                endpoint = f"{settings.ollama_url.rstrip('/')}/api/generate"
+                payload = {"model": settings.ollama_model, "prompt": prompt, "stream": False, "format": "json"}
+                try:
+                    async with httpx.AsyncClient(timeout=40.0) as client:
+                        resp = await client.post(endpoint, json=payload)
+                        if resp.status_code == 200:
+                            emit_log(f"Resposta recebida do Ollama local ({settings.ollama_model}).", level="SUCCESS", source="BACKEND")
+                            return resp.json().get("response", "{}")
+                except Exception as e:
+                    print(f"[AIService] Ollama API error: {e}")
 
-        # 2. Tenta Ollama local se configurado
-        if settings.ollama_url:
-            endpoint = f"{settings.ollama_url.rstrip('/')}/api/generate"
-            payload = {
-                "model": settings.ollama_model,
-                "prompt": prompt,
-                "stream": False,
-                "format": "json",
-            }
-            try:
-                async with httpx.AsyncClient(timeout=40.0) as client:
-                    resp = await client.post(endpoint, json=payload)
-                    if resp.status_code == 200:
-                        emit_log(f"Resposta recebida do Ollama local ({settings.ollama_model}).", level="SUCCESS", source="BACKEND")
-                        return resp.json().get("response", "{}")
-            except Exception as e:
-                print(f"[AIService] Ollama API error: {e}")
-
-        # Se não há chave e nem Ollama respondeu
-        if not effective_key:
             raise AIServiceError(
-                "Chave de API do Gemini não configurada. Acesse as Configurações para inserir sua chave gratuita do Google AI Studio.",
+                "Nenhum provedor de IA (Gemini ou OpenRouter) está configurado. Acesse as Configurações para inserir sua chave gratuita.",
                 error_type="api_key_error",
                 status_code=401,
             )
-
-        raise AIServiceError(
-            "Nenhum provedor de IA (Gemini ou Ollama) respondeu. Verifique sua conexão e chave nas Configurações.",
-            error_type="generation_error",
-            status_code=500,
-        )
 
     async def curate_vocabulary_stage1(
         self,
@@ -193,6 +372,9 @@ class AIService:
         native_lang: str = "Portuguese",
         api_key: Optional[str] = None,
         model: Optional[str] = None,
+        openrouter_key: Optional[str] = None,
+        openrouter_model: Optional[str] = None,
+        api_provider: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         ETAPA 1: Curadoria de vocabulário alvo e traços linguísticos.
@@ -229,7 +411,14 @@ class AIService:
         emit_log(f"Iniciando Etapa 1: Curadoria de vocabulário ({language.upper()} | {proficiency} | Tema: {theme_desc})", level="INFO", source="STAGE")
 
         try:
-            raw = await self._call_llm(prompt, api_key=api_key, model=model)
+            raw = await self._call_llm(
+                prompt,
+                api_key=api_key,
+                model=model,
+                openrouter_key=openrouter_key,
+                openrouter_model=openrouter_model,
+                api_provider=api_provider,
+            )
             data = json.loads(clean_json_response(raw))
             vocab = data.get("vocabulary", [])
             if isinstance(vocab, list) and len(vocab) > 0:
@@ -255,6 +444,9 @@ class AIService:
         native_lang: str = "Portuguese",
         api_key: Optional[str] = None,
         model: Optional[str] = None,
+        openrouter_key: Optional[str] = None,
+        openrouter_model: Optional[str] = None,
+        api_provider: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         ETAPA 2: Geração da narrativa interlinear, duplo dicionário e hidratação SQLite.
@@ -272,7 +464,14 @@ class AIService:
 
         story_payload = None
         try:
-            raw = await self._call_llm(prompt, api_key=api_key, model=model)
+            raw = await self._call_llm(
+                prompt,
+                api_key=api_key,
+                model=model,
+                openrouter_key=openrouter_key,
+                openrouter_model=openrouter_model,
+                api_provider=api_provider,
+            )
             data = json.loads(clean_json_response(raw))
             if "sentences" in data and len(data["sentences"]) > 0:
                 emit_log(f"Etapa 2 Concluída: História redigida com {len(data['sentences'])} pares de sentenças!", level="SUCCESS", source="STAGE")
@@ -523,6 +722,9 @@ class AIService:
         native_lang: str = "Portuguese",
         api_key: Optional[str] = None,
         model: Optional[str] = None,
+        openrouter_key: Optional[str] = None,
+        openrouter_model: Optional[str] = None,
+        api_provider: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Gera uma explicação aprofundada (Raio-X) sob demanda com anatomia de caracteres,
@@ -539,7 +741,14 @@ class AIService:
         )
 
         try:
-            raw = await self._call_llm(prompt, api_key=api_key, model=model)
+            raw = await self._call_llm(
+                prompt,
+                api_key=api_key,
+                model=model,
+                openrouter_key=openrouter_key,
+                openrouter_model=openrouter_model,
+                api_provider=api_provider,
+            )
             cleaned = clean_json_response(raw)
             data = json.loads(cleaned)
             emit_log(f"Raio-X IA gerado com sucesso para '{word}'!", level="SUCCESS", source="STAGE")

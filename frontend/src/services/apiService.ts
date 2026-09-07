@@ -1,6 +1,7 @@
 import { Story, AppSettings, SSEGenerationEvent, WordDeepDiveData, LanguageCode, ProficiencyLevel } from '../types';
 import { GenerateStoryParams } from './providers/types';
 import { GeminiProvider } from './providers/GeminiProvider';
+import { OpenRouterProvider } from './providers/OpenRouterProvider';
 import { BackendProvider } from './providers/BackendProvider';
 import { ProceduralProvider } from './providers/ProceduralProvider';
 import { logService } from './logService';
@@ -10,6 +11,7 @@ export * from './providers/types';
 
 class ApiService {
   private geminiProvider = new GeminiProvider();
+  private openRouterProvider = new OpenRouterProvider();
   private backendProvider = new BackendProvider();
   private proceduralProvider = new ProceduralProvider();
 
@@ -40,12 +42,131 @@ class ApiService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           gemini_api_key: settings.geminiApiKey.trim(),
-          gemini_model: settings.geminiModel || 'gemini-3.6-flash',
+          gemini_model: settings.geminiModel || 'gemini-2.5-flash',
+          api_provider: settings.apiProvider,
         }),
       });
       return response.ok;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Sincroniza configurações do OpenRouter com o backend FastAPI
+   */
+  public async syncOpenRouterSettings(settings: AppSettings): Promise<boolean> {
+    if (!settings.backendUrl || !settings.openRouterApiKey?.trim()) return false;
+    try {
+      const response = await fetch(`${settings.backendUrl}/api/settings/openrouter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          openrouter_api_key: settings.openRouterApiKey.trim(),
+          openrouter_model: settings.openRouterModel || 'openrouter/free',
+          api_provider: settings.apiProvider,
+        }),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Sincroniza o modo de provedor selecionado com o backend FastAPI
+   */
+  public async syncProvider(provider: string, backendUrl?: string): Promise<boolean> {
+    if (!backendUrl) return false;
+    try {
+      const response = await fetch(`${backendUrl}/api/settings/provider`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_provider: provider }),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Testa a validade da chave OpenRouter (via backend ou chamada direta)
+   */
+  public async testOpenRouterConnection(
+    apiKey: string,
+    model: string = 'openrouter/free',
+    backendUrl?: string
+  ): Promise<{ success: boolean; message: string; models?: string[] }> {
+    const trimmedKey = apiKey.trim();
+    if (!trimmedKey) {
+      return { success: false, message: 'Nenhuma chave fornecida.' };
+    }
+
+    // 1. Tenta via backend se fornecido e acessível
+    if (backendUrl) {
+      try {
+        const resp = await fetch(`${backendUrl}/api/settings/openrouter/test`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            openrouter_api_key: trimmedKey,
+            openrouter_model: model,
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          return {
+            success: Boolean(data.success),
+            message: data.message || 'Conexão validada com OpenRouter.',
+            models: data.models,
+          };
+        }
+      } catch (err) {
+        console.warn('Backend OpenRouter test route unreachable, testing directly with OpenRouter:', err);
+      }
+    }
+
+    // 2. Teste direto contra o OpenRouter endpoint
+    try {
+      logService.addLog('INFO', 'OPENROUTER', 'Testando chave diretamente contra a API do OpenRouter...');
+      const response = await fetch('https://openrouter.ai/api/v1/auth/key', {
+        headers: {
+          Authorization: `Bearer ${trimmedKey}`,
+          'HTTP-Referer': 'http://localhost:5173',
+          'X-Title': 'Language Stories',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const label = data?.data?.label || 'Chave ativa';
+        const freeModels = [
+          'openrouter/free',
+          'google/gemma-4-26b-a4b-it:free',
+          'google/gemma-4-31b-it:free',
+          'nvidia/nemotron-3.5-lightning:free',
+          'liquid/lfm-2.5-2.6b:free',
+        ];
+        logService.addLog('SUCCESS', 'OPENROUTER', `Validação OpenRouter bem-sucedida! (${label})`);
+        return {
+          success: true,
+          message: `Conexão direta com OpenRouter validada! (${label})`,
+          models: freeModels,
+        };
+      } else {
+        const errText = await response.text().catch(() => '');
+        logService.addLog('ERROR', 'OPENROUTER', `OpenRouter recusou a chave: ${errText.slice(0, 150)}`);
+        return {
+          success: false,
+          message: `OpenRouter recusou a chave: ${errText.slice(0, 150)}`,
+        };
+      }
+    } catch (err: any) {
+      logService.addLog('ERROR', 'OPENROUTER', `Falha de rede ao conectar com OpenRouter: ${err?.message}`);
+      return {
+        success: false,
+        message: `Falha de rede ao conectar com OpenRouter: ${err?.message}`,
+      };
     }
   }
 
@@ -154,7 +275,15 @@ class ApiService {
       return await this.geminiProvider.generateStory(finalParams, settings);
     }
 
-    // 3. Provedor Procedural apenas se explicitamente selecionado como 'mock' nas configurações
+    // 3. Provedor OpenRouter direto no cliente (se configurado)
+    if (
+      settings.apiProvider === 'openrouter' &&
+      this.openRouterProvider.isAvailable(settings)
+    ) {
+      return await this.openRouterProvider.generateStory(finalParams, settings);
+    }
+
+    // 4. Provedor Procedural apenas se explicitamente selecionado como 'mock' nas configurações
     if (settings.apiProvider === 'mock') {
       return await this.proceduralProvider.generateStory(finalParams, settings);
     }
@@ -162,8 +291,8 @@ class ApiService {
     // Se nenhum provedor estiver viável, dispara erro explícito para o caderno exibir o diagnóstico
     throw new Error(
       settings.uiLanguage === 'pt'
-        ? 'Nenhum provedor de IA (Gemini ou Backend) está disponível. Verifique sua chave de API nas Configurações.'
-        : 'No AI provider (Gemini or Backend) is available. Please check your API key in Settings.'
+        ? 'Nenhum provedor de IA (Gemini, OpenRouter ou Backend) está disponível. Verifique sua chave de API nas Configurações.'
+        : 'No AI provider (Gemini, OpenRouter or Backend) is available. Please check your API key in Settings.'
     );
   }
 
@@ -199,7 +328,15 @@ class ApiService {
       return await this.geminiProvider.generateStory(finalParams, settings);
     }
 
-    // 3. Mock procedural apenas se explicitamente selecionado
+    // 3. Tenta direct OpenRouter Free Tier API se configurado
+    if (
+      settings.apiProvider === 'openrouter' &&
+      this.openRouterProvider.isAvailable(settings)
+    ) {
+      return await this.openRouterProvider.generateStory(finalParams, settings);
+    }
+
+    // 4. Mock procedural apenas se explicitamente selecionado
     if (settings.apiProvider === 'mock') {
       return await this.proceduralProvider.generateStory(finalParams, settings);
     }
@@ -253,6 +390,9 @@ class ApiService {
             native_lang: nativeLang,
             gemini_api_key: settings.geminiApiKey?.trim() || undefined,
             gemini_model: settings.geminiModel || undefined,
+            openrouter_api_key: settings.openRouterApiKey?.trim() || undefined,
+            openrouter_model: settings.openRouterModel || undefined,
+            api_provider: settings.apiProvider || undefined,
           }),
         });
         if (resp.ok) {
@@ -262,7 +402,7 @@ class ApiService {
           return data;
         }
       } catch (err) {
-        console.warn('Backend deep-dive request failed, trying Gemini direct...', err);
+        console.warn('Backend deep-dive request failed, trying providers direct...', err);
       }
     }
 
@@ -282,7 +422,26 @@ class ApiService {
         logService.addLog('SUCCESS', 'GEMINI', `Raio-X de "${trimmedWord}" gerado via Gemini e armazenado em cache!`);
         return data;
       } catch (err) {
-        console.warn('Gemini direct deep-dive failed, falling back to simulated data...', err);
+        console.warn('Gemini direct deep-dive failed...', err);
+      }
+    }
+
+    // 4. Tenta OpenRouter diretamente
+    if (this.openRouterProvider.isAvailable(settings)) {
+      try {
+        logService.addLog('INFO', 'OPENROUTER', `Gerando Raio-X de "${trimmedWord}" diretamente via OpenRouter...`);
+        const data = await this.openRouterProvider.getWordDeepDive(
+          trimmedWord,
+          context,
+          settings,
+          language,
+          proficiency
+        );
+        storageService.saveWordDeepDive(language, trimmedWord, data);
+        logService.addLog('SUCCESS', 'OPENROUTER', `Raio-X de "${trimmedWord}" gerado via OpenRouter e armazenado em cache!`);
+        return data;
+      } catch (err) {
+        console.warn('OpenRouter direct deep-dive failed, falling back to simulated data...', err);
       }
     }
 

@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Sparkles, BookOpen, Search, CheckCircle2, Feather, AlertCircle, X } from 'lucide-react';
 
 export const StoryGenerationMascot: React.FC = () => {
-  const { mascotState, cancelGeneration } = useApp();
+  const { mascotState, cancelGeneration, t } = useApp();
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export const StoryGenerationMascot: React.FC = () => {
           <button
             className="mascot-close-btn"
             onClick={cancelGeneration}
-            title="Cancelar geração"
+            title={t('mascotCancel')}
           >
             <X size={16} />
           </button>
@@ -175,19 +175,19 @@ export const StoryGenerationMascot: React.FC = () => {
         {/* Título & Mensagem da Etapa Atual */}
         <div className="mascot-info">
           <div className="mascot-stage-badge">
-            {stage === 'stage_start:curation' && 'ETAPA 1: CURADORIA DE VOCABULÁRIO'}
-            {stage === 'stage_curation_done' && 'VOCABULÁRIO DEFINIDO (SRS)'}
-            {stage === 'stage_start:generation' && 'ETAPA 2: GERAÇÃO DA NARRATIVA'}
-            {stage === 'stage_done' && 'HISTÓRIA PRONTA! ✨'}
-            {stage === 'error' && 'AVISO DO ASSISTENTE'}
+            {stage === 'stage_start:curation' && t('mascotStage1Badge')}
+            {stage === 'stage_curation_done' && t('mascotStageCurationDoneBadge')}
+            {stage === 'stage_start:generation' && t('mascotStage2Badge')}
+            {stage === 'stage_done' && t('mascotStageDoneBadge')}
+            {stage === 'error' && t('mascotStageErrorBadge')}
           </div>
 
           <h3 className="mascot-headline">
-            {stage === 'stage_start:curation' && 'Curando Vocabulário Ideal'}
-            {stage === 'stage_curation_done' && 'Palavras Alvo Selecionadas!'}
-            {stage === 'stage_start:generation' && 'Escrevendo sua História'}
-            {stage === 'stage_done' && 'Tudo Pronto para a Leitura!'}
-            {stage === 'error' && 'Ops, ocorreu um contratempo'}
+            {stage === 'stage_start:curation' && t('mascotHeadlineCuration')}
+            {stage === 'stage_curation_done' && t('mascotHeadlineSelected')}
+            {stage === 'stage_start:generation' && t('mascotHeadlineGeneration')}
+            {stage === 'stage_done' && t('mascotHeadlineDone')}
+            {stage === 'error' && t('mascotHeadlineError')}
           </h3>
 
           <p className="mascot-message">{message}</p>
@@ -196,10 +196,10 @@ export const StoryGenerationMascot: React.FC = () => {
           {counts && (counts.newWordsCount > 0 || counts.reviewWordsCount > 0) && (
             <div className="mascot-stats-pills">
               <span className="mascot-pill new-words">
-                +{counts.newWordsCount} Novas Palavras
+                +{counts.newWordsCount} {t('mascotNewWords')}
               </span>
               <span className="mascot-pill review-words">
-                {counts.reviewWordsCount} em Reforço (SRS)
+                {counts.reviewWordsCount} {t('mascotInReviewSRS')}
               </span>
             </div>
           )}
@@ -217,19 +217,19 @@ export const StoryGenerationMascot: React.FC = () => {
           <div className="mascot-steps-indicator">
             <div className={`mascot-step-item ${currentStep >= 1 ? 'active' : ''}`}>
               <div className="step-dot" />
-              <span>1. Curadoria</span>
+              <span>{t('mascotStep1')}</span>
             </div>
             <div className={`mascot-step-item ${currentStep >= 2 ? 'active' : ''}`}>
               <div className="step-dot" />
-              <span>2. Seleção</span>
+              <span>{t('mascotStep2')}</span>
             </div>
             <div className={`mascot-step-item ${currentStep >= 3 ? 'active' : ''}`}>
               <div className="step-dot" />
-              <span>3. Narrativa</span>
+              <span>{t('mascotStep3')}</span>
             </div>
             <div className={`mascot-step-item ${currentStep >= 4 ? 'active' : ''}`}>
               <div className="step-dot" />
-              <span>4. Glossário</span>
+              <span>{t('mascotStep4')}</span>
             </div>
           </div>
         </div>
