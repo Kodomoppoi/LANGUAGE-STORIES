@@ -10,6 +10,7 @@ import { createDefaultSRSMetrics } from '../srsEngine';
 import { GenerateStoryParams, StoryGeneratorProvider } from './types';
 import { logService } from '../logService';
 import { enrichStoryPhonetics } from '../auxiliaryPhonetics';
+import { getAuxiliaryTranslation, getAuxiliaryPOS, isInvalidTranslation } from '../auxiliaryLexicon';
 
 export class GeminiProvider implements StoryGeneratorProvider {
   public readonly id = 'gemini';
@@ -53,49 +54,42 @@ export class GeminiProvider implements StoryGeneratorProvider {
     const targetNativeLang = params.nativeLanguage || (settings.uiLanguage === 'en' ? 'English' : 'Portuguese');
 
     const prompt = `
-You are an expert language pedagogue creating an interactive graded reader story in JSON.
+You are an expert language pedagogue creating a graded reader story in JSON.
 
 Target Language: ${params.language}
 CEFR Level: ${params.proficiency}
 Theme / Pedagogical Focus: ${themeInstruction}
-Native Language (Interface Translation Language): ${targetNativeLang}
+Native Translation Language: ${targetNativeLang}
 ${sanitizedPrompt ? `Custom Topic/Instruction: ${sanitizedPrompt}` : ''}
 Story Length Requirement: ${lengthGuide}
-Spaced Repetition Requirement: ${repetitionGuide}
+Spaced Repetition: ${repetitionGuide}
 ${params.injectNewWordsCount ? `Introduce ${params.injectNewWordsCount} new vocabulary words.` : ''}
 ${params.targetWords?.length ? `MANDATORY TARGET WORDS TO INJECT AND REPEAT MULTIPLE TIMES: ${params.targetWords.join(', ')}` : ''}
 ${params.existingDictionary?.length ? `Re-use and reinforce these known words: ${params.existingDictionary.map((w) => w.word).join(', ')}` : ''}
 
 CRITICAL RULES:
-1. The story MUST be substantial and meet the requested length. DO NOT output a short 1-paragraph story.
-2. Every target word MUST appear multiple times (isTargetWord: true) so the reader encounters it in varied syntactic contexts.
-3. For Japanese (ja), provide accurate Furigana (Hiragana) in "ruby" for all Kanji tokens.
-4. For Mandarin (zh), provide Pinyin with tone marks in "ruby" for Chinese character tokens.
-5. Provide high-quality tokenization so every word is clickable.
-6. MANDATORY TRANSLATION LANGUAGE: ALL translations ("titleTranslation", sentence "translation", token "translation", token "explanation", vocabulary "translation", "definition", "exampleTranslation", quiz questions and answers) MUST be strictly in ${targetNativeLang}. DO NOT output translations in any other language.
+1. Provide sentence-by-sentence text and natural sentence translation in ${targetNativeLang}.
+2. For each sentence, provide a compact array of words/tokens with its contextual pronunciation and exact contextual translation.
+   FORMAT: [word, phonetic_ruby_or_null, contextual_translation_in_${targetNativeLang}]
+   - For Mandarin (zh): include Pinyin with tones in index 1 (e.g. ["咖啡馆", "kā fēi guǎn", "cafeteria"]).
+   - For Japanese (ja): include Hiragana furigana in index 1 for Kanji words (e.g. ["静か", "しずか", "tranquilo"]).
+   - For other languages (es, fr, de, it, en, ru, etc.): set index 1 to null, and index 2 to the exact contextual translation of that specific inflected/conjugated word (e.g. ["estudiábamos", null, "estudávamos"]).
+3. "targetVocabulary": Array of 4 to 8 key pedagogical words taught in this lesson with word, ruby, part of speech, translation in ${targetNativeLang}, and an example sentence.
+4. ALL translations MUST strictly be in ${targetNativeLang}.
 
-Output ONLY valid JSON following this schema:
+Output strictly valid JSON matching this compact schema:
 {
   "title": "Story Title in Target Language",
   "titleTranslation": "Title Translation in ${targetNativeLang}",
   "paragraphs": [
     {
-      "id": "p-1",
       "sentences": [
         {
-          "id": "s-1",
           "text": "Full sentence in target language.",
-          "translation": "Accurate sentence translation in ${targetNativeLang}.",
-          "tokens": [
-            {
-              "id": "t-1",
-              "text": "word",
-              "ruby": "phonetic / furigana / pinyin if applicable",
-              "translation": "meaning",
-              "partOfSpeech": "Noun/Verb/Adj/Particle",
-              "explanation": "Contextual usage note",
-              "isTargetWord": true
-            }
+          "translation": "Natural translation in ${targetNativeLang}.",
+          "words": [
+            ["word1", "ruby1_or_null", "translation1"],
+            ["word2", "ruby2_or_null", "translation2"]
           ]
         }
       ]
@@ -103,25 +97,12 @@ Output ONLY valid JSON following this schema:
   ],
   "targetVocabulary": [
     {
-      "id": "v-1",
-      "word": "word",
-      "ruby": "phonetic reading",
+      "word": "key_word",
+      "ruby": "phonetic_reading_or_null",
       "translation": "definition in ${targetNativeLang}",
-      "partOfSpeech": "Noun",
-      "definition": "Clear explanation in ${targetNativeLang}",
-      "exampleSentence": "Example in target language",
+      "partOfSpeech": "Noun/Verb/Adj",
+      "exampleSentence": "Short example in target language",
       "exampleTranslation": "Example translation in ${targetNativeLang}"
-    }
-  ],
-  "quiz": [
-    {
-      "id": "q-1",
-      "type": "mcq",
-      "prompt": "Meaning of the target word?",
-      "targetWord": "word",
-      "options": ["Opt1", "Opt2", "Opt3", "Opt4"],
-      "correctAnswer": "Opt1",
-      "explanation": "Why Opt1 is correct"
     }
   ]
 }
@@ -131,7 +112,7 @@ Output ONLY valid JSON following this schema:
     logService.addLog('INFO', 'GEMINI', `[Cliente Direto] Disparando inferência no modelo ${modelName}...`);
 
     const candidateModels = [modelName];
-    for (const alt of ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash', 'gemini-3.5-flash']) {
+    for (const alt of ['gemini-3.7-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash']) {
       if (!candidateModels.includes(alt)) candidateModels.push(alt);
     }
 
@@ -143,6 +124,17 @@ Output ONLY valid JSON following this schema:
       usedModel = cleanModel;
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${settings.geminiApiKey}`;
 
+      // Configuração de reasoning oficial do Google Gemini API:
+      // - Gemini 3.x: thinking_budget descontinuado, utiliza thinkingLevel: "MINIMAL" (enum MINIMAL)
+      // - Gemini 2.5: thinkingBudget: 0 desativa o raciocínio
+      const genConfig: any = { responseMimeType: 'application/json' };
+      const modelLower = cleanModel.toLowerCase();
+      if (modelLower.startsWith('gemini-3') || modelLower.includes('3.')) {
+        genConfig.thinkingConfig = { thinkingLevel: 'MINIMAL' };
+      } else if (modelLower.includes('2.5')) {
+        genConfig.thinkingConfig = { thinkingBudget: 0 };
+      }
+
       try {
         const resp = await fetch(endpoint, {
           method: 'POST',
@@ -152,7 +144,7 @@ Output ONLY valid JSON following this schema:
           },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: 'application/json' },
+            generationConfig: genConfig,
           }),
         });
 
@@ -223,57 +215,97 @@ Output ONLY valid JSON following this schema:
     logService.addLog('SUCCESS', 'GEMINI', `[Cliente Direto] Resposta estruturada recebida da API Gemini [${usedModel}] (${rawText.length} chars).`);
 
     const parsed = JSON.parse(rawText);
-
-    // Defensive parsing for paragraphs
-    const paragraphs: StoryParagraph[] = Array.isArray(parsed?.paragraphs)
-      ? parsed.paragraphs.map((p: any, pIdx: number) => ({
-        id: p?.id || `p-${pIdx + 1}`,
-        sentences: Array.isArray(p?.sentences)
-          ? p.sentences.map((s: any, sIdx: number) => ({
-            id: s?.id || `s-${pIdx + 1}-${sIdx + 1}`,
-            text: s?.text || '',
-            translation: s?.translation || '',
-            tokens: Array.isArray(s?.tokens)
-              ? s.tokens.map((t: any, tIdx: number) => ({
-                id: t?.id || `t-${pIdx + 1}-${sIdx + 1}-${tIdx + 1}`,
-                text: t?.text || '',
-                ruby: t?.ruby,
-                phonetic: t?.phonetic,
-                translation: t?.translation,
-                partOfSpeech: t?.partOfSpeech,
-                explanation: t?.explanation,
-                isTargetWord: Boolean(t?.isTargetWord),
-              }))
-              : [],
-          }))
-          : [],
-      }))
-      : [];
-
-    const fullText = paragraphs
-      .flatMap((p) => p.sentences.map((s) => s.text))
-      .filter(Boolean)
-      .join('\n\n');
+    const uiLang = (params.nativeLanguage === 'English' || settings.uiLanguage === 'en') ? 'en' : 'pt';
 
     // Defensive parsing for target vocabulary
-    const targetVocabulary: DictionaryEntry[] = Array.isArray(parsed?.targetVocabulary)
-      ? parsed.targetVocabulary.map((v: any, vIdx: number) => ({
+    const rawVocab = Array.isArray(parsed?.targetVocabulary)
+      ? parsed.targetVocabulary
+      : (Array.isArray(parsed?.target_vocabulary) ? parsed.target_vocabulary : []);
+
+    const targetVocabulary: DictionaryEntry[] = rawVocab.map((v: any, vIdx: number) => {
+      const vWord = String(v?.word || '').trim();
+      const rawTrans = v?.translation || v?.definition || v?.context_translation;
+      const trans = (!isInvalidTranslation(rawTrans, vWord) ? rawTrans : null)
+        || getAuxiliaryTranslation(vWord, params.language, uiLang)
+        || (uiLang === 'en' ? 'Target vocabulary' : 'Vocabulário alvo');
+      return {
         id: v?.id || `v-${vIdx + 1}`,
-        word: v?.word || '',
-        ruby: v?.ruby,
-        phonetic: v?.phonetic,
-        translation: v?.translation || 'Vocabulary definition',
-        partOfSpeech: v?.partOfSpeech || 'Word',
-        definition: v?.definition || v?.translation || '',
-        exampleSentence: v?.exampleSentence || '',
-        exampleTranslation: v?.exampleTranslation || '',
+        word: vWord,
+        ruby: v?.ruby || v?.pinyin || v?.phonetic,
+        phonetic: v?.phonetic || v?.ruby || v?.pinyin,
+        translation: trans,
+        partOfSpeech: v?.partOfSpeech || v?.part_of_speech || getAuxiliaryPOS(vWord, params.language) || 'Word',
+        definition: (!isInvalidTranslation(v?.definition, vWord) ? v.definition : null) || trans,
+        exampleSentence: v?.exampleSentence || v?.example_sentence || '',
+        exampleTranslation: v?.exampleTranslation || v?.example_translation || '',
         language: params.language,
         proficiency: params.proficiency,
         isStarred: false,
         srsMetrics: createDefaultSRSMetrics(),
         createdAt: new Date().toISOString(),
-      }))
-      : [];
+      };
+    });
+
+    // Defensive parsing for paragraphs & compact tokens
+    const rawParas = Array.isArray(parsed?.paragraphs)
+      ? parsed.paragraphs
+      : (Array.isArray(parsed?.sentences) ? [{ sentences: parsed.sentences }] : []);
+
+    const paragraphs: StoryParagraph[] = rawParas.map((p: any, pIdx: number) => ({
+      id: p?.id || `p-${pIdx + 1}`,
+      sentences: (Array.isArray(p?.sentences) ? p.sentences : []).map((s: any, sIdx: number) => {
+        const rawTokens = Array.isArray(s?.words) ? s.words : (Array.isArray(s?.tokens) ? s.tokens : []);
+        const tokens = rawTokens.map((t: any, tIdx: number) => {
+          let tText = '';
+          let tRuby: string | undefined = undefined;
+          let rawTrans: string | undefined = undefined;
+
+          if (Array.isArray(t)) {
+            // Compact tuple: [word, ruby, translation]
+            tText = String(t[0] || '').trim();
+            tRuby = t[1] ? String(t[1]).trim() : undefined;
+            rawTrans = t[2] ? String(t[2]).trim() : undefined;
+          } else if (typeof t === 'object' && t !== null) {
+            tText = String(t?.text || t?.word || '').trim();
+            tRuby = t?.ruby || t?.phonetic || t?.pinyin;
+            rawTrans = t?.translation || t?.meaning;
+          } else {
+            tText = String(t || '').trim();
+          }
+
+          const matchedWord = targetVocabulary.find((v) => v.word === tText);
+          const isInvalid = isInvalidTranslation(rawTrans, tText);
+          const safeMatchedTrans = matchedWord && !isInvalidTranslation(matchedWord.translation, tText) ? matchedWord.translation : null;
+
+          const tokenTrans = (!isInvalid ? rawTrans : null)
+            || safeMatchedTrans
+            || getAuxiliaryTranslation(tText, params.language, uiLang)
+            || (uiLang === 'en' ? 'Term in context' : 'Vocábulo no contexto');
+
+          return {
+            id: t?.id || `t-${pIdx + 1}-${sIdx + 1}-${tIdx + 1}`,
+            text: tText,
+            ruby: tRuby || (matchedWord ? matchedWord.ruby : undefined),
+            phonetic: tRuby,
+            translation: tokenTrans,
+            partOfSpeech: matchedWord?.partOfSpeech || getAuxiliaryPOS(tText, params.language),
+            isTargetWord: Boolean(matchedWord),
+          };
+        });
+
+        return {
+          id: s?.id || `s-${pIdx + 1}-${sIdx + 1}`,
+          text: s?.text || '',
+          translation: s?.translation || '',
+          tokens,
+        };
+      }),
+    }));
+
+    const fullText = paragraphs
+      .flatMap((p) => p.sentences.map((s) => s.text))
+      .filter(Boolean)
+      .join('\n\n');
 
     // Defensive parsing for quiz questions
     const quiz: QuizQuestion[] = Array.isArray(parsed?.quiz)
@@ -322,75 +354,40 @@ Output ONLY valid JSON following this schema:
     const isCJK = language === 'zh' || language === 'ja';
     const isJapanese = language === 'ja';
 
-    const prompt = isCJK
-      ? `You are an expert language pedagogue analyzing the ${isJapanese ? 'Japanese' : 'Mandarin'} word "${word}".
+    const prompt = `You are an elite linguistic scholar and pedagogue.
+Create a comprehensive, deep educational Markdown study dossier for the ${isJapanese ? 'Japanese' : isCJK ? 'Mandarin' : language} word "${word}".
 Sentence Context: "${context || 'N/A'}"
-Learner Proficiency: ${proficiency}
-Target Explanation Language: ${nativeLang}
+Target Learner Level: ${proficiency}
+Explanation Language: ${nativeLang}
 
-CRITICAL RULES:
-1. EXTREME BREVITY: Max 1-2 lines per section, under 500 characters total.
-2. Return STRICTLY valid JSON matching:
+The dossier MUST contain these structured sections in clean, dense, highly informative Markdown:
+# 📖 ${word} [${isJapanese ? 'Furigana/Romaji' : isCJK ? 'Pinyin' : 'Pronunciation'}] • [Part of Speech] • [Level]
+
+## 🎯 1. Significado Contextual & Nuance
+Detailed explanation of what this word means in the context of the story, its register, and emotional nuance.
+
+## 🧩 2. ${isCJK ? 'Anatomia dos Caracteres, Radicais & Origem' : 'Origem, Raízes & Etimologia'}
+Detailed breakdown of the radicals, ideogram components or morphological roots, historical evolution and character anatomy.
+
+## 🧠 3. Mnemônica Visual & Dica de Fixação
+A memorable visual story, mental anchor, or association to permanently memorize this word.
+
+## 🌳 4. Família de Palavras & Compostos
+List 3 to 5 real high-frequency words or collocations with translation in ${nativeLang}.
+
+## ⚠️ 5. Cuidados, Sons & Armadilhas
+Pronunciation traps, tones/pitch pitfalls, false friends, homophones, or near-synonym contrasts.
+
+## 📝 6. Frases Práticas de Exemplo
+2 natural sentences featuring this word with translation in ${nativeLang}.
+
+Output strictly valid JSON with the full Markdown text in "markdown_content":
 {
   "word": "${word}",
-  "ruby": "${isJapanese ? 'furigana' : 'pinyin'}",
-  "level": "${proficiency}",
-  "part_of_speech": "Substantivo/Verbo/etc",
-  "context_meaning": "Significado exato no contexto (máx 120 chars)",
-  "character_anatomy": [
-    {
-      "char": "字",
-      "radical": "radical",
-      "components": "decomposição",
-      "meaning": "significado"
-    }
-  ],
-  "shared_characters": [
-    {
-      "word": "palavra composta",
-      "ruby": "pronúncia",
-      "meaning": "tradução"
-    }
-  ],
-  "phonetics_homophones": {
-    "tip": "dica de pronúncia ou tom",
-    "homophones": ["palavra com som parecido"]
-  },
-  "synonyms_and_nuances": [
-    {
-      "synonym": "sinônimo",
-      "difference": "diferença prática"
-    }
-  ]
-}`
-      : `You are an expert language pedagogue analyzing the word "${word}" (${language}).
-Sentence Context: "${context || 'N/A'}"
-Learner Proficiency: ${proficiency}
-Target Explanation Language: ${nativeLang}
-
-CRITICAL RULES:
-1. EXTREME BREVITY: Max 1-2 lines per section, under 500 characters total.
-2. Return STRICTLY valid JSON matching:
-{
-  "word": "${word}",
-  "ruby": "",
-  "level": "${proficiency}",
-  "part_of_speech": "Substantivo/Verbo/etc",
-  "context_meaning": "Significado exato no contexto (máx 120 chars)",
-  "etymology_roots": "Origem ou raiz da palavra",
-  "common_collocations": [
-    {
-      "phrase": "colocação comum",
-      "meaning": "tradução"
-    }
-  ],
-  "false_friends_or_homophones": "Alerta de falso amigo ou som parecido",
-  "synonyms_and_nuances": [
-    {
-      "synonym": "sinônimo",
-      "difference": "diferença prática"
-    }
-  ]
+  "ruby": "${isJapanese ? 'furigana' : isCJK ? 'pinyin' : ''}",
+  "part_of_speech": "PartOfSpeech",
+  "context_meaning": "contextual meaning in ${nativeLang}",
+  "markdown_content": "# 📖 ${word} ... (full markdown dossier)"
 }`;
 
     const candidateModels = [
@@ -439,6 +436,20 @@ CRITICAL RULES:
     }
 
     const cleaned = rawText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-    return JSON.parse(cleaned) as WordDeepDiveData;
+    let parsed: any = {};
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      parsed = {
+        word,
+        markdown_content: rawText.trim(),
+      };
+    }
+
+    if (!parsed.markdown_content && rawText.includes('#')) {
+      parsed.markdown_content = rawText.trim();
+    }
+
+    return parsed as WordDeepDiveData;
   }
 }

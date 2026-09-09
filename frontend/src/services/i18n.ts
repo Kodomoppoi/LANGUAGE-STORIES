@@ -684,6 +684,26 @@ export const TRANSLATIONS = {
     en: 'Close (Esc)',
     pt: 'Fechar (Esc)',
   },
+  deepDiveDossierTab: {
+    en: '📖 Study Dossier',
+    pt: '📖 Dossiê de Estudo',
+  },
+  deepDiveRawTab: {
+    en: '📄 Raw Markdown',
+    pt: '📄 Markdown Bruto',
+  },
+  deepDiveCopyBtn: {
+    en: 'Copy .md',
+    pt: 'Copiar .md',
+  },
+  deepDiveCopiedBtn: {
+    en: 'Copied! ✓',
+    pt: 'Copiado! ✓',
+  },
+  deepDiveDownloadBtn: {
+    en: 'Download .md',
+    pt: 'Baixar .md',
+  },
   deepDiveLoadingText: {
     en: 'Analyzing characters, radicals and didactic nuances with AI...',
     pt: 'Analisando caracteres, radicais e nuances didáticas com IA...',
@@ -977,6 +997,26 @@ export const TRANSLATIONS = {
   popoverContextTranslation: {
     en: 'Contextual translation',
     pt: 'Tradução em contexto',
+  },
+  sentenceContextLabel: {
+    en: 'Sentence in Context',
+    pt: 'Frase em Contexto',
+  },
+  sentenceOriginalTitle: {
+    en: 'Original Sentence',
+    pt: 'Frase Original',
+  },
+  sentenceTranslationTitle: {
+    en: 'Sentence Translation',
+    pt: 'Tradução da Frase',
+  },
+  ttsPlaySentence: {
+    en: 'Listen to this sentence',
+    pt: 'Ouvir esta frase',
+  },
+  ttsPauseSentence: {
+    en: 'Pause sentence audio',
+    pt: 'Pausar áudio da frase',
   },
 
   // Settings Modal Extra

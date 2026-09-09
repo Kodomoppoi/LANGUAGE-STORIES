@@ -121,18 +121,19 @@ export function getRepetitionWeight(score: number, isPinned?: boolean): number {
  * Retorna uma pontuação contínua de 0% a 100%.
  */
 export function calculateMasteryScore(
-  metrics: SRSMetrics,
+  metrics?: SRSMetrics | null,
   lookedUpCount: number = 0,
   lastSeenDate?: string
 ): number {
   let score = 20; // Pontuação base inicial
+  const safeMetrics = metrics || createDefaultSRSMetrics();
 
-  if (metrics.totalReviews > 0) {
-    const accuracy = metrics.correctReviews / metrics.totalReviews;
+  if (safeMetrics.totalReviews > 0) {
+    const accuracy = safeMetrics.correctReviews / safeMetrics.totalReviews;
     // Até 50 pontos por precisão em revisões/quiz
     score += accuracy * 50;
     // Até 30 pontos pela cadeia de repetição e intervalo SM-2
-    score += Math.min(30, metrics.repetition * 10);
+    score += Math.min(30, safeMetrics.repetition * 10);
   }
 
   // Penalidade por consultas no leitor:
@@ -144,11 +145,18 @@ export function calculateMasteryScore(
   // Decaimento temporal de Ebbinghaus:
   // Conforme os dias passam sem contato com a palavra, a retenção teórica decai suavemente.
   if (lastSeenDate) {
-    const daysSince = Math.max(0, (Date.now() - new Date(lastSeenDate).getTime()) / (1000 * 60 * 60 * 24));
-    if (daysSince > 1) {
-      // Decaimento exponencial suave (meia-vida aproximada de 10 dias)
-      const decayFactor = Math.exp(-0.06 * (daysSince - 1));
-      score = score * Math.max(0.3, decayFactor);
+    try {
+      const parsedTime = new Date(lastSeenDate).getTime();
+      if (!isNaN(parsedTime)) {
+        const daysSince = Math.max(0, (Date.now() - parsedTime) / (1000 * 60 * 60 * 24));
+        if (daysSince > 1) {
+          // Decaimento exponencial suave (meia-vida aproximada de 10 dias)
+          const decayFactor = Math.exp(-0.06 * (daysSince - 1));
+          score = score * Math.max(0.3, decayFactor);
+        }
+      }
+    } catch {
+      // ignore date parsing error
     }
   }
 
@@ -160,13 +168,15 @@ export function calculateMasteryScore(
  * aplicando penalidade imediata na pontuação de saber e atualizando cor e peso.
  */
 export function recordWordLookup(entry: DictionaryEntry): DictionaryEntry {
+  const safeMetrics = entry.srsMetrics || createDefaultSRSMetrics();
   const lookedUpCount = (entry.lookedUpCount || 0) + 1;
-  const masteryScore = calculateMasteryScore(entry.srsMetrics, lookedUpCount, entry.lastSeenDate);
+  const masteryScore = calculateMasteryScore(safeMetrics, lookedUpCount, entry.lastSeenDate);
   const statusColor = getStatusColor(masteryScore);
   const repetitionWeight = getRepetitionWeight(masteryScore, entry.isStarred || entry.isPinned);
 
   return {
     ...entry,
+    srsMetrics: safeMetrics,
     lookedUpCount,
     masteryScore,
     statusColor,
@@ -179,7 +189,8 @@ export function recordWordLookup(entry: DictionaryEntry): DictionaryEntry {
  * Atualiza vocabulário pós-quiz com novo score contínuo, cor e peso.
  */
 export function recordWordQuizReview(entry: DictionaryEntry, quality: number): DictionaryEntry {
-  const updatedMetrics = calculateSM2(entry.srsMetrics, quality);
+  const safeMetrics = entry.srsMetrics || createDefaultSRSMetrics();
+  const updatedMetrics = calculateSM2(safeMetrics, quality);
   // Reduz progressivamente o peso de penalidades anteriores se acertar com qualidade >= 4
   const lookedUpCount = quality >= 4 ? Math.max(0, (entry.lookedUpCount || 0) - 1) : (entry.lookedUpCount || 0);
   const masteryScore = calculateMasteryScore(updatedMetrics, lookedUpCount, new Date().toISOString());

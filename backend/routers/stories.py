@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..services.ai_service import ai_service, AIServiceError
 from ..languages.phonetics import enrich_tokens_phonetics, get_phonetic_reading
+from ..languages.lexicon import get_auxiliary_translation, get_auxiliary_pos, is_invalid_translation
 from .logs import emit_log
 
 
@@ -85,6 +86,22 @@ def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] =
     story_dict = story_data.get("story_dictionary", [])
     lang = (language or story_data.get("language") or "zh").lower()
 
+    # Cria índice de termos conhecidos da história para segmentação precisa de palavras compostas
+    known_dict = {}
+    for d in story_dict:
+        w = d.get("word")
+        if w and isinstance(w, str) and w.strip():
+            w_clean = w.strip()
+            known_dict[w_clean] = {
+                "ruby": d.get("ruby") or d.get("pinyin"),
+                "context_translation": d.get("context_translation") or d.get("translation"),
+                "part_of_speech": d.get("part_of_speech") or d.get("partOfSpeech"),
+                "isTargetWord": True,
+                "mastery_score": d.get("mastery_score", 0.25),
+                "status_color": d.get("status_color", "orange"),
+                "traits": d.get("traits", {}),
+            }
+
     # Cria parágrafos estruturados caso o frontend utilize tokens diretamente
     paragraphs = []
     sentences_objects = []
@@ -95,25 +112,124 @@ def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] =
         translation_text = s.get("translation_text", "")
         translations.append(translation_text)
 
-        # Tokenização defensiva por caracteres (CJK) ou palavras
         tokens = []
         is_cjk = any("\u4e00" <= c <= "\u9fff" for c in target_text)
-        units = list(target_text) if is_cjk else target_text.split()
 
-        for c_idx, unit in enumerate(units):
-            matched = next((d for d in story_dict if unit in d.get("word", "")), None)
-            ruby_val = matched.get("ruby") if matched else None
-            tokens.append({
-                "id": f"t-{idx}-{c_idx}",
-                "text": unit,
-                "ruby": ruby_val,
-                "translation": matched.get("context_translation") if matched else None,
-                "partOfSpeech": matched.get("part_of_speech") if matched else None,
-                "isTargetWord": bool(matched),
-                "masteryScore": round(matched.get("mastery_score", 0.25) * 100) if matched else 25,
-                "statusColor": matched.get("status_color", "orange") if matched else "orange",
-                "traits": matched.get("traits", {}) if matched else {},
-            })
+        if is_cjk:
+            i = 0
+            n = len(target_text)
+            max_len = 6
+            c_idx = 0
+
+            while i < n:
+                char = target_text[i]
+                # Preserva pontuações e espaçamentos como tokens de pontuação
+                if char in " ，。！？、“”‘’：；（）…—\t\r\n,.!?:;\"'()[]{}":
+                    tokens.append({
+                        "id": f"t-{idx}-{c_idx}",
+                        "text": char,
+                        "ruby": None,
+                        "translation": None,
+                        "partOfSpeech": "Punctuation",
+                        "isTargetWord": False,
+                        "masteryScore": 100,
+                        "statusColor": "green",
+                        "traits": {},
+                    })
+                    i += 1
+                    c_idx += 1
+                    continue
+
+                matched_word = None
+                matched_meta = None
+
+                # Tenta casar a maior palavra conhecida (de 6 até 2 caracteres)
+                for l in range(min(max_len, n - i), 1, -1):
+                    sub = target_text[i : i + l]
+                    if sub in known_dict:
+                        matched_word = sub
+                        matched_meta = known_dict[sub]
+                        break
+                    aux_trans = get_auxiliary_translation(sub, lang, native_lang="Portuguese")
+                    if aux_trans:
+                        matched_word = sub
+                        matched_meta = {
+                            "ruby": None,
+                            "context_translation": aux_trans,
+                            "part_of_speech": get_auxiliary_pos(sub, lang),
+                            "isTargetWord": False,
+                            "mastery_score": 0.25,
+                            "status_color": "orange",
+                            "traits": {},
+                        }
+                        break
+
+                if matched_word and matched_meta:
+                    trans_val = matched_meta.get("context_translation")
+                    if is_invalid_translation(trans_val, matched_word):
+                        aux_trans = get_auxiliary_translation(matched_word, lang, native_lang="Portuguese")
+                        trans_val = aux_trans or "Vocábulo no contexto"
+
+                    tokens.append({
+                        "id": f"t-{idx}-{c_idx}",
+                        "text": matched_word,
+                        "ruby": matched_meta.get("ruby"),
+                        "translation": trans_val,
+                        "partOfSpeech": matched_meta.get("part_of_speech") or get_auxiliary_pos(matched_word, lang),
+                        "isTargetWord": matched_meta.get("isTargetWord", False),
+                        "masteryScore": round(matched_meta.get("mastery_score", 0.25) * 100),
+                        "statusColor": matched_meta.get("status_color", "orange"),
+                        "traits": matched_meta.get("traits", {}),
+                    })
+                    i += len(matched_word)
+                    c_idx += 1
+                else:
+                    single_char = target_text[i]
+                    single_meta = known_dict.get(single_char, {})
+                    trans_val = single_meta.get("context_translation")
+                    if is_invalid_translation(trans_val, single_char):
+                        aux_trans = get_auxiliary_translation(single_char, lang, native_lang="Portuguese")
+                        trans_val = aux_trans or "Vocábulo no contexto"
+
+                    tokens.append({
+                        "id": f"t-{idx}-{c_idx}",
+                        "text": single_char,
+                        "ruby": single_meta.get("ruby"),
+                        "translation": trans_val,
+                        "partOfSpeech": single_meta.get("part_of_speech") or get_auxiliary_pos(single_char, lang),
+                        "isTargetWord": bool(single_meta),
+                        "masteryScore": round(single_meta.get("mastery_score", 0.25) * 100) if single_meta else 25,
+                        "statusColor": single_meta.get("status_color", "orange") if single_meta else "orange",
+                        "traits": single_meta.get("traits", {}),
+                    })
+                    i += 1
+                    c_idx += 1
+        else:
+            # Tokenização alfabética por palavras
+            units = target_text.split()
+            for c_idx, unit in enumerate(units):
+                clean_unit = unit.strip(" ,.!?;:\"'()[]{}")
+                matched = next((d for d in story_dict if clean_unit.lower() == d.get("word", "").lower()), None)
+                trans_val = matched.get("context_translation") if matched else None
+                pos_val = matched.get("part_of_speech") if matched else None
+
+                if is_invalid_translation(trans_val, clean_unit):
+                    aux_trans = get_auxiliary_translation(clean_unit, lang, native_lang="Portuguese")
+                    trans_val = aux_trans or "Vocábulo no contexto"
+                if not pos_val:
+                    pos_val = get_auxiliary_pos(clean_unit, lang)
+
+                tokens.append({
+                    "id": f"t-{idx}-{c_idx}",
+                    "text": unit,
+                    "ruby": None,
+                    "translation": trans_val,
+                    "partOfSpeech": pos_val or "Word",
+                    "isTargetWord": bool(matched),
+                    "masteryScore": round(matched.get("mastery_score", 0.25) * 100) if matched else 25,
+                    "statusColor": matched.get("status_color", "orange") if matched else "orange",
+                    "traits": matched.get("traits", {}) if matched else {},
+                })
 
         # 100% Ruby: Preenche fonética para todos os tokens restantes no idioma
         tokens = enrich_tokens_phonetics(tokens, lang)
@@ -143,16 +259,21 @@ def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] =
         traits = item.get("traits", {})
         word_val = item.get("word") or item.get("lemma") or f"Term-{idx}"
         ruby_val = item.get("ruby") or item.get("pinyin") or get_phonetic_reading(word_val, lang)
+
+        raw_trans = item.get("context_translation") or item.get("translation")
+        if not raw_trans or str(raw_trans).strip() in ["Termo em contexto", "Contextual translation", ""]:
+            raw_trans = get_auxiliary_translation(word_val, lang, "Portuguese") or "Vocabulário"
+
         target_vocabulary.append({
-            "id": str(item.get("id") or f"dict-{idx}-{Date.now() if 'Date' in locals() else idx}"),
+            "id": str(item.get("id") or f"dict-{idx}"),
             "word": word_val,
             "ruby": ruby_val,
             "phonetic": ruby_val,
-            "translation": item.get("context_translation") or item.get("translation") or "Termo em contexto",
-            "partOfSpeech": item.get("part_of_speech") or traits.get("part_of_speech") or "Noun",
-            "definition": item.get("context_translation") or item.get("translation") or "Vocabulário alvo",
+            "translation": raw_trans,
+            "partOfSpeech": item.get("part_of_speech") or traits.get("part_of_speech") or get_auxiliary_pos(word_val, lang) or "Noun",
+            "definition": raw_trans,
             "exampleSentence": item.get("example_sentence") or word_val,
-            "exampleTranslation": item.get("example_translation") or item.get("context_translation") or "",
+            "exampleTranslation": item.get("example_translation") or raw_trans or "",
             "language": lang,
             "proficiency": story_data.get("proficiency", "A2"),
             "isStarred": bool(item.get("is_pinned")),

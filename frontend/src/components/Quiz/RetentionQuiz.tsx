@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { QuizQuestion } from '../../types';
 import confetti from 'canvas-confetti';
 import {
   Sparkles,
@@ -19,6 +20,8 @@ export const RetentionQuiz: React.FC = () => {
     setIsQuizOpen,
     submitQuiz,
     speakSingleToken,
+    vocabularyVault,
+    settings,
     t,
   } = useApp();
 
@@ -28,10 +31,50 @@ export const RetentionQuiz: React.FC = () => {
   const [quizFinished, setQuizFinished] = useState(false);
   const [scoreQuality, setScoreQuality] = useState<number>(4);
 
-  if (!isQuizOpen || !currentStory.quiz?.length) return null;
+  // Geração procedural sob demanda (0 tokens de IA, 0ms de latência)
+  // Utiliza as perguntas geradas pela IA se existirem, ou monta um quiz a partir do vocabulário alvo
+  const effectiveQuiz: QuizQuestion[] = useMemo(() => {
+    if (currentStory.quiz && currentStory.quiz.length > 0) {
+      return currentStory.quiz;
+    }
+    const targetVocab = currentStory.targetVocabulary || [];
+    if (targetVocab.length === 0) return [];
 
-  const currentQ = currentStory.quiz[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex === currentStory.quiz.length - 1;
+    const allDistractorPool = [
+      ...targetVocab.map((v) => v.translation),
+      ...vocabularyVault.map((v) => v.translation),
+      'cafeteria', 'livraria', 'estação de trem', 'amigo', 'viagem', 'chá quente',
+      'pequeno', 'grande', 'alegre', 'comer', 'beber', 'aprender', 'ler'
+    ].filter((val, idx, self) => val && val.trim() && self.indexOf(val) === idx);
+
+    return targetVocab.slice(0, 6).map((item, idx) => {
+      const correct = item.translation;
+      const pool = allDistractorPool.filter((d) => d !== correct);
+      const shuffledDistractors = [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
+      const options = [correct, ...shuffledDistractors].sort(() => Math.random() - 0.5);
+
+      const promptText = settings.uiLanguage === 'en'
+        ? `What is the meaning of "${item.word}"?`
+        : `Qual é o significado de "${item.word}"?`;
+
+      return {
+        id: `gen-quiz-${idx + 1}`,
+        type: 'mcq' as const,
+        prompt: promptText,
+        targetWord: item.word,
+        ruby: item.ruby,
+        options,
+        correctAnswer: correct,
+        explanation: `${item.word} = ${correct}.`,
+        contextSentence: item.exampleSentence,
+      };
+    });
+  }, [currentStory.quiz, currentStory.targetVocabulary, vocabularyVault, settings.uiLanguage]);
+
+  if (!isQuizOpen || !effectiveQuiz.length) return null;
+
+  const currentQ = effectiveQuiz[currentQuestionIndex];
+  const isLastQuestion = currentQuestionIndex === effectiveQuiz.length - 1;
 
   const handleSelectOption = (option: string) => {
     if (isAnswerSubmitted) return;
@@ -95,7 +138,7 @@ export const RetentionQuiz: React.FC = () => {
             {/* Progress Badge */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span className="quiz-badge">
-                {t('questionPrefix')} {currentQuestionIndex + 1} {t('ofPrefix')} {currentStory.quiz.length}
+                {t('questionPrefix')} {currentQuestionIndex + 1} {t('ofPrefix')} {effectiveQuiz.length}
               </span>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                 {t('quizTargetPrefix')} <strong>{currentQ.targetWord}</strong>

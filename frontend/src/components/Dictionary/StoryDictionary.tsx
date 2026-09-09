@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Bot,
 } from 'lucide-react';
+import { getAuxiliaryTranslation, isInvalidTranslation } from '../../services/auxiliaryLexicon';
 
 interface StoryDictionaryProps {
   isStarredView?: boolean;
@@ -352,12 +353,30 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
 
                       {/* Translation */}
                       <td>
-                        <div style={{ fontWeight: 600 }}>{traits?.contextMeaning || entry.translation}</div>
-                        {entry.definition && entry.definition !== entry.translation && (
-                          <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                            {entry.definition}
-                          </div>
-                        )}
+                        {(() => {
+                          const aux = getAuxiliaryTranslation(entry.word, currentStory.language, settings.uiLanguage as 'pt' | 'en');
+                          const displayTranslation = (!isInvalidTranslation(traits?.contextMeaning, entry.word))
+                            ? traits!.contextMeaning!
+                            : (!isInvalidTranslation(entry.translation, entry.word)
+                              ? entry.translation
+                              : (aux || (!isInvalidTranslation(entry.definition, entry.word) ? entry.definition : (settings.uiLanguage === 'en' ? 'Term in context' : 'Vocábulo no contexto'))));
+
+                          const hasValidDefinition = entry.definition &&
+                            !isInvalidTranslation(entry.definition, entry.word) &&
+                            entry.definition !== entry.translation &&
+                            entry.definition !== displayTranslation;
+
+                          return (
+                            <>
+                              <div style={{ fontWeight: 600 }}>{displayTranslation}</div>
+                              {hasValidDefinition && (
+                                <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                                  {entry.definition}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </td>
 
                       {/* Retenção SRS Contínua (0-100%) e Peso de Repetição */}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Volume2,
@@ -13,10 +13,13 @@ import {
 import { createDefaultSRSMetrics, getStatusColor, getRepetitionWeight } from '../../services/srsEngine';
 import { DictionaryEntry, ChineseTraits } from '../../types';
 import { getAuxiliaryRuby } from '../../services/auxiliaryPhonetics';
+import { getAuxiliaryTranslation, isInvalidTranslation } from '../../services/auxiliaryLexicon';
 
 export const WordPopover: React.FC = () => {
   const {
     activeToken,
+    activeSentence,
+    currentStory,
     closeTokenPopover,
     currentLanguage,
     currentProficiency,
@@ -58,40 +61,98 @@ export const WordPopover: React.FC = () => {
     };
   }, [closeTokenPopover]);
 
-  if (!activeToken) return null;
+  const tokenText = activeToken?.text ? String(activeToken.text).trim() : '';
 
   // Check if token already exists in vault
   const vaultEntry = vocabularyVault.find(
-    (w) => w.word === activeToken.text && w.language === currentLanguage
+    (w) => tokenText && w.word === tokenText && w.language === currentLanguage
   );
   const isInVault = Boolean(vaultEntry);
   const isStarred = vaultEntry?.isStarred || false;
   const isPinned = vaultEntry?.isPinned || isStarred;
 
-  // Traços linguísticos (especialmente Mandarim)
-  const traits = (vaultEntry?.traits || activeToken.traits || {}) as ChineseTraits;
+  // Traços linguísticos defensivos (especialmente Mandarim)
+  const traits = (
+    vaultEntry?.traits && typeof vaultEntry.traits === 'object'
+      ? vaultEntry.traits
+      : (activeToken?.traits && typeof activeToken.traits === 'object' ? activeToken.traits : {})
+  ) as ChineseTraits;
   const radicals = traits.radicals || (traits.radicalChar ? `${traits.radicalChar} (${traits.radicalMeaning || ''})` : undefined);
   const hskLevel = traits.hskLevel;
 
+  const isCJK = currentLanguage === 'zh' || currentLanguage === 'ja';
+
   // Fonética auxiliar se não estiver no token original
-  const effectiveRuby = activeToken.ruby || getAuxiliaryRuby(activeToken.text, currentLanguage);
+  // Se o token for de 1 caractere mas herdou múltiplos tons de uma palavra composta (ex: 米 herdou [mǐ fàn]),
+  // recalibra para a fonética real do caractere individual
+  const auxRuby = tokenText ? getAuxiliaryRuby(tokenText, currentLanguage) : undefined;
+  const isRubyMismatched = isCJK && tokenText.length === 1 && Boolean(activeToken?.ruby && activeToken.ruby.trim().includes(' '));
+  const effectiveRuby = (isRubyMismatched && auxRuby) ? auxRuby : (activeToken?.ruby || auxRuby);
 
   // Pontuação contínua de saber e cor de status (0% a 100%)
-  const masteryScore = vaultEntry?.masteryScore ?? activeToken.masteryScore ?? 25;
-  const statusColor = vaultEntry?.statusColor ?? activeToken.statusColor ?? getStatusColor(masteryScore);
+  const masteryScore = vaultEntry?.masteryScore ?? activeToken?.masteryScore ?? 25;
+  const statusColor = vaultEntry?.statusColor ?? activeToken?.statusColor ?? getStatusColor(masteryScore);
   const repetitionWeight = vaultEntry?.repetitionWeight ?? getRepetitionWeight(masteryScore, isPinned);
 
+  const getSentenceText = (s?: any): string => {
+    if (!s) return '';
+    return String(s.text || s.target_text || '');
+  };
+
+  const getSentenceTranslation = (s?: any): string => {
+    if (!s) return '';
+    return String(s.translation || s.translation_text || '');
+  };
+
+  // 1. Resolução de significado real sem placeholders (hook incondicional)
+  const resolvedMeaning = useMemo(() => {
+    if (!activeToken || !tokenText) return '';
+
+    if (!isInvalidTranslation(traits.contextMeaning, tokenText)) {
+      return traits.contextMeaning!;
+    }
+    if (!isInvalidTranslation(activeToken.translation, tokenText)) {
+      return activeToken.translation!;
+    }
+    const matchingVocab = currentStory?.targetVocabulary?.find((v) => {
+      const w = v?.word ? String(v.word).trim() : '';
+      if (!w || !tokenText) return false;
+      if (w === tokenText) return true;
+      if (tokenText.length > 1 && (w.includes(tokenText) || tokenText.includes(w))) return true;
+      return false;
+    });
+    if (!isInvalidTranslation(matchingVocab?.translation, tokenText)) {
+      return matchingVocab!.translation!;
+    }
+    const vaultItem = vocabularyVault.find(
+      (w) => w && w.word === tokenText && w.language === currentLanguage
+    );
+    if (!isInvalidTranslation(vaultItem?.translation, tokenText)) {
+      return vaultItem!.translation!;
+    }
+    const aux = getAuxiliaryTranslation(
+      tokenText,
+      currentLanguage,
+      settings.uiLanguage as 'pt' | 'en'
+    );
+    if (aux && !isInvalidTranslation(aux, tokenText)) return aux;
+
+    return settings.uiLanguage === 'pt'
+      ? 'Tradução no contexto da frase abaixo'
+      : 'Contextual translation in sentence below';
+  }, [traits.contextMeaning, activeToken, tokenText, currentStory, vocabularyVault, currentLanguage, settings.uiLanguage]);
+
   const handleAddToVault = () => {
-    if (isInVault) return;
+    if (isInVault || !tokenText || !activeToken) return;
     const newEntry: DictionaryEntry = {
       id: `vocab-${Date.now()}`,
-      word: activeToken.text,
+      word: tokenText,
       ruby: effectiveRuby,
-      translation: activeToken.translation || 'Target word',
+      translation: resolvedMeaning || (settings.uiLanguage === 'en' ? 'Target word' : 'Termo em contexto'),
       partOfSpeech: activeToken.partOfSpeech || 'Noun',
-      definition: activeToken.explanation || `Usage of ${activeToken.text} in context.`,
-      exampleSentence: activeToken.text,
-      exampleTranslation: activeToken.translation || '',
+      definition: activeToken.explanation || resolvedMeaning || `Usage of ${tokenText} in context.`,
+      exampleSentence: tokenText,
+      exampleTranslation: resolvedMeaning || '',
       language: currentLanguage,
       proficiency: currentProficiency,
       isStarred: false,
@@ -116,6 +177,60 @@ export const WordPopover: React.FC = () => {
     const targetId = vaultEntry?.id || `vocab-${Date.now()}`;
     toggleStarWord(targetId);
   };
+
+  // 2. Sentença contextual que contém o token (hook incondicional)
+  const contextSentence = useMemo(() => {
+    if (!tokenText) return null;
+
+    const activeText = getSentenceText(activeSentence);
+    if (activeText && activeText.includes(tokenText)) {
+      return activeSentence;
+    }
+    for (const p of currentStory?.paragraphs || []) {
+      for (const s of p?.sentences || []) {
+        const sText = getSentenceText(s);
+        if (
+          (sText && sText.includes(tokenText)) ||
+          s?.tokens?.some((t: any) => t?.id === activeToken?.id || t?.text === tokenText)
+        ) {
+          return s;
+        }
+      }
+    }
+    return activeSentence || null;
+  }, [activeSentence, currentStory, activeToken, tokenText]);
+
+  // 3. Renderiza a frase original destacando/sublinhando a palavra ativa
+  const renderSentenceWithUnderline = (sentenceText?: string, targetWord?: string) => {
+    const text = String(sentenceText || '');
+    const word = String(targetWord || '');
+    if (!word || !text || !text.includes(word)) {
+      return <span>{text}</span>;
+    }
+
+    try {
+      const parts = text.split(word);
+      return (
+        <span>
+          {parts.map((part, index) => (
+            <React.Fragment key={index}>
+              {part}
+              {index < parts.length - 1 && (
+                <u className="sentence-target-word-underline" title={word}>
+                  {word}
+                </u>
+              )}
+            </React.Fragment>
+          ))}
+        </span>
+      );
+    } catch {
+      return <span>{text}</span>;
+    }
+  };
+
+  // Se não houver token ativo selecionado, não renderiza JSX
+  if (!activeToken) return null;
 
   return (
     <aside
@@ -205,11 +320,11 @@ export const WordPopover: React.FC = () => {
         </div>
       )}
 
-      {/* Caixa de Tradução Contextual */}
+      {/* Caixa de Tradução Direta */}
       <div className="lateral-translation-box">
         <div className="lateral-translation-label">{t('contextMeaningLabel')}</div>
         <div className="lateral-translation-text">
-          {traits.contextMeaning || activeToken.translation || t('popoverContextTranslation')}
+          {resolvedMeaning}
         </div>
         {activeToken.explanation && (
           <div className="lateral-explanation-text">
@@ -217,6 +332,28 @@ export const WordPopover: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Caixa de Frase em Contexto com Palavra Sublinhada */}
+      {contextSentence && getSentenceText(contextSentence) && (
+        <div className="lateral-sentence-context-card">
+          <div className="lateral-context-card-header">
+            <span>📝 {t('sentenceContextLabel')}</span>
+          </div>
+
+          <div className="lateral-context-sentence-orig">
+            {renderSentenceWithUnderline(getSentenceText(contextSentence), activeToken.text)}
+          </div>
+
+          {getSentenceTranslation(contextSentence) && (
+            <div className="lateral-context-sentence-trans">
+              <span className="sentence-translation-marker" style={{ marginRight: '6px' }}>
+                {t('translationPrefix')}
+              </span>
+              <span>{getSentenceTranslation(contextSentence)}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Retenção Contínua SRS (0-100%) e Curva de Esquecimento */}
       <div style={{ padding: '8px 10px', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)' }}>

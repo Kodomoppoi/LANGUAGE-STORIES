@@ -121,7 +121,8 @@ MANDATORY OUTPUT REQUIREMENTS:
        "translation_text": "Em um beco tranquilo, havia uma pequena cafeteria."
      }}
    ]
-4. "story_dictionary": Comprehensive list of all important vocabulary in the story with Hanzi, Pinyin, Part of Speech, Radicals, and HSK level.
+4. "story_dictionary": Comprehensive list of all vocabulary in the story with Hanzi, Pinyin, Part of Speech, Radicals, and HSK level.
+   CRITICAL: For EVERY entry in "story_dictionary", "context_translation" in {native_lang} is MANDATORY. You MUST include every word from the TARGET VOCABULARY list with its clear, pedagogical translation in {native_lang}. DO NOT leave "context_translation" blank or generic.
 5. "story_translated_dictionary": Reverse mapping of translated terms back to original Chinese words with brief notes:
    [
      {{
@@ -357,51 +358,47 @@ Return strictly valid JSON only:
         proficiency: str,
         native_lang: str = "Portuguese",
     ) -> str:
-        return f"""Analyze the Mandarin word/character "{word}" in deep pedagogical detail for a language learner (Level: {proficiency}).
+        return f"""You are an elite linguistic scholar and pedagogue of Mandarin Chinese.
+Create a comprehensive, deep educational dossier for the Chinese word/characters: "{word}".
+Target Learner Level: {proficiency} (HSK framework).
 Sentence Context: "{sentence_context or 'N/A'}"
-Target Explanation Language: {native_lang}
+Explanation Language: {native_lang}.
 
-CRITICAL RULES:
-1. EXTREME BREVITY: Max 1-2 direct lines per section. No filler, no introductions. Total output must be under 500 characters.
-2. Provide exact Chinese CJK structural breakdown:
-   - Meaning in this specific context and nuance.
-   - Anatomy: Deconstruct characters and radicals (部首) with component meanings.
-   - Shared Characters: 2 high-frequency words sharing the same Hanzi.
-   - Phonetics & Homophones: Pinyin with tones + homophone/confusable sounds alert.
-   - Synonyms: 1-2 practical synonyms and brief contrast.
-3. Return STRICTLY valid JSON ONLY:
+TASK:
+Produce a dense, high-value, organized Markdown study dossier with pedagogical depth. DO NOT cut corners or use placeholder text.
 
+The dossier MUST contain these exact sections in clean Markdown:
+# 📖 {word} [Pinyin with Tones] • [Part of Speech] • [HSK Level]
+
+## 🎯 1. Significado Contextual & Nuance
+Detailed explanation of what this word means in the context of the story, its register (casual, formal, literary), and emotional nuance.
+
+## 🧩 2. Anatomia dos Caracteres, Radicais & Etimologia
+- **Radical Principal (部首):** Name, Hanzi, and meaning of the main radical.
+- **Decomposição dos Ideogramas:** Meaning of individual components and how they fit together.
+- **Evolução Histórica:** Pictographic origin or historical concept behind the character(s).
+
+## 🧠 3. Mnemônica Visual & Dica Mental de Fixação
+A memorable visual story, mental anchor, or vivid association to permanently memorize this word and its tones.
+
+## 🌳 4. Família de Palavras & Compostos de Alta Frequência
+List 3 to 5 real high-frequency compound words formed with these characters, with Pinyin and translation in {native_lang}.
+
+## ⚠️ 5. Cuidados, Tons & Armadilhas
+Pronunciation advice, tone pitfalls, confusable homophones or near-synonym contrasts.
+
+## 📝 6. Frases Práticas de Exemplo
+2 natural sentences featuring this word with Hanzi, Pinyin, and translation in {native_lang}.
+
+OUTPUT FORMAT:
+Return strictly valid JSON with the full Markdown text in "markdown_content":
 {{
   "word": "{word}",
   "pinyin": "pīnyīn with tones",
-  "hsk_level": "HSK 1-6",
+  "hsk_level": "HSK {proficiency}",
   "part_of_speech": "Substantivo / Verbo / etc",
-  "context_meaning": "Significado exato no contexto (máx 120 caracteres)",
-  "character_anatomy": [
-    {{
-      "char": "字",
-      "radical": "宀 (teto)",
-      "components": "componentes ou traços",
-      "meaning": "significado individual"
-    }}
-  ],
-  "shared_characters": [
-    {{
-      "word": "词语",
-      "pinyin": "cí yǔ",
-      "meaning": "tradução direta"
-    }}
-  ],
-  "phonetics_homophones": {{
-    "pinyin_tone_tip": "dica de tom e som",
-    "homophones": ["同音词 (tóng yīn cí)"]
-  }},
-  "synonyms_and_nuances": [
-    {{
-      "synonym": "近义词",
-      "difference": "diferença prática de uso"
-    }}
-  ]
+  "context_meaning": "Significado contextual resumido",
+  "markdown_content": "# 📖 {word} ... (full markdown dossier)"
 }}
 """
 
@@ -411,35 +408,57 @@ CRITICAL RULES:
         proficiency: str,
         native_lang: str = "Portuguese",
     ) -> Dict[str, Any]:
+        pinyin_map = {
+            "客": "kè",
+            "客人": "kè rén",
+            "米饭": "mǐ fàn",
+            "服务员": "fú wù yuán",
+            "筷子": "kuài zi",
+            "茶馆": "chá guǎn",
+            "咖啡馆": "kā fēi guǎn",
+            "水": "shuǐ",
+            "好吃": "hǎo chī",
+            "觉得": "jué de",
+        }
+        py = pinyin_map.get(word, "")
+        pinyin_header = f"[{py}]" if py else ""
+        is_pt = str(native_lang).lower().startswith("port")
+
+        md_content = f"""# 📖 {word} {pinyin_header} • Substantivo / Termo Lexical • HSK {proficiency}
+
+## 🎯 1. Significado Contextual & Nuance
+{'No contexto da narrativa, refere-se ao termo em uso natural na frase, denotando seu papel prático no cotidiano.' if is_pt else 'In the story narrative, this word is used in its natural everyday pedagogical sense.'}
+
+## 🧩 2. Anatomia dos Caracteres, Radicais & Etimologia
+- **Radical Principal (部首):** {'Componente semântico e estrutural do ideograma' if is_pt else 'Key semantic and structural radical of the ideogram'}.
+- **Decomposição:** {'Ideograma formado por traços fundamentais que combinam significado e sonoridade.' if is_pt else 'Character composed of fundamental strokes combining sound and meaning.'}
+- **Origem Histórica:** {'Evolução a partir da escrita tradicional chinesa preservando a essência do conceito.' if is_pt else 'Evolution from traditional Chinese script preserving the conceptual essence.'}
+
+## 🧠 3. Mnemônica Visual & Dica de Fixação
+{'Visualize a estrutura dos traços associando a forma física do caractere à ação que ele representa no dia a dia.' if is_pt else 'Visualize the stroke structure connecting the visual form to the everyday concept it represents.'}
+
+## 🌳 4. Família de Palavras & Compostos
+- **{word}** {pinyin_header} — {'Vocábulo principal' if is_pt else 'Main vocabulary word'}
+- **请客** (qǐng kè) — {'Convidar / pagar a conta para alguém' if is_pt else 'To treat someone / invite'}
+- **客气** (kè qi) — {'Cerimonioso / educado (不客气 = de nada)' if is_pt else 'Polite / courteous'}
+
+## ⚠️ 5. Cuidados, Tons & Armadilhas
+{'Mantenha a atenção estrita à modulação tonal para diferenciar termos semelhantes e garantir clareza nativa.' if is_pt else 'Pay strict attention to tonal modulation to distinguish similar terms with native clarity.'}
+
+## 📝 6. Frases Práticas de Exemplo
+1. 客人在餐厅里点菜。
+   - *Kèrén zài cāntīng lǐ diǎn cài.*
+   - {'O cliente pede a comida no restaurante.' if is_pt else 'The guest orders food in the restaurant.'}
+2. 服务员热情地招待客人。
+   - *Fúwùyuán rèqíng de zhāodài kèrén.*
+   - {'O garçom atende o cliente com entusiasmo.' if is_pt else 'The waiter enthusiastically serves the guest.'}
+"""
+
         return {
             "word": word,
-            "pinyin": "kā fēi guǎn" if word == "咖啡馆" else "",
-            "hsk_level": f"HSK 2 ({proficiency})",
+            "pinyin": py,
+            "hsk_level": f"HSK {proficiency}",
             "part_of_speech": "Substantivo",
-            "context_meaning": f"Uso de '{word}' no contexto da narrativa.",
-            "character_anatomy": [
-                {
-                    "char": word[0] if word else "字",
-                    "radical": "口 (boca)",
-                    "components": "Radical semântico + elemento fonético",
-                    "meaning": "Componente fundamental do caractere",
-                }
-            ],
-            "shared_characters": [
-                {
-                    "word": f"{word[0]}厅" if word else "茶室",
-                    "pinyin": "kā tīng",
-                    "meaning": "Salão / Espaço relacionado",
-                }
-            ],
-            "phonetics_homophones": {
-                "pinyin_tone_tip": "Preste atenção à modulação dos tons para clareza.",
-                "homophones": [],
-            },
-            "synonyms_and_nuances": [
-                {
-                    "synonym": "茶馆",
-                    "difference": "Estabelecimento similar voltado a infusões tradicionais.",
-                }
-            ],
+            "context_meaning": f"Uso de '{word}' no contexto da história.",
+            "markdown_content": md_content,
         }

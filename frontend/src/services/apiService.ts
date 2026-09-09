@@ -447,6 +447,43 @@ class ApiService {
 
     // 4. Fallback Estruturado Simulado
     const isCJK = language === 'zh' || language === 'ja';
+    const fallbackMd = isCJK
+      ? `# 📖 ${trimmedWord} • Substantivo / Termo Lexical • ${proficiency}
+
+## 🎯 1. Significado Contextual & Nuance
+No contexto da narrativa, refere-se ao termo em uso prático e natural na história.
+
+## 🧩 2. Anatomia, Radicais & Etimologia
+- **Radical Principal (部首):** Componente semântico e estrutural do ideograma.
+- **Estrutura:** Composição tradicional combinando raiz semântica e fonética.
+
+## 🧠 3. Mnemônica Visual & Dica de Fixação
+Visualize o padrão dos traços associando a forma física ao conceito que o ideograma representa.
+
+## 🌳 4. Família de Palavras & Compostos
+- **${trimmedWord}** — Vocábulo principal estudado na lição.
+
+## ⚠️ 5. Cuidados, Sons & Armadilhas
+Preste atenção cuidadosa à modulação de tons e articulação clara dos fonemas.
+
+## 📝 6. Frases Práticas de Exemplo
+1. Frase prática com ${trimmedWord} em contexto comunicativo real.
+`
+      : `# 📖 ${trimmedWord} • Vocábulo • ${proficiency}
+
+## 🎯 1. Significado Contextual & Nuance
+Significado em contexto aplicado na narrativa.
+
+## 🧩 2. Origem, Raízes & Etimologia
+Formação regular e expressiva característica do idioma.
+
+## 🧠 3. Mnemônica & Dica de Fixação
+Associe os sons ou grafia a termos familiares para consolidar na memória de longo prazo.
+
+## 🌳 4. Família de Palavras & Colocações
+- Usar ${trimmedWord} em situações conversacionais do dia a dia.
+`;
+
     const fallbackData: WordDeepDiveData = isCJK
       ? {
           word: trimmedWord,
@@ -454,6 +491,7 @@ class ApiService {
           level: proficiency,
           part_of_speech: 'Palavra CJK',
           context_meaning: `Significado contextual de "${trimmedWord}" na narrativa.`,
+          markdown_content: fallbackMd,
           character_anatomy: [
             {
               char: trimmedWord[0] || '字',
@@ -485,6 +523,7 @@ class ApiService {
           level: proficiency,
           part_of_speech: 'Vocábulo',
           context_meaning: `Significado de "${trimmedWord}" no contexto da história.`,
+          markdown_content: fallbackMd,
           etymology_roots: `Vocábulo característico do idioma.`,
           common_collocations: [
             {

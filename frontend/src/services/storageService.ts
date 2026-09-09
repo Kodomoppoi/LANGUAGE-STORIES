@@ -1,5 +1,7 @@
 import { DictionaryEntry, LanguageCode, ProficiencyLevel, UserStats, AppSettings, WordDeepDiveData, Story } from '../types';
 import { createDefaultSRSMetrics } from './srsEngine';
+import { getAuxiliaryTranslation, isInvalidTranslation } from './auxiliaryLexicon';
+import { getAuxiliaryRuby } from './auxiliaryPhonetics';
 
 const KEYS = {
   SETTINGS: 'lang_stories_settings',
@@ -58,31 +60,83 @@ export class StorageService {
         const map = JSON.parse(mapRaw);
         if (map && map[lang]) return map[lang] as ProficiencyLevel;
       }
+      return defaultLevel;
     } catch {
-      // ignore
+      return defaultLevel;
     }
-    return this.loadProficiency(defaultLevel);
   }
 
   public saveProficiencyForLanguage(lang: LanguageCode, level: ProficiencyLevel): void {
     try {
-      let map: Record<string, string> = {};
       const mapRaw = localStorage.getItem('lang_stories_proficiencies_map');
-      if (mapRaw) {
-        map = JSON.parse(mapRaw) || {};
-      }
+      const map = mapRaw ? JSON.parse(mapRaw) : {};
       map[lang] = level;
       localStorage.setItem('lang_stories_proficiencies_map', JSON.stringify(map));
-      this.saveProficiency(level);
     } catch (e) {
-      console.error('Failed to save proficiency map', e);
+      console.error('Failed to save language proficiency map', e);
     }
+  }
+
+  public sanitizeVaultEntries(entries: DictionaryEntry[]): DictionaryEntry[] {
+    if (!Array.isArray(entries)) return [];
+    let modified = false;
+    const sanitized = entries.map((entry) => {
+      if (!entry || !entry.word) return entry;
+
+      const isPlaceholder = isInvalidTranslation(entry.translation, entry.word);
+      const isDefInvalid = isInvalidTranslation(entry.definition, entry.word);
+
+      const isCJK = entry.language === 'zh' || entry.language === 'ja';
+      const isRubyMismatched = isCJK && entry.word.length === 1 && Boolean(entry.ruby && entry.ruby.trim().includes(' '));
+      const auxRuby = getAuxiliaryRuby(entry.word, entry.language as any);
+      const healedRuby = isRubyMismatched && auxRuby ? auxRuby : (entry.ruby || auxRuby);
+
+      if (isPlaceholder || (isRubyMismatched && auxRuby)) {
+        modified = true;
+        const aux =
+          getAuxiliaryTranslation(entry.word, entry.language as any, 'pt') ||
+          getAuxiliaryTranslation(entry.word, entry.language as any, 'en');
+        const healedTranslation =
+          aux ||
+          (!isDefInvalid
+            ? entry.definition!
+            : (aux || 'Vocábulo no contexto'));
+
+        return {
+          ...entry,
+          ruby: healedRuby,
+          translation: healedTranslation,
+          definition:
+            !isDefInvalid
+              ? entry.definition!
+              : healedTranslation,
+          srsMetrics: entry.srsMetrics || createDefaultSRSMetrics(),
+        };
+      }
+
+      if (!entry.srsMetrics) {
+        modified = true;
+        return {
+          ...entry,
+          ruby: healedRuby,
+          srsMetrics: createDefaultSRSMetrics(),
+        };
+      }
+
+      return entry;
+    });
+
+    if (modified) {
+      this.saveVault(sanitized);
+    }
+    return sanitized;
   }
 
   public loadVault(defaultEntries: DictionaryEntry[] = []): DictionaryEntry[] {
     try {
       const saved = localStorage.getItem(KEYS.VAULT);
-      return saved ? JSON.parse(saved) : defaultEntries;
+      const raw = saved ? JSON.parse(saved) : defaultEntries;
+      return this.sanitizeVaultEntries(raw);
     } catch {
       return defaultEntries;
     }

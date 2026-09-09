@@ -2,6 +2,7 @@ import { Story, AppSettings, SSEGenerationEvent, DictionaryEntry, StoryParagraph
 import { GenerateStoryParams, StoryGeneratorProvider } from './types';
 import { createDefaultSRSMetrics, getStatusColor, getRepetitionWeight } from '../srsEngine';
 import { enrichStoryPhonetics } from '../auxiliaryPhonetics';
+import { getAuxiliaryTranslation, getAuxiliaryPOS, isInvalidTranslation } from '../auxiliaryLexicon';
 
 export class BackendProvider implements StoryGeneratorProvider {
   public readonly id = 'backend';
@@ -167,6 +168,7 @@ export class BackendProvider implements StoryGeneratorProvider {
    * mapeando traits por idioma (Mandarim: hanzi, pinyin, radicals, hsk_level) e SRS contínuo.
    */
   private normalizeStoryResponse(data: any, params: GenerateStoryParams): Story {
+    const uiLang = params.nativeLanguage === 'English' ? 'en' : 'pt';
     const rawVocab = Array.isArray(data.targetVocabulary)
       ? data.targetVocabulary
       : (Array.isArray(data.dictionary) ? data.dictionary : []);
@@ -178,7 +180,13 @@ export class BackendProvider implements StoryGeneratorProvider {
       const pinyin = traits.pinyin || item.pinyin || item.ruby;
       const radicals = traits.radicals || item.radicals;
       const hskLevel = traits.hsk_level || traits.hskLevel || item.hsk_level;
-      const contextMeaning = traits.context_meaning || item.context_meaning || item.translation;
+      const wordVal = hanzi || item.word || `Palavra-${idx}`;
+
+      const rawMeaning = traits.context_meaning || item.context_meaning || item.translation;
+      const cleanMeaning = (!isInvalidTranslation(rawMeaning, wordVal))
+        ? rawMeaning
+        : (getAuxiliaryTranslation(wordVal, params.language, uiLang) || (uiLang === 'en' ? 'Target vocabulary' : 'Vocabulário alvo'));
+
       const masteryScore = typeof item.mastery_score === 'number'
         ? (item.mastery_score <= 1.0 ? Math.round(item.mastery_score * 100) : item.mastery_score)
         : 25;
@@ -188,14 +196,14 @@ export class BackendProvider implements StoryGeneratorProvider {
 
       return {
         id: item.id ? String(item.id) : `dict-${idx}-${Date.now()}`,
-        word: hanzi || item.word || `Palavra-${idx}`,
+        word: wordVal,
         ruby: pinyin,
         phonetic: pinyin,
-        translation: contextMeaning || item.translation || 'Termo em contexto',
-        partOfSpeech: traits.part_of_speech || item.part_of_speech || item.partOfSpeech || 'Noun',
-        definition: item.definition || contextMeaning || 'Vocabulário alvo',
+        translation: cleanMeaning || 'Vocabulário',
+        partOfSpeech: traits.part_of_speech || item.part_of_speech || item.partOfSpeech || getAuxiliaryPOS(wordVal, params.language) || 'Noun',
+        definition: item.definition || cleanMeaning || 'Vocabulário alvo',
         exampleSentence: item.exampleSentence || hanzi || '',
-        exampleTranslation: item.exampleTranslation || contextMeaning || '',
+        exampleTranslation: item.exampleTranslation || cleanMeaning || '',
         language: params.language,
         proficiency: params.proficiency,
         isStarred: isPinned,
@@ -209,8 +217,8 @@ export class BackendProvider implements StoryGeneratorProvider {
           pinyin,
           radicals,
           hskLevel,
-          contextMeaning,
-          partOfSpeech: traits.part_of_speech || item.part_of_speech,
+          contextMeaning: cleanMeaning,
+          partOfSpeech: traits.part_of_speech || item.part_of_speech || getAuxiliaryPOS(wordVal, params.language),
         },
         occurrences: item.occurrences || 1,
         lifetimeOccurrences: item.lifetimeOccurrences || 1,
@@ -221,11 +229,33 @@ export class BackendProvider implements StoryGeneratorProvider {
 
     if (data.paragraphs && Array.isArray(data.paragraphs) && data.paragraphs.length > 0) {
       const fullTextStr = data.fullText || data.content || '';
+      // Garante que nenhum token fique com tradução nula ou dummy
+      const enrichedParagraphs: StoryParagraph[] = data.paragraphs.map((p: any) => ({
+        ...p,
+        sentences: (p.sentences || []).map((s: any) => ({
+          ...s,
+          tokens: (s.tokens || []).map((t: any) => {
+            let tTrans = t.translation;
+            const isInvalidTrans = isInvalidTranslation(tTrans, t.text);
+
+            if (isInvalidTrans) {
+              const matchedWord = targetVocabulary.find((v) => v.word === t.text);
+              const safeMatched = matchedWord && !isInvalidTranslation(matchedWord.translation, t.text) ? matchedWord.translation : null;
+              tTrans = safeMatched || getAuxiliaryTranslation(t.text, params.language, uiLang) || (uiLang === 'en' ? 'Term in context' : 'Vocábulo no contexto');
+            }
+            return {
+              ...t,
+              translation: tTrans || undefined,
+            };
+          }),
+        })),
+      }));
+
       return enrichStoryPhonetics({
         ...(data as Story),
         targetVocabulary,
         fullText: fullTextStr,
-        paragraphs: data.paragraphs,
+        paragraphs: enrichedParagraphs,
       });
     }
 
@@ -236,19 +266,56 @@ export class BackendProvider implements StoryGeneratorProvider {
       ? data.translations
       : (Array.isArray(data.paragraph_translations) ? data.paragraph_translations : []);
 
+    const isCJK = params.language === 'zh' || params.language === 'ja';
+
+    // Segmentador CJK que preserva palavras compostas do vocabulário alvo
+    const segmentText = (text: string): string[] => {
+      if (!isCJK) {
+        return text.split(/\s+/).filter(Boolean);
+      }
+      const vocabWords = targetVocabulary
+        .map((v) => v.word.trim())
+        .filter((w) => w.length > 1)
+        .sort((a, b) => b.length - a.length);
+
+      const units: string[] = [];
+      let i = 0;
+      while (i < text.length) {
+        let matched = false;
+        for (const vw of vocabWords) {
+          if (text.startsWith(vw, i)) {
+            units.push(vw);
+            i += vw.length;
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          units.push(text[i]);
+          i += 1;
+        }
+      }
+      return units;
+    };
+
     const paragraphs: StoryParagraph[] = rawParagraphs.map((paraText: string, pIdx: number) => {
       const matchedTranslations: string[] = [];
-      const tokens = paraText.split('').map((char: string, cIdx: number) => {
-        const matchingWord = targetVocabulary.find((v) => v.word.includes(char));
-        if (matchingWord?.translation && !matchedTranslations.includes(matchingWord.translation)) {
-          matchedTranslations.push(matchingWord.translation);
+      const textUnits = segmentText(paraText);
+      const tokens = textUnits.map((unit: string, cIdx: number) => {
+        const matchingWord = targetVocabulary.find((v) => v.word === unit);
+        const safeMatchingTrans = matchingWord && !isInvalidTranslation(matchingWord.translation, unit) ? matchingWord.translation : null;
+        const tokenTranslation = safeMatchingTrans
+          || getAuxiliaryTranslation(unit, params.language, uiLang)
+          || (uiLang === 'en' ? 'Term in context' : 'Vocábulo no contexto');
+        if (tokenTranslation && !matchedTranslations.includes(tokenTranslation)) {
+          matchedTranslations.push(tokenTranslation);
         }
         return {
           id: `t-${pIdx}-${cIdx}`,
-          text: char,
+          text: unit,
           ruby: matchingWord?.ruby,
-          translation: matchingWord?.translation,
-          partOfSpeech: matchingWord?.partOfSpeech,
+          translation: tokenTranslation,
+          partOfSpeech: matchingWord?.partOfSpeech || getAuxiliaryPOS(unit, params.language),
           isTargetWord: Boolean(matchingWord),
           masteryScore: matchingWord?.masteryScore,
           statusColor: matchingWord?.statusColor,
@@ -259,7 +326,7 @@ export class BackendProvider implements StoryGeneratorProvider {
       const explicitTranslation = rawTranslations[pIdx] || '';
       const fallbackTranslation = matchedTranslations.length > 0
         ? matchedTranslations.join(' • ')
-        : (data.titleTranslation || 'Tradução do parágrafo contextual');
+        : (data.titleTranslation || 'Tradução contextual');
 
       return {
         id: `p-${pIdx + 1}`,

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..database import StoryModel, VocabularyModel
 from ..languages.registry import registry
+from ..languages.lexicon import get_auxiliary_translation, is_invalid_translation
 from .srs_engine import get_status_info
 from ..routers.logs import emit_log
 
@@ -100,11 +101,7 @@ class AIService:
         # Pacing: máximo 80% da capacidade (12 RPM, mín 5.0s entre reqs)
         await gemini_limiter.acquire()
 
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json"},
-        }
-        emit_log(f"Disparando inferência no modelo {effective_model} via Gemini API (pacing 80% ativo)...", level="INFO", source="GEMINI")
+        emit_log(f"Disparando inferência no modelo {effective_model} via Gemini API (pacing 80% ativo, zero reasoning)...", level="INFO", source="GEMINI")
 
         candidate_models = [effective_model]
         fallback_model = "gemini-3.7-flash" if effective_model != "gemini-3.7-flash" else "gemini-3.6-flash"
@@ -117,6 +114,18 @@ class AIService:
             headers = {
                 "Content-Type": "application/json",
                 "x-goog-api-key": effective_key,
+            }
+
+            gen_config: Dict[str, Any] = {"responseMimeType": "application/json"}
+            clean_model_lower = clean_model.lower()
+            if clean_model_lower.startswith("gemini-3") or "3." in clean_model_lower:
+                gen_config["thinkingConfig"] = {"thinkingLevel": "MINIMAL"}
+            elif "2.5" in clean_model_lower:
+                gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": gen_config,
             }
 
             async with httpx.AsyncClient(timeout=18.0) as client:
@@ -498,10 +507,64 @@ class AIService:
         raw_dict = story_payload.get("story_dictionary", [])
         hydrated_dictionary = []
 
+        # Mapeamento do vocabulário curado da Etapa 1
+        curated_map = {item.get("word"): item for item in curated_vocab if item.get("word")}
+
+        # Dicionário reverso de traduções contextuais geradas pela IA
+        reverse_dict: Dict[str, str] = {}
+        for rev_item in story_payload.get("story_translated_dictionary", []):
+            orig = rev_item.get("original_word")
+            trans = rev_item.get("translated_term")
+            if orig and trans and orig not in reverse_dict:
+                reverse_dict[orig] = trans
+
+        # Garante que todos os termos curados de curated_vocab estejam presentes no raw_dict
+        existing_words = set(d.get("word") or d.get("lemma") for d in raw_dict if d.get("word") or d.get("lemma"))
+        for c_word, c_item in curated_map.items():
+            if c_word not in existing_words:
+                raw_dict.append({
+                    "word": c_word,
+                    "lemma": c_item.get("lemma", c_word),
+                    "ruby": c_item.get("ruby") or c_item.get("pinyin", ""),
+                    "pinyin": c_item.get("pinyin") or c_item.get("ruby", ""),
+                    "part_of_speech": c_item.get("part_of_speech", "NOUN"),
+                    "context_translation": c_item.get("context_translation") or c_item.get("translation") or c_item.get("meaning", ""),
+                    "traits": c_item.get("traits", {}),
+                    "hsk_level": c_item.get("hsk_level"),
+                    "radicals": c_item.get("radicals"),
+                })
+
         for item in raw_dict:
             word_str = item.get("word") or item.get("lemma") or ""
             if not word_str:
                 continue
+
+            # Resolução resiliente da tradução (100% de preenchimento)
+            raw_translation = (
+                item.get("context_translation")
+                or item.get("translation")
+                or item.get("meaning")
+                or item.get("definition")
+            )
+            # Se for nulo ou dummy placeholder genérico, busca no curated_map, reverse_dict ou léxico auxiliar
+            if is_invalid_translation(raw_translation, word_str):
+                c_item = curated_map.get(word_str, {})
+                c_trans = (
+                    c_item.get("context_translation")
+                    or c_item.get("translation")
+                    or c_item.get("meaning")
+                )
+                rev_trans = reverse_dict.get(word_str)
+                aux_trans = get_auxiliary_translation(word_str, language, native_lang)
+
+                if not is_invalid_translation(c_trans, word_str):
+                    raw_translation = c_trans
+                elif not is_invalid_translation(rev_trans, word_str):
+                    raw_translation = rev_trans
+                elif not is_invalid_translation(aux_trans, word_str):
+                    raw_translation = aux_trans
+                else:
+                    raw_translation = None
 
             # Busca no SQLite pelo termo no idioma
             db_entry = (
@@ -510,9 +573,20 @@ class AIService:
                 .first()
             )
 
+            db_trans = db_entry.translation if (db_entry and not is_invalid_translation(db_entry.translation, word_str)) else None
+
+            final_translation = (
+                raw_translation
+                or db_trans
+                or get_auxiliary_translation(word_str, language, native_lang)
+                or ("Target vocabulary" if native_lang.lower().startswith("en") else "Vocabulário no contexto")
+            )
+
             traits = profile.extract_traits(item)
 
             if db_entry:
+                if is_invalid_translation(db_entry.translation, word_str) and final_translation:
+                    db_entry.translation = final_translation
                 color, label, weight, stage = get_status_info(db_entry.mastery_score, db_entry.is_pinned)
                 hydrated_dictionary.append({
                     "id": db_entry.id,
@@ -520,7 +594,7 @@ class AIService:
                     "lemma": db_entry.lemma or word_str,
                     "ruby": db_entry.ruby or item.get("pinyin") or item.get("ruby"),
                     "part_of_speech": db_entry.part_of_speech,
-                    "context_translation": item.get("context_translation") or db_entry.translation,
+                    "context_translation": final_translation,
                     "traits": traits,
                     "mastery_score": db_entry.mastery_score,
                     "status_label": label,
@@ -539,7 +613,7 @@ class AIService:
                     word=word_str,
                     lemma=item.get("lemma", word_str),
                     ruby=item.get("pinyin") or item.get("ruby") or "",
-                    translation=item.get("context_translation", ""),
+                    translation=final_translation,
                     part_of_speech=item.get("part_of_speech", "NOUN"),
                     traits_json=traits,
                     mastery_score=default_score,
@@ -559,7 +633,7 @@ class AIService:
                     "lemma": new_vocab.lemma,
                     "ruby": new_vocab.ruby,
                     "part_of_speech": new_vocab.part_of_speech,
-                    "context_translation": item.get("context_translation", ""),
+                    "context_translation": final_translation,
                     "traits": traits,
                     "mastery_score": default_score,
                     "status_label": label,
@@ -749,8 +823,19 @@ class AIService:
                 openrouter_model=openrouter_model,
                 api_provider=api_provider,
             )
-            cleaned = clean_json_response(raw)
-            data = json.loads(cleaned)
+            data = {}
+            try:
+                cleaned = clean_json_response(raw)
+                data = json.loads(cleaned)
+            except Exception:
+                data = {
+                    "word": word,
+                    "markdown_content": raw.strip(),
+                }
+
+            if isinstance(data, dict) and not data.get("markdown_content") and "#" in raw:
+                data["markdown_content"] = raw.strip()
+
             emit_log(f"Raio-X IA gerado com sucesso para '{word}'!", level="SUCCESS", source="STAGE")
             return data
         except Exception as e:

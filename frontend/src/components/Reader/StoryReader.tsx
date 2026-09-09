@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { WordPopover } from './WordPopover';
+import { ErrorBoundary } from '../ErrorBoundary';
 import { BookErrorCard } from './BookErrorCard';
 import { getAuxiliaryRuby } from '../../services/auxiliaryPhonetics';
 import {
@@ -57,6 +58,7 @@ export const StoryReader: React.FC = () => {
     setCustomStoryTheme,
     isPlayingAudio,
     playStoryAudio,
+    playSentenceAudio,
     pauseStoryAudio,
     stopStoryAudio,
     currentProficiency,
@@ -290,38 +292,53 @@ export const StoryReader: React.FC = () => {
             key={sentence.id}
             className={`book-sentence-wrapper ${isPlayingThis ? 'active-speech' : ''}`}
           >
-            <p className="book-sentence-text">
-              {sentence.tokens.map((token) => {
-                const srsStage = getTokenSRSStage(token);
-                const isTarget = token.isTargetWord;
-                const isSelected = activeToken?.id === token.id || (activeToken?.text === token.text && activeToken?.ruby === token.ruby);
+            <div className="book-sentence-row">
+              <p className="book-sentence-text">
+                {sentence.tokens.map((token) => {
+                  const srsStage = getTokenSRSStage(token);
+                  const isTarget = token.isTargetWord;
+                  const isSelected = activeToken?.id === token.id || (activeToken?.text === token.text && activeToken?.ruby === token.ruby);
 
-                return (
-                  <span
-                    key={token.id}
-                    className={`word-token ${isTarget ? 'target-word' : ''} ${
-                      isSelected ? 'token-selected-active' : ''
-                    } ${
-                      settings.highlightSRS && srsStage ? `srs-${srsStage}` : ''
-                    }`}
-                    onClick={(e) => openTokenPopover(token, e)}
-                    title={t('clickForDetails')}
-                  >
-                    {(() => {
-                      const displayRuby = token.ruby || (langInfo?.hasRuby ? getAuxiliaryRuby(token.text, currentLanguage) : undefined);
-                      return settings.showRuby && displayRuby ? (
-                        <ruby>
-                          {token.text}
-                          <rt>{displayRuby}</rt>
-                        </ruby>
-                      ) : (
-                        token.text
-                      );
-                    })()}
-                  </span>
-                );
-              })}
-            </p>
+                  return (
+                    <span
+                      key={token.id}
+                      className={`word-token ${isTarget ? 'target-word' : ''} ${
+                        isSelected ? 'token-selected-active' : ''
+                      } ${
+                        settings.highlightSRS && srsStage ? `srs-${srsStage}` : ''
+                      }`}
+                      onClick={(e) => openTokenPopover(token, e, sentence)}
+                      title={t('clickForDetails')}
+                    >
+                      {(() => {
+                        const displayRuby = token.ruby || (langInfo?.hasRuby ? getAuxiliaryRuby(token.text, currentLanguage) : undefined);
+                        return settings.showRuby && displayRuby ? (
+                          <ruby>
+                            {token.text}
+                            <rt>{displayRuby}</rt>
+                          </ruby>
+                        ) : (
+                          token.text
+                        );
+                      })()}
+                    </span>
+                  );
+                })}
+              </p>
+
+              <button
+                type="button"
+                className={`sentence-tts-btn ${isPlayingThis ? 'playing' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  playSentenceAudio(sentence.globalIndex, sentence.text);
+                }}
+                title={isPlayingThis ? t('ttsPauseSentence') : t('ttsPlaySentence')}
+                aria-label={isPlayingThis ? t('ttsPauseSentence') : t('ttsPlaySentence')}
+              >
+                {isPlayingThis ? <Pause size={13} /> : <Volume2 size={13} />}
+              </button>
+            </div>
 
             {/* Translation underneath each sentence */}
             {showTranslations && (
@@ -1010,7 +1027,11 @@ export const StoryReader: React.FC = () => {
       </div>
 
       {/* Floating Word Popover Tooltip */}
-      <WordPopover />
+      {activeToken && (
+        <ErrorBoundary fallback={null}>
+          <WordPopover />
+        </ErrorBoundary>
+      )}
     </div>
   );
 };

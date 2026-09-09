@@ -46,4 +46,7 @@ export interface WordDeepDiveData {
   false_friends_or_homophones?: string;
   // Shared
   synonyms_and_nuances?: SynonymItem[];
+  // Markdown Dossier Format
+  markdown_content?: string;
+  markdownContent?: string;
 }

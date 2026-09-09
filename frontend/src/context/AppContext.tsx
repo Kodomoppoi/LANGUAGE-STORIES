@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import {
   Story,
+  StorySentence,
   StoryToken,
   DictionaryEntry,
   LanguageCode,
@@ -37,6 +38,8 @@ import { storageService } from '../services/storageService';
 import { logService } from '../services/logService';
 import { getTranslation, TranslationKey } from '../services/i18n';
 import { localizeStory } from '../services/storyLocalization';
+import { getAuxiliaryTranslation, isInvalidTranslation } from '../services/auxiliaryLexicon';
+import { getAuxiliaryRuby } from '../services/auxiliaryPhonetics';
 import { getProficiencyNativeInfo } from '../services/proficiencyUtils';
 
 interface AppContextType {
@@ -69,8 +72,9 @@ interface AppContextType {
 
   // Popover Token Lookup
   activeToken: StoryToken | null;
+  activeSentence: StorySentence | null;
   popoverPosition: { x: number; y: number } | null;
-  openTokenPopover: (token: StoryToken, event: React.MouseEvent) => void;
+  openTokenPopover: (token: StoryToken, event: React.MouseEvent, sentence?: StorySentence) => void;
   closeTokenPopover: () => void;
 
   // Master Vocabulary Vault & JSON Archive
@@ -88,6 +92,7 @@ interface AppContextType {
   ttsSpeed: number;
   setTtsSpeed: (speed: number) => void;
   playStoryAudio: () => void;
+  playSentenceAudio: (sentenceIndex: number, sentenceText: string) => void;
   pauseStoryAudio: () => void;
   stopStoryAudio: () => void;
   speakSingleToken: (token: StoryToken) => void;
@@ -323,6 +328,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Popover Token state
   const [activeToken, setActiveToken] = useState<StoryToken | null>(null);
+  const [activeSentence, setActiveSentence] = useState<StorySentence | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ x: number; y: number } | null>(null);
 
   // Mascote de Carregamento em Tempo Real (SSE)
@@ -536,13 +542,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const mastery = vaultItem?.masteryScore ?? t.masteryScore ?? 25;
             const isPinned = vaultItem?.isPinned ?? vaultItem?.isStarred ?? false;
 
+            const aux = getAuxiliaryTranslation(t.text, currentStory.language, (settings.uiLanguage as any) || 'pt');
+            const rawTrans = t.translation ? String(t.translation).trim() : '';
+            const isInvalidTrans = isInvalidTranslation(rawTrans, t.text);
+            const defaultFallback = settings.uiLanguage === 'en' ? 'Term in context' : 'Vocábulo no contexto';
+
+            const resolvedTrans = !isInvalidTrans
+              ? rawTrans
+              : (aux || (!isInvalidTranslation(vaultItem?.translation, t.text) ? vaultItem!.translation : (aux || defaultFallback)));
+
+            const isCJK = currentStory.language === 'zh' || currentStory.language === 'ja';
+            const isRubyMismatched = isCJK && t.text.length === 1 && Boolean(t.ruby && t.ruby.trim().includes(' '));
+            const auxRuby = getAuxiliaryRuby(t.text, currentStory.language);
+            const resolvedRuby = (isRubyMismatched && auxRuby) ? auxRuby : (t.ruby || auxRuby);
+
             wordMap.set(t.text, {
               id: `token-${t.id}`,
               word: t.text,
-              ruby: t.ruby,
-              translation: t.translation || 'Termo da história',
+              ruby: resolvedRuby,
+              translation: resolvedTrans,
               partOfSpeech: t.partOfSpeech || 'Palavra',
-              definition: t.explanation || `Usado em: "${s.text}"`,
+              definition: t.explanation || (aux ? aux : resolvedTrans),
               exampleSentence: s.text,
               exampleTranslation: s.translation,
               language: currentStory.language,
@@ -565,7 +585,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
 
     return Array.from(wordMap.values());
-  }, [currentStory, vocabularyVault]);
+  }, [currentStory, vocabularyVault, settings.uiLanguage]);
 
   // AUTOMATIC MASTER HARVEST: Harvest and consolidate all tokens into master JSON bank
   useEffect(() => {
@@ -575,16 +595,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const vaultMap = new Map<string, DictionaryEntry>();
       prev.forEach((item) => vaultMap.set(`${item.language}:${item.word}`, item));
 
+      const defaultFallback = settings.uiLanguage === 'en' ? 'Term in context' : 'Vocábulo no contexto';
+
       allStoryWords.forEach((storyItem) => {
         const key = `${storyItem.language}:${storyItem.word}`;
         const existing = vaultMap.get(key);
+        const aux = getAuxiliaryTranslation(storyItem.word, storyItem.language, (settings.uiLanguage as any) || 'pt');
+
+        const isStoryTransInvalid = isInvalidTranslation(storyItem.translation, storyItem.word);
 
         if (existing) {
+          const isExistingTransInvalid = isInvalidTranslation(existing.translation, existing.word);
+
+          const finalTrans = !isStoryTransInvalid
+            ? storyItem.translation
+            : (!isExistingTransInvalid ? existing.translation : (aux || defaultFallback));
+
           const mastery = existing.masteryScore ?? calculateMasteryScore(existing.srsMetrics, existing.lookedUpCount, existing.lastSeenDate);
           vaultMap.set(key, {
             ...existing,
             ruby: storyItem.ruby || existing.ruby,
-            translation: storyItem.translation !== 'Termo da história' ? storyItem.translation : existing.translation,
+            translation: finalTrans,
+            definition: !isInvalidTranslation(existing.definition, existing.word) ? existing.definition : (storyItem.definition || finalTrans),
             exampleSentence: storyItem.exampleSentence || existing.exampleSentence,
             exampleTranslation: storyItem.exampleTranslation || existing.exampleTranslation,
             traits: storyItem.traits || existing.traits,
@@ -596,9 +628,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           });
         } else {
           const mastery = storyItem.masteryScore ?? 25;
+          const safeTrans = !isStoryTransInvalid ? storyItem.translation : (aux || defaultFallback);
           vaultMap.set(key, {
             ...storyItem,
             id: `vault-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            translation: safeTrans,
+            definition: !isInvalidTranslation(storyItem.definition, storyItem.word) ? storyItem.definition : safeTrans,
             masteryScore: mastery,
             statusColor: storyItem.statusColor || getStatusColor(mastery),
             repetitionWeight: storyItem.repetitionWeight || getRepetitionWeight(mastery, storyItem.isPinned || storyItem.isStarred),
@@ -695,21 +730,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   // Popover handlers with 4.1 Lookup Penalty
-  const openTokenPopover = useCallback((token: StoryToken, event: React.MouseEvent) => {
+  const openTokenPopover = useCallback((token: StoryToken, event: React.MouseEvent, sentence?: StorySentence) => {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const x = Math.min(window.innerWidth - 330, Math.max(20, rect.left - 40));
     const y = rect.bottom + 12 > window.innerHeight - 240 ? rect.top - 230 : rect.bottom + 10;
     setActiveToken(token);
+    setActiveSentence(sentence || null);
     setPopoverPosition({ x, y });
 
     // 4.1 Penalidade por consultas no leitor:
     // Se o usuário clica na palavra durante a leitura para ver a tradução,
     // penaliza a pontuação recente e sinaliza necessidade de reforço
     setVocabularyVault((prev) => {
-      const existing = prev.find((w) => w.word === token.text && w.language === currentLanguage);
-      if (existing) {
-        const updated = recordWordLookup(existing);
-        return prev.map((w) => (w.id === existing.id ? updated : w));
+      try {
+        const existing = prev.find((w) => w && w.word === token.text && w.language === currentLanguage);
+        if (existing) {
+          const updated = recordWordLookup(existing);
+          return prev.map((w) => (w.id === existing.id ? updated : w));
+        }
+      } catch (err) {
+        console.warn('Non-fatal error updating word lookup penalty:', err);
       }
       return prev;
     });
@@ -717,6 +757,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const closeTokenPopover = useCallback(() => {
     setActiveToken(null);
+    setActiveSentence(null);
     setPopoverPosition(null);
   }, []);
 
@@ -832,6 +873,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ttsService.pause();
     setIsPlayingAudio(false);
   }, []);
+
+  const playSentenceAudio = useCallback(
+    (sentenceIndex: number, sentenceText: string) => {
+      if (isPlayingAudio && currentPlayingSentenceIndex === sentenceIndex) {
+        ttsService.pause();
+        setIsPlayingAudio(false);
+        setCurrentPlayingSentenceIndex(-1);
+        return;
+      }
+
+      ttsService.stop();
+      setIsPlayingAudio(true);
+      setCurrentPlayingSentenceIndex(sentenceIndex);
+
+      ttsService.speak(sentenceText, currentStory.language, ttsSpeed, {
+        onEnd: () => {
+          setIsPlayingAudio(false);
+          setCurrentPlayingSentenceIndex(-1);
+        },
+        onError: () => {
+          setIsPlayingAudio(false);
+          setCurrentPlayingSentenceIndex(-1);
+        },
+      });
+    },
+    [isPlayingAudio, currentPlayingSentenceIndex, currentStory.language, ttsSpeed]
+  );
 
   const stopStoryAudio = useCallback(() => {
     ttsService.stop();
@@ -1083,6 +1151,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         cancelGeneration,
         allStoryWords,
         activeToken,
+        activeSentence,
         popoverPosition,
         openTokenPopover,
         closeTokenPopover,
@@ -1098,6 +1167,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         ttsSpeed,
         setTtsSpeed,
         playStoryAudio,
+        playSentenceAudio,
         pauseStoryAudio,
         stopStoryAudio,
         speakSingleToken,
