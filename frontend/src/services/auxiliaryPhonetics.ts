@@ -307,6 +307,25 @@ export const CHINESE_PINYIN_MAP: Record<string, string> = {
   '边': 'biān',
   '旁': 'páng',
   '内': 'nèi',
+
+  // Morfemas, caracteres individuais e termos de alta frequência
+  '午': 'wǔ',
+  '巷': 'xiàng',
+  '咖': 'kā',
+  '啡': 'fēi',
+  '咖啡': 'kā fēi',
+  '咖啡馆': 'kā fēi guǎn',
+  '茶馆': 'chá guǎn',
+  '下午': 'xià wǔ',
+  '上午': 'shàng wǔ',
+  '中午': 'zhōng wǔ',
+  '晚上': 'wǎn shang',
+  '小明': 'xiǎo míng',
+  '朋友': 'péng you',
+  '美丽': 'měi lì',
+  '安静': 'ān jìng',
+  '温暖': 'wēn nuǎn',
+  '一起': 'yī qǐ',
 };
 
 /**
@@ -396,6 +415,17 @@ export const JAPANESE_FURIGANA_MAP: Record<string, string> = {
   '世界': 'せかい',
   '日本': 'にほん',
   '語': 'ご',
+  '午後': 'ごご',
+  '午前': 'ごぜん',
+  '一緒': 'いっしょ',
+  '一緒に': 'いっしょに',
+  '綺麗': 'きれい',
+  '静か': 'しずか',
+  '喫茶店': 'きっさてん',
+  '喫茶': 'きっさ',
+  '温かい': 'あたたかい',
+  '暖かい': 'あたたかい',
+  '小明': 'しょうめい',
 };
 
 /**

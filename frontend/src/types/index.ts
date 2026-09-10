@@ -58,6 +58,7 @@ export interface StoryToken {
   statusColor?: SRSStatusColor; // 'orange' | 'yellow' | 'green'
   traits?: LanguageTraits;
   audioText?: string;
+  isPunctuation?: boolean; // Static punctuation token (not clickable, no SRS highlight)
 }
 
 export interface StorySentence {

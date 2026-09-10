@@ -326,6 +326,20 @@ CHINESE_LEXICON: Dict[str, Dict[str, str]] = {
     "面包": {"pt": "pão", "en": "bread", "pos": "NOUN"},
     "包子": {"pt": "pão recheado cozido no vapor", "en": "steamed stuffed bun", "pos": "NOUN"},
     "饺子": {"pt": "guioza / pastel chinês", "en": "dumpling / jiaozi", "pos": "NOUN"},
+
+    # Termos de Alta Frequência, Nomes, Locais e Adjetivos
+    "小明": {"pt": "Xiao Ming (nome próprio)", "en": "Xiao Ming (proper name)", "pos": "PROPN"},
+    "美丽": {"pt": "bonito(a) / belo(a)", "en": "beautiful", "pos": "ADJ"},
+    "茶馆": {"pt": "casa de chá", "en": "teahouse", "pos": "NOUN"},
+    "小巷": {"pt": "beco / ruela / viela", "en": "alley / lane", "pos": "NOUN"},
+    "安静": {"pt": "tranquilo(a) / silencioso(a)", "en": "quiet / peaceful", "pos": "ADJ"},
+    "温暖": {"pt": "caloroso(a) / ameno(a) / acolhedor", "en": "warm", "pos": "ADJ"},
+    # Morfemas e caracteres individuais essenciais
+    "午": {"pt": "meio-dia", "en": "noon", "pos": "NOUN"},
+    "明": {"pt": "claro / brilhante / amanhã", "en": "bright / clear", "pos": "ADJ"},
+    "馆": {"pt": "estabelecimento / salão", "en": "building / shop", "pos": "NOUN"},
+    "巷": {"pt": "beco / viela", "en": "alley / lane", "pos": "NOUN"},
+    "静": {"pt": "calmo / silencioso", "en": "quiet / still", "pos": "ADJ"},
 }
 
 JAPANESE_LEXICON: Dict[str, Dict[str, str]] = {
@@ -377,6 +391,25 @@ JAPANESE_LEXICON: Dict[str, Dict[str, str]] = {
     "学生": {"pt": "estudante", "en": "student", "pos": "NOUN"},
     "学校": {"pt": "escola", "en": "school", "pos": "NOUN"},
     "家": {"pt": "casa", "en": "house / home", "pos": "NOUN"},
+
+    # Vocabulário de Alta Frequência, Tempo, Conectores e Locais
+    "午後": {"pt": "tarde (após meio-dia)", "en": "afternoon / p.m.", "pos": "NOUN"},
+    "午前": {"pt": "manhã (antes do meio-dia)", "en": "morning / a.m.", "pos": "NOUN"},
+    "今日": {"pt": "hoje", "en": "today", "pos": "NOUN"},
+    "明日": {"pt": "amanhã", "en": "tomorrow", "pos": "NOUN"},
+    "昨日": {"pt": "ontem", "en": "yesterday", "pos": "NOUN"},
+    "小明": {"pt": "Xiao Ming (nome)", "en": "Xiao Ming (proper name)", "pos": "PROPN"},
+    "一緒": {"pt": "junto(s)", "en": "together", "pos": "NOUN"},
+    "一緒に": {"pt": "junto(s) com", "en": "together with", "pos": "ADV"},
+    "綺麗": {"pt": "bonito(a) / limpo(a)", "en": "beautiful / clean", "pos": "ADJ"},
+    "静か": {"pt": "tranquilo / calmo / silencioso", "en": "quiet / peaceful", "pos": "ADJ"},
+    "喫茶店": {"pt": "cafeteria / casa de chá", "en": "café / coffee shop", "pos": "NOUN"},
+    "カフェ": {"pt": "café / cafeteria", "en": "café", "pos": "NOUN"},
+    "温かい": {"pt": "morno / caloroso", "en": "warm (to the touch/emotion)", "pos": "ADJ"},
+    "暖かい": {"pt": "quente / ameno / agradável", "en": "warm (climate/atmosphere)", "pos": "ADJ"},
+    "店": {"pt": "loja / estabelecimento", "en": "shop / store", "pos": "NOUN"},
+    "茶": {"pt": "chá", "en": "tea", "pos": "NOUN"},
+    "道": {"pt": "caminho / rua / estrada", "en": "way / road / street", "pos": "NOUN"},
 }
 
 

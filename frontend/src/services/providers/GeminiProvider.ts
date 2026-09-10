@@ -11,6 +11,7 @@ import { GenerateStoryParams, StoryGeneratorProvider } from './types';
 import { logService } from '../logService';
 import { enrichStoryPhonetics } from '../auxiliaryPhonetics';
 import { getAuxiliaryTranslation, getAuxiliaryPOS, isInvalidTranslation } from '../auxiliaryLexicon';
+import { sanitizeOrUnpackTokens } from '../textSegmentation';
 
 export class GeminiProvider implements StoryGeneratorProvider {
   public readonly id = 'gemini';
@@ -255,47 +256,20 @@ Output strictly valid JSON matching this compact schema:
       id: p?.id || `p-${pIdx + 1}`,
       sentences: (Array.isArray(p?.sentences) ? p.sentences : []).map((s: any, sIdx: number) => {
         const rawTokens = Array.isArray(s?.words) ? s.words : (Array.isArray(s?.tokens) ? s.tokens : []);
-        const tokens = rawTokens.map((t: any, tIdx: number) => {
-          let tText = '';
-          let tRuby: string | undefined = undefined;
-          let rawTrans: string | undefined = undefined;
-
-          if (Array.isArray(t)) {
-            // Compact tuple: [word, ruby, translation]
-            tText = String(t[0] || '').trim();
-            tRuby = t[1] ? String(t[1]).trim() : undefined;
-            rawTrans = t[2] ? String(t[2]).trim() : undefined;
-          } else if (typeof t === 'object' && t !== null) {
-            tText = String(t?.text || t?.word || '').trim();
-            tRuby = t?.ruby || t?.phonetic || t?.pinyin;
-            rawTrans = t?.translation || t?.meaning;
-          } else {
-            tText = String(t || '').trim();
-          }
-
-          const matchedWord = targetVocabulary.find((v) => v.word === tText);
-          const isInvalid = isInvalidTranslation(rawTrans, tText);
-          const safeMatchedTrans = matchedWord && !isInvalidTranslation(matchedWord.translation, tText) ? matchedWord.translation : null;
-
-          const tokenTrans = (!isInvalid ? rawTrans : null)
-            || safeMatchedTrans
-            || getAuxiliaryTranslation(tText, params.language, uiLang)
-            || (uiLang === 'en' ? 'Term in context' : 'Vocábulo no contexto');
-
-          return {
-            id: t?.id || `t-${pIdx + 1}-${sIdx + 1}-${tIdx + 1}`,
-            text: tText,
-            ruby: tRuby || (matchedWord ? matchedWord.ruby : undefined),
-            phonetic: tRuby,
-            translation: tokenTrans,
-            partOfSpeech: matchedWord?.partOfSpeech || getAuxiliaryPOS(tText, params.language),
-            isTargetWord: Boolean(matchedWord),
-          };
-        });
+        const sText = s?.text || '';
+        const idPrefix = `t-${pIdx + 1}-${sIdx + 1}`;
+        const tokens = sanitizeOrUnpackTokens(
+          rawTokens,
+          sText,
+          params.language,
+          targetVocabulary,
+          uiLang,
+          idPrefix
+        );
 
         return {
           id: s?.id || `s-${pIdx + 1}-${sIdx + 1}`,
-          text: s?.text || '',
+          text: sText,
           translation: s?.translation || '',
           tokens,
         };

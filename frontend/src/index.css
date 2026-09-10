@@ -1245,6 +1245,15 @@ body[data-theme='dark'] .word-token:hover {
   color: var(--srs-mastered-text);
 }
 
+/* Punctuation and Space Tokens (non-interactive inline text) */
+.book-punct-token {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  user-select: text;
+  cursor: default;
+}
+
 /* Translation preview beneath each sentence - High contrast, warm Nordic callout */
 .book-sentence-translation {
   display: flex;

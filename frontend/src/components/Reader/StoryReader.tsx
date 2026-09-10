@@ -272,6 +272,7 @@ export const StoryReader: React.FC = () => {
     }
     // Fallback: synthesize translation from target vocabulary and token definitions
     const tokenTranslations = sentence.tokens
+      .filter((t) => !t.isPunctuation)
       .map((t) => t.translation || t.explanation || t.traits?.contextMeaning)
       .filter(Boolean) as string[];
 
@@ -298,6 +299,14 @@ export const StoryReader: React.FC = () => {
             <div className="book-sentence-row">
               <p className="book-sentence-text">
                 {sentence.tokens.map((token) => {
+                  if (token.isPunctuation) {
+                    return (
+                      <span key={token.id} className="book-punct-token">
+                        {token.text}
+                      </span>
+                    );
+                  }
+
                   const srsStage = getTokenSRSStage(token);
                   const isTarget = token.isTargetWord;
                   const isSelected = activeToken?.id === token.id || (activeToken?.text === token.text && activeToken?.ruby === token.ruby);

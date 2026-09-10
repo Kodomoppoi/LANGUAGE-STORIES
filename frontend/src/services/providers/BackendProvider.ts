@@ -3,6 +3,7 @@ import { GenerateStoryParams, StoryGeneratorProvider } from './types';
 import { createDefaultSRSMetrics, getStatusColor, getRepetitionWeight } from '../srsEngine';
 import { enrichStoryPhonetics } from '../auxiliaryPhonetics';
 import { getAuxiliaryTranslation, getAuxiliaryPOS, isInvalidTranslation } from '../auxiliaryLexicon';
+import { sanitizeOrUnpackTokens, segmentSentenceIntoTokens } from '../textSegmentation';
 
 export class BackendProvider implements StoryGeneratorProvider {
   public readonly id = 'backend';
@@ -229,26 +230,26 @@ export class BackendProvider implements StoryGeneratorProvider {
 
     if (data.paragraphs && Array.isArray(data.paragraphs) && data.paragraphs.length > 0) {
       const fullTextStr = data.fullText || data.content || '';
-      // Garante que nenhum token fique com tradução nula ou dummy
-      const enrichedParagraphs: StoryParagraph[] = data.paragraphs.map((p: any) => ({
+      // Garante que nenhum token fique colado com pontuação ou com tradução nula
+      const enrichedParagraphs: StoryParagraph[] = data.paragraphs.map((p: any, pIdx: number) => ({
         ...p,
-        sentences: (p.sentences || []).map((s: any) => ({
-          ...s,
-          tokens: (s.tokens || []).map((t: any) => {
-            let tTrans = t.translation;
-            const isInvalidTrans = isInvalidTranslation(tTrans, t.text);
-
-            if (isInvalidTrans) {
-              const matchedWord = targetVocabulary.find((v) => v.word === t.text);
-              const safeMatched = matchedWord && !isInvalidTranslation(matchedWord.translation, t.text) ? matchedWord.translation : null;
-              tTrans = safeMatched || getAuxiliaryTranslation(t.text, params.language, uiLang) || (uiLang === 'en' ? 'Term in context' : 'Vocábulo no contexto');
-            }
-            return {
-              ...t,
-              translation: tTrans || undefined,
-            };
-          }),
-        })),
+        sentences: (p.sentences || []).map((s: any, sIdx: number) => {
+          const rawTokens = s.tokens || [];
+          const sText = s.text || '';
+          const idPrefix = `t-${pIdx + 1}-${sIdx + 1}`;
+          const tokens = sanitizeOrUnpackTokens(
+            rawTokens,
+            sText,
+            params.language,
+            targetVocabulary,
+            uiLang,
+            idPrefix
+          );
+          return {
+            ...s,
+            tokens,
+          };
+        }),
       }));
 
       return enrichStoryPhonetics({
@@ -266,67 +267,15 @@ export class BackendProvider implements StoryGeneratorProvider {
       ? data.translations
       : (Array.isArray(data.paragraph_translations) ? data.paragraph_translations : []);
 
-    const isCJK = params.language === 'zh' || params.language === 'ja';
-
-    // Segmentador CJK que preserva palavras compostas do vocabulário alvo
-    const segmentText = (text: string): string[] => {
-      if (!isCJK) {
-        return text.split(/\s+/).filter(Boolean);
-      }
-      const vocabWords = targetVocabulary
-        .map((v) => v.word.trim())
-        .filter((w) => w.length > 1)
-        .sort((a, b) => b.length - a.length);
-
-      const units: string[] = [];
-      let i = 0;
-      while (i < text.length) {
-        let matched = false;
-        for (const vw of vocabWords) {
-          if (text.startsWith(vw, i)) {
-            units.push(vw);
-            i += vw.length;
-            matched = true;
-            break;
-          }
-        }
-        if (!matched) {
-          units.push(text[i]);
-          i += 1;
-        }
-      }
-      return units;
-    };
-
     const paragraphs: StoryParagraph[] = rawParagraphs.map((paraText: string, pIdx: number) => {
-      const matchedTranslations: string[] = [];
-      const textUnits = segmentText(paraText);
-      const tokens = textUnits.map((unit: string, cIdx: number) => {
-        const matchingWord = targetVocabulary.find((v) => v.word === unit);
-        const safeMatchingTrans = matchingWord && !isInvalidTranslation(matchingWord.translation, unit) ? matchingWord.translation : null;
-        const tokenTranslation = safeMatchingTrans
-          || getAuxiliaryTranslation(unit, params.language, uiLang)
-          || (uiLang === 'en' ? 'Term in context' : 'Vocábulo no contexto');
-        if (tokenTranslation && !matchedTranslations.includes(tokenTranslation)) {
-          matchedTranslations.push(tokenTranslation);
-        }
-        return {
-          id: `t-${pIdx}-${cIdx}`,
-          text: unit,
-          ruby: matchingWord?.ruby,
-          translation: tokenTranslation,
-          partOfSpeech: matchingWord?.partOfSpeech || getAuxiliaryPOS(unit, params.language),
-          isTargetWord: Boolean(matchingWord),
-          masteryScore: matchingWord?.masteryScore,
-          statusColor: matchingWord?.statusColor,
-          traits: matchingWord?.traits,
-        };
-      });
-
       const explicitTranslation = rawTranslations[pIdx] || '';
-      const fallbackTranslation = matchedTranslations.length > 0
-        ? matchedTranslations.join(' • ')
-        : (data.titleTranslation || 'Tradução contextual');
+      const tokens = segmentSentenceIntoTokens({
+        sentenceText: paraText,
+        language: params.language,
+        targetVocabulary,
+        uiLang,
+        idPrefix: `t-${pIdx + 1}-1`,
+      });
 
       return {
         id: `p-${pIdx + 1}`,
@@ -334,7 +283,7 @@ export class BackendProvider implements StoryGeneratorProvider {
           {
             id: `s-${pIdx + 1}-1`,
             text: paraText,
-            translation: explicitTranslation || fallbackTranslation,
+            translation: explicitTranslation || data.titleTranslation || '',
             tokens,
           },
         ],
