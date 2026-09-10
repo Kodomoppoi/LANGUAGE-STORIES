@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
+  useRef,
   ReactNode,
 } from 'react';
 import {
@@ -442,6 +443,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [currentPlayingSentenceIndex, setCurrentPlayingSentenceIndex] = useState(-1);
   const [ttsSpeed, setTtsSpeedState] = useState<number>(settings.ttsSpeed || 1.0);
+  const ttsSpeedRef = useRef<number>(settings.ttsSpeed || 1.0);
 
   // Modals state
   const [isQuizOpen, setIsQuizOpen] = useState(false);
@@ -460,6 +462,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     document.body.setAttribute('data-theme', settings.theme);
     storageService.saveSettings(settings);
+    ttsService.setBackendUrl(settings.backendUrl);
+    ttsService.setProvider(settings.ttsProvider);
+    const speed = settings.ttsSpeed || 1.0;
+    ttsSpeedRef.current = speed;
+    ttsService.setSpeed(speed);
   }, [settings]);
 
   // Persist State Changes
@@ -726,6 +733,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const setTtsSpeed = useCallback((speed: number) => {
     setTtsSpeedState(speed);
+    ttsSpeedRef.current = speed;
+    ttsService.setSpeed(speed);
     setSettings((prev) => ({ ...prev, ttsSpeed: speed }));
   }, []);
 
@@ -833,7 +842,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return;
       }
       setCurrentPlayingSentenceIndex(idx);
-      ttsService.speak(sentences[idx].text, currentStory.language, ttsSpeed, {
+      const activeSpeed = ttsSpeedRef.current;
+      ttsService.speak(sentences[idx].text, currentStory.language, activeSpeed, {
         onEnd: () => {
           playSentence(idx + 1);
         },
@@ -867,7 +877,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     playSentence(currentIdx);
-  }, [isPlayingAudio, currentStory, currentPlayingSentenceIndex, ttsSpeed, settings.uiLanguage]);
+  }, [isPlayingAudio, currentStory, currentPlayingSentenceIndex, settings.uiLanguage]);
 
   const pauseStoryAudio = useCallback(() => {
     ttsService.pause();
@@ -887,7 +897,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setIsPlayingAudio(true);
       setCurrentPlayingSentenceIndex(sentenceIndex);
 
-      ttsService.speak(sentenceText, currentStory.language, ttsSpeed, {
+      const activeSpeed = ttsSpeedRef.current;
+      ttsService.speak(sentenceText, currentStory.language, activeSpeed, {
         onEnd: () => {
           setIsPlayingAudio(false);
           setCurrentPlayingSentenceIndex(-1);
@@ -898,7 +909,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         },
       });
     },
-    [isPlayingAudio, currentPlayingSentenceIndex, currentStory.language, ttsSpeed]
+    [isPlayingAudio, currentPlayingSentenceIndex, currentStory.language]
   );
 
   const stopStoryAudio = useCallback(() => {
@@ -909,9 +920,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const speakSingleToken = useCallback(
     (token: StoryToken) => {
-      ttsService.speakToken(token.text, currentStory.language, ttsSpeed * 0.9);
+      const activeSpeed = ttsSpeedRef.current;
+      ttsService.speakToken(token.text, currentStory.language, activeSpeed);
     },
-    [currentStory.language, ttsSpeed]
+    [currentStory.language]
   );
 
   // Story Generator Actions com SSE Streaming e Pesos SRS

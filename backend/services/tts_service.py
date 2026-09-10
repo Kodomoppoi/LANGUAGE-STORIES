@@ -37,8 +37,12 @@ class TTSService:
         if not clean_text:
             raise ValueError("Texto para síntese de áudio não pode estar vazio.")
 
+        lang_code = (language or "zh").lower()
+        if lang_code in ["jp", "japanese"]:
+            lang_code = "ja"
+
         if not voice:
-            profile = registry.get(language)
+            profile = registry.get(lang_code)
             voice = profile.default_tts_voice
 
         cache_path = self._get_cache_path(clean_text, voice, rate)

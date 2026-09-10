@@ -474,6 +474,60 @@ export const SettingsModal: React.FC = () => {
               <span>{t('audioDisplaySection')}</span>
             </div>
 
+            <div className="control-group" style={{ marginBottom: '14px' }}>
+              <label className="control-label">
+                {settings.uiLanguage === 'pt' ? 'Motor de Leitura (TTS)' : 'TTS Voice Engine'}
+              </label>
+              <select
+                className="control-select"
+                value={settings.ttsProvider}
+                onChange={(e) => updateSettings({ ttsProvider: e.target.value as 'edge-tts' | 'web-speech' })}
+              >
+                <option value="web-speech">
+                  {settings.uiLanguage === 'pt'
+                    ? 'Híbrido Inteligente (Web Speech + Fallback Neural)'
+                    : 'Smart Hybrid (Web Speech + Neural Fallback)'}
+                </option>
+                <option value="edge-tts">
+                  {settings.uiLanguage === 'pt'
+                    ? 'Edge-TTS Neural (Backend FastAPI - Alta Definição)'
+                    : 'Edge-TTS Neural (FastAPI Backend - High Definition)'}
+                </option>
+              </select>
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                {settings.uiLanguage === 'pt'
+                  ? 'Suporte nativo a Japonês (Nanami/Keita) e Mandarim com cache instantâneo.'
+                  : 'Native support for Japanese (Nanami/Keita) and Mandarin with instant audio cache.'}
+              </span>
+            </div>
+
+            <div className="control-group" style={{ marginBottom: '14px' }}>
+              <label className="control-label">
+                {settings.uiLanguage === 'pt' ? 'Velocidade de Leitura (TTS)' : 'Default Playback Speed'}
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {[0.5, 0.75, 1.0, 1.25, 1.5].map((speed) => (
+                  <button
+                    key={speed}
+                    type="button"
+                    className={`btn-secondary ${settings.ttsSpeed === speed ? 'active' : ''}`}
+                    style={{
+                      flex: 1,
+                      padding: '6px 0',
+                      fontSize: '0.80rem',
+                      fontWeight: 700,
+                      background: settings.ttsSpeed === speed ? 'var(--flower-500)' : 'var(--bg-input)',
+                      color: settings.ttsSpeed === speed ? '#ffffff' : 'var(--text-primary)',
+                      borderColor: settings.ttsSpeed === speed ? 'var(--flower-500)' : 'var(--border-medium)',
+                    }}
+                    onClick={() => updateSettings({ ttsSpeed: speed })}
+                  >
+                    {speed}x
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <label className="toggle-switch-label">
                 <input

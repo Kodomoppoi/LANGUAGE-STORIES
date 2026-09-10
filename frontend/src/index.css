@@ -1719,6 +1719,21 @@ body[data-theme='dark'] .dock-toggle-thumb {
   color: #ffffff;
 }
 
+.dock-speed-popover {
+  animation: dockSpeedFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dockSpeedFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 .dock-quiz-btn {
   background: linear-gradient(135deg, var(--flower-500), var(--flower-600));
   color: #ffffff;

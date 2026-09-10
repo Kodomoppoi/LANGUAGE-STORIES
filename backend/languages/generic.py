@@ -3,6 +3,7 @@ from .base import LanguageProfile
 
 VOICE_MAP = {
     "ja": "ja-JP-NanamiNeural",
+    "jp": "ja-JP-NanamiNeural",
     "es": "es-ES-ElviraNeural",
     "fr": "fr-FR-DeniseNeural",
     "de": "de-DE-KatjaNeural",
@@ -16,6 +17,7 @@ VOICE_MAP = {
 
 LANG_NAME_MAP = {
     "ja": "Japanese",
+    "jp": "Japanese",
     "es": "Spanish",
     "fr": "French",
     "de": "German",

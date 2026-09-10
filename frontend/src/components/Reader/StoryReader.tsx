@@ -66,6 +66,8 @@ export const StoryReader: React.FC = () => {
     bookError,
     clearBookError,
     setIsSettingsOpen,
+    ttsSpeed,
+    setTtsSpeed,
     t,
   } = useApp();
 
@@ -74,6 +76,7 @@ export const StoryReader: React.FC = () => {
   const [newWordQuantity, setNewWordQuantity] = useState(5);
   const [isThemePopoverOpen, setIsThemePopoverOpen] = useState(false);
   const [isDifficultyPopoverOpen, setIsDifficultyPopoverOpen] = useState(false);
+  const [isSpeedPopoverOpen, setIsSpeedPopoverOpen] = useState(false);
 
   const langInfo = SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage);
   const currentLevelInfo = getProficiencyNativeInfo(currentLanguage, currentProficiency, settings.uiLanguage);
@@ -971,22 +974,76 @@ export const StoryReader: React.FC = () => {
 
         <div className="dock-separator" />
 
-        {/* Audio TTS Play / Pause */}
-        <button
-          className={`dock-audio-btn ${isPlayingAudio ? 'playing' : ''}`}
-          onClick={isPlayingAudio ? pauseStoryAudio : playStoryAudio}
-          disabled={isWelcomeState || isGeneratingStory}
-          title={
-            isWelcomeState
-              ? t('readerAudioStoryWarning')
-              : isPlayingAudio
-              ? t('pauseAudioTooltip')
-              : t('listenAudioTooltip')
-          }
-        >
-          {isPlayingAudio ? <Pause size={15} /> : <Play size={15} />}
-          <span>{isPlayingAudio ? t('pauseBtn') : t('audioBtn')}</span>
-        </button>
+        {/* Audio TTS Play / Pause & Speed Control */}
+        <div className="dock-control-item dock-audio-group" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            className={`dock-audio-btn ${isPlayingAudio ? 'playing' : ''}`}
+            onClick={isPlayingAudio ? pauseStoryAudio : playStoryAudio}
+            disabled={isWelcomeState || isGeneratingStory}
+            title={
+              isWelcomeState
+                ? t('readerAudioStoryWarning')
+                : isPlayingAudio
+                ? t('pauseAudioTooltip')
+                : t('listenAudioTooltip')
+            }
+          >
+            {isPlayingAudio ? <Pause size={15} /> : <Play size={15} />}
+            <span>{isPlayingAudio ? t('pauseBtn') : t('audioBtn')}</span>
+          </button>
+
+          <button
+            type="button"
+            className="dock-chip-btn dock-speed-chip-btn"
+            style={{ padding: '6px 10px', minWidth: '46px', justifyContent: 'center' }}
+            onClick={() => setIsSpeedPopoverOpen((prev) => !prev)}
+            title={`${t('ttsSpeedTooltip') || 'Velocidade de reprodução'}: ${ttsSpeed}x`}
+            aria-label="Velocidade de reprodução"
+          >
+            <Gauge size={12} style={{ marginRight: 2 }} />
+            <span>{ttsSpeed}x</span>
+          </button>
+
+          {isSpeedPopoverOpen && (
+            <div
+              className="dock-speed-popover"
+              style={{
+                position: 'absolute',
+                bottom: 'calc(100% + 12px)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '8px',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
+                display: 'flex',
+                gap: '6px',
+                zIndex: 150,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {[0.5, 0.75, 1.0, 1.25, 1.5].map((speed) => (
+                <button
+                  key={speed}
+                  type="button"
+                  className={`dock-chip-btn ${ttsSpeed === speed ? 'active' : ''}`}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.78rem',
+                    borderRadius: 'var(--radius-full)',
+                  }}
+                  onClick={() => {
+                    setTtsSpeed(speed);
+                    setIsSpeedPopoverOpen(false);
+                  }}
+                >
+                  {speed}x
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Ruby Toggle */}
         {langInfo?.hasRuby && (

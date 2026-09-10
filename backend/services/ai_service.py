@@ -30,8 +30,10 @@ class AIServiceError(Exception):
     """Exceção estruturada para falhas de provedores de IA e cotas."""
     def __init__(self, message: str, error_type: str = "generation_error", status_code: int = 500):
         super().__init__(message)
+        self.message = str(message)
         self.error_type = error_type
         self.status_code = status_code
+
 
 
 class ProviderRateLimiter:

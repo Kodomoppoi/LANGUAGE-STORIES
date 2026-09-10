@@ -15,6 +15,8 @@ class LanguageRegistry:
 
     def get(self, lang_code: str) -> LanguageProfile:
         code = (lang_code or "zh").lower()
+        if code in ["jp", "japanese"]:
+            code = "ja"
         if code in self._profiles:
             return self._profiles[code]
         # Cria ou reutiliza perfil genérico
