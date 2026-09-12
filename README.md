@@ -1,3 +1,10 @@
+> [!NOTE]
+> **Important information for beginners:** This application lets you practice a new language by reading interactive 3D stories. No manual setup is required – just double‑click `run.bat`. The script will check for Node.js and Python, install missing packages, and automatically open your default web browser.
+
+[Demo video](https://youtu.be/q0s4YX148H8?si=OEB-99Ce7YFSyOY_)
+
+![Demo GIF](file:///C:/Users/Pichau/Downloads/Gravando2026-09-12142601-ezgif.com-video-to-gif-converter.gif)
+
 #  Language Stories
 
 > **Immersive natural language acquisition platform based on the *Comprehensible Input* principle, featuring 3D open-book reading, full phonetic annotations (100% Ruby / Pinyin / Furigana), Spaced Repetition System (SRS), and real-time synchronized audio.**
