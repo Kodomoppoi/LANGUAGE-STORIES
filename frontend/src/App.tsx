@@ -5,6 +5,7 @@ import { NavigationRail } from './components/NavigationRail';
 import { StoryReader } from './components/Reader/StoryReader';
 import { StoryDictionary } from './components/Dictionary/StoryDictionary';
 import { RetentionQuiz } from './components/Quiz/RetentionQuiz';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsModal } from './components/Settings/SettingsModal';
 import { StoryGenerationMascot } from './components/Mascot/StoryGenerationMascot';
 import { TerminalDrawer } from './components/Terminal/TerminalDrawer';
@@ -35,7 +36,9 @@ export const App: React.FC = () => {
       </div>
 
       {/* Modals & Overlays */}
-      <RetentionQuiz />
+      <ErrorBoundary fallback={null}>
+        <RetentionQuiz />
+      </ErrorBoundary>
       <SettingsModal />
       <StoryGenerationMascot />
       <TerminalDrawer />

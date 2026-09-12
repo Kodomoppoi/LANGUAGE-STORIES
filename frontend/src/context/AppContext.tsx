@@ -602,9 +602,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return Array.from(wordMap.values());
   }, [currentStory, vocabularyVault, settings.uiLanguage]);
 
+  const lastHarvestedStoryIdRef = useRef<string>('');
+
   // AUTOMATIC MASTER HARVEST: Harvest and consolidate all tokens into master JSON bank
   useEffect(() => {
     if (!allStoryWords.length || currentStory.id === 'welcome') return;
+    if (lastHarvestedStoryIdRef.current === currentStory.id) return;
+    lastHarvestedStoryIdRef.current = currentStory.id;
 
     setVocabularyVault((prev) => {
       const vaultMap = new Map<string, DictionaryEntry>();
@@ -673,11 +677,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const starredCount = vocabularyVault.filter((v) => v.isStarred).length;
     const dueCount = vocabularyVault.filter((v) => isReviewDue(v.srsMetrics.nextReviewDate)).length;
 
-    setUserStats((prev) => ({
-      ...prev,
-      starredWordsCount: starredCount,
-      reviewsDueToday: dueCount,
-    }));
+    setUserStats((prev) => {
+      if (prev.starredWordsCount === starredCount && prev.reviewsDueToday === dueCount) {
+        return prev;
+      }
+      return {
+        ...prev,
+        starredWordsCount: starredCount,
+        reviewsDueToday: dueCount,
+      };
+    });
   }, [vocabularyVault]);
 
   // Export / Import Helpers via StorageService
@@ -822,16 +831,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
   }, []);
 
-  const updateWordSRS = useCallback((wordId: string, quality: number) => {
-    setVocabularyVault((prev) =>
-      prev.map((w) => {
-        if (w.id === wordId || w.word === wordId) {
-          return recordWordQuizReview(w, quality);
+  const updateWordSRS = useCallback(
+    (wordId: string, quality: number) => {
+      setVocabularyVault((prev) => {
+        const index = prev.findIndex((w) => w.id === wordId || w.word === wordId);
+        if (index >= 0) {
+          return prev.map((w, idx) => (idx === index ? recordWordQuizReview(w, quality) : w));
         }
-        return w;
-      })
-    );
-  }, []);
+        // Se a palavra revisada ainda não estava no cofre, busca no vocabulário alvo da história e adiciona
+        const storyTarget = (currentStory.targetVocabulary || []).find(
+          (v) => v.id === wordId || v.word === wordId
+        );
+        if (storyTarget) {
+          return [...prev, recordWordQuizReview(storyTarget, quality)];
+        }
+        return prev;
+      });
+
+      // Sincroniza o status visual no vocabulário da história atual
+      setCurrentStory((prev) => {
+        if (!prev.targetVocabulary || !prev.targetVocabulary.length) return prev;
+        const updatedTarget = prev.targetVocabulary.map((v) => {
+          if (v.id === wordId || v.word === wordId) {
+            return recordWordQuizReview(v, quality);
+          }
+          return v;
+        });
+        return {
+          ...prev,
+          targetVocabulary: updatedTarget,
+        };
+      });
+    },
+    [currentStory.targetVocabulary]
+  );
 
   // Audio Playback
   const playStoryAudio = useCallback(() => {
