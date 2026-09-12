@@ -1,7 +1,7 @@
 > [!NOTE]
 > **Important information for beginners:** This application lets you practice a new language by reading interactive 3D stories. No manual setup is required – just double‑click `run.bat`. The script will check for Node.js and Python, install missing packages, and automatically open your default web browser.
 
-🎥 **Demo Video**: [Watch the walkthrough on YouTube (10-12 min)](https://youtu.be/q0s4YX148H8)
+🎥 [setup tutorial](https://youtu.be/q0s4YX148H8)
 
 ![Demo GIF](assets/demo.gif)
 
