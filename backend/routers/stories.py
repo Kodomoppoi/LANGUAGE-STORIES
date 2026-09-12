@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..services.ai_service import ai_service, AIServiceError
-from ..languages.phonetics import enrich_tokens_phonetics, get_phonetic_reading
+from ..languages.phonetics import enrich_tokens_phonetics, get_phonetic_reading, to_romaji
 from ..languages.lexicon import get_auxiliary_translation, get_auxiliary_pos, is_invalid_translation
 from .logs import emit_log
 
@@ -76,7 +76,11 @@ class GenerateStoryRequest(BaseModel):
         return (self.api_provider or self.apiProvider or "").strip()
 
 
-def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] = None) -> Dict[str, Any]:
+def _enrich_story_response(
+    story_data: Dict[str, Any],
+    language: Optional[str] = None,
+    native_lang: Optional[str] = "Portuguese",
+) -> Dict[str, Any]:
     """
     Garante máxima compatibilidade de contratos entre frontend legado e
     nova arquitetura interlinear (sentences, paragraphs, dictionary, targetVocabulary, full_text).
@@ -85,6 +89,14 @@ def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] =
     sentences = story_data.get("sentences", [])
     story_dict = story_data.get("story_dictionary", [])
     lang = (language or story_data.get("language") or "zh").lower()
+    resolved_native = native_lang or "Portuguese"
+
+    # Se for japonês, normaliza antecipadamente todos os rubies para Rōmaji oficial no dicionário
+    if lang in ["ja", "jp"]:
+        for d in story_dict:
+            r = d.get("ruby") or d.get("pinyin")
+            if r:
+                d["ruby"] = to_romaji(r)
 
     # Cria índice de termos conhecidos da história para segmentação precisa de palavras compostas
     known_dict = {}
@@ -92,8 +104,11 @@ def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] =
         w = d.get("word")
         if w and isinstance(w, str) and w.strip():
             w_clean = w.strip()
+            r = d.get("ruby") or d.get("pinyin")
+            if lang in ["ja", "jp"] and r:
+                r = to_romaji(r)
             known_dict[w_clean] = {
-                "ruby": d.get("ruby") or d.get("pinyin"),
+                "ruby": r,
                 "context_translation": d.get("context_translation") or d.get("translation"),
                 "part_of_speech": d.get("part_of_speech") or d.get("partOfSpeech"),
                 "isTargetWord": True,
@@ -108,17 +123,17 @@ def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] =
     translations = []
 
     for idx, s in enumerate(sentences):
-        target_text = s.get("target_text", "")
-        translation_text = s.get("translation_text", "")
+        target_text = s.get("target_text") or s.get("text", "")
+        translation_text = s.get("translation_text") or s.get("translation", "")
         translations.append(translation_text)
 
         tokens = []
-        is_cjk = any("\u4e00" <= c <= "\u9fff" for c in target_text)
+        is_cjk = lang in ["zh", "ja", "jp"] or any("\u4e00" <= c <= "\u9fff" or "\u3040" <= c <= "\u30ff" for c in target_text)
 
         if is_cjk:
             i = 0
             n = len(target_text)
-            max_len = 6
+            max_len = max([len(k) for k in known_dict.keys()] + [8])
             c_idx = 0
 
             while i < n:
@@ -143,32 +158,37 @@ def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] =
                 matched_word = None
                 matched_meta = None
 
-                # Tenta casar a maior palavra conhecida (de 6 até 2 caracteres)
+                # 1. Tenta casar a maior palavra conhecida no dicionário da história (palavras-alvo)
                 for l in range(min(max_len, n - i), 1, -1):
                     sub = target_text[i : i + l]
                     if sub in known_dict:
                         matched_word = sub
                         matched_meta = known_dict[sub]
                         break
-                    aux_trans = get_auxiliary_translation(sub, lang, native_lang="Portuguese")
-                    if aux_trans:
-                        matched_word = sub
-                        matched_meta = {
-                            "ruby": None,
-                            "context_translation": aux_trans,
-                            "part_of_speech": get_auxiliary_pos(sub, lang),
-                            "isTargetWord": False,
-                            "mastery_score": 0.25,
-                            "status_color": "orange",
-                            "traits": {},
-                        }
-                        break
+
+                # 2. Se não casou no vocabulário alvo, tenta casar termos do léxico de alta frequência
+                if not matched_word:
+                    for l in range(min(8, n - i), 1, -1):
+                        sub = target_text[i : i + l]
+                        aux_trans = get_auxiliary_translation(sub, lang, native_lang=resolved_native)
+                        if aux_trans and not is_invalid_translation(aux_trans, sub):
+                            matched_word = sub
+                            matched_meta = {
+                                "ruby": None,
+                                "context_translation": aux_trans,
+                                "part_of_speech": get_auxiliary_pos(sub, lang),
+                                "isTargetWord": False,
+                                "mastery_score": 0.25,
+                                "status_color": "orange",
+                                "traits": {},
+                            }
+                            break
 
                 if matched_word and matched_meta:
                     trans_val = matched_meta.get("context_translation")
                     if is_invalid_translation(trans_val, matched_word):
-                        aux_trans = get_auxiliary_translation(matched_word, lang, native_lang="Portuguese")
-                        trans_val = aux_trans or "Vocábulo no contexto"
+                        aux_trans = get_auxiliary_translation(matched_word, lang, native_lang=resolved_native)
+                        trans_val = aux_trans or None
 
                     tokens.append({
                         "id": f"t-{idx}-{c_idx}",
@@ -188,8 +208,8 @@ def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] =
                     single_meta = known_dict.get(single_char, {})
                     trans_val = single_meta.get("context_translation")
                     if is_invalid_translation(trans_val, single_char):
-                        aux_trans = get_auxiliary_translation(single_char, lang, native_lang="Portuguese")
-                        trans_val = aux_trans or "Vocábulo no contexto"
+                        aux_trans = get_auxiliary_translation(single_char, lang, native_lang=resolved_native)
+                        trans_val = aux_trans or None
 
                     tokens.append({
                         "id": f"t-{idx}-{c_idx}",
@@ -214,8 +234,8 @@ def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] =
                 pos_val = matched.get("part_of_speech") if matched else None
 
                 if is_invalid_translation(trans_val, clean_unit):
-                    aux_trans = get_auxiliary_translation(clean_unit, lang, native_lang="Portuguese")
-                    trans_val = aux_trans or "Vocábulo no contexto"
+                    aux_trans = get_auxiliary_translation(clean_unit, lang, native_lang=resolved_native)
+                    trans_val = aux_trans or None
                 if not pos_val:
                     pos_val = get_auxiliary_pos(clean_unit, lang)
 
@@ -259,6 +279,8 @@ def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] =
         traits = item.get("traits", {})
         word_val = item.get("word") or item.get("lemma") or f"Term-{idx}"
         ruby_val = item.get("ruby") or item.get("pinyin") or get_phonetic_reading(word_val, lang)
+        if lang in ["ja", "jp"] and ruby_val:
+            ruby_val = to_romaji(ruby_val)
 
         raw_trans = item.get("context_translation") or item.get("translation")
         if not raw_trans or str(raw_trans).strip() in ["Termo em contexto", "Contextual translation", ""]:
@@ -285,6 +307,7 @@ def _enrich_story_response(story_data: Dict[str, Any], language: Optional[str] =
         })
 
     enriched = dict(story_data)
+    enriched["sentences"] = sentences_objects
     enriched["paragraphs"] = paragraphs
     enriched["dictionary"] = story_dict
     enriched["targetVocabulary"] = target_vocabulary
@@ -360,7 +383,7 @@ async def generate_story(
             api_provider=provider,
         )
 
-        return _enrich_story_response(story_data, language=req.language)
+        return _enrich_story_response(story_data, language=req.language, native_lang=native)
     except AIServiceError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
     except Exception as e:
@@ -490,7 +513,7 @@ async def generate_story_stream(
             # 3. Validação e Traços
             yield f"event: stage_start\ndata: {json.dumps({'stage': 'validation', 'message': 'Validando gramática e hidratação de traços linguísticos...'})}\n\n"
 
-            enriched = _enrich_story_response(story_data, language=req.language)
+            enriched = _enrich_story_response(story_data, language=req.language, native_lang=native)
 
             # 4. Finalização
             yield f"event: stage_done\ndata: {json.dumps({'story': enriched})}\n\n"

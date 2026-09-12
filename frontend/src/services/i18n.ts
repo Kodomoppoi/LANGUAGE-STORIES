@@ -135,8 +135,8 @@ export const TRANSLATIONS = {
     pt: 'Ruby',
   },
   rubyTooltip: {
-    en: 'Toggle reading annotations (Furigana / Pinyin)',
-    pt: 'Alternar anotações de leitura (Furigana / Pinyin)',
+    en: 'Toggle reading aids (Rōmaji for Japanese / Pinyin for Chinese)',
+    pt: 'Alternar guias de leitura (Rōmaji no japonês / Pinyin no chinês)',
   },
   translationToggle: {
     en: 'Translation',
@@ -217,8 +217,8 @@ export const TRANSLATIONS = {
     pt: 'Preferências de Áudio & Exibição',
   },
   showRubyLabel: {
-    en: 'Show Ruby Annotations (Furigana for JA / Pinyin for ZH)',
-    pt: 'Mostrar anotações Ruby (Furigana para JA / Pinyin para ZH)',
+    en: 'Show Ruby Annotations (Rōmaji for JA / Pinyin for ZH)',
+    pt: 'Mostrar anotações Ruby (Rōmaji para JA / Pinyin para ZH)',
   },
   highlightSRSLabel: {
     en: 'Highlight Target Words with SRS Status',

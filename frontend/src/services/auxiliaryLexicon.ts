@@ -393,6 +393,12 @@ export const JAPANESE_LEXICON: Record<string, LexiconEntry> = {
   '明日': { pt: 'amanhã', en: 'tomorrow', pos: 'NOUN' },
   '昨日': { pt: 'ontem', en: 'yesterday', pos: 'NOUN' },
   '小明': { pt: 'Xiao Ming (nome)', en: 'Xiao Ming (proper name)', pos: 'PROPN' },
+  'ケン': { pt: 'Ken (nome próprio)', en: 'Ken (proper name)', pos: 'PROPN' },
+  'ケンさん': { pt: 'Ken (Sr. Ken)', en: 'Ken (Mr. Ken)', pos: 'PROPN' },
+  'メアリー': { pt: 'Mary (nome próprio)', en: 'Mary (proper name)', pos: 'PROPN' },
+  'メアリーさん': { pt: 'Mary (Sra. Mary)', en: 'Mary (Ms. Mary)', pos: 'PROPN' },
+  '田中': { pt: 'Tanaka (sobrenome)', en: 'Tanaka (surname)', pos: 'PROPN' },
+  '田中さん': { pt: 'Sr(a). Tanaka', en: 'Mr./Ms. Tanaka', pos: 'PROPN' },
   '一緒': { pt: 'junto(s)', en: 'together', pos: 'NOUN' },
   '一緒に': { pt: 'junto(s) com', en: 'together with', pos: 'ADV' },
   '綺麗': { pt: 'bonito(a) / limpo(a)', en: 'beautiful / clean', pos: 'ADJ' },
@@ -404,11 +410,334 @@ export const JAPANESE_LEXICON: Record<string, LexiconEntry> = {
   '店': { pt: 'loja / estabelecimento', en: 'shop / store', pos: 'NOUN' },
   '茶': { pt: 'chá', en: 'tea', pos: 'NOUN' },
   '道': { pt: 'caminho / rua / estrada', en: 'way / road / street', pos: 'NOUN' },
+
+  // Restaurante, Culinária e Bebidas
+  'レストラン': { pt: 'restaurante', en: 'restaurant', pos: 'NOUN' },
+  'メニュー': { pt: 'menu / cardápio', en: 'menu', pos: 'NOUN' },
+  '注文': { pt: 'pedido / encomendar', en: 'order', pos: 'NOUN' },
+  '注文する': { pt: 'fazer um pedido / pedir', en: 'to order', pos: 'VERB' },
+  'お勧め': { pt: 'recomendação / sugestão', en: 'recommendation / suggestion', pos: 'NOUN' },
+  'おすすめ': { pt: 'recomendação / sugestão', en: 'recommendation / suggestion', pos: 'NOUN' },
+  '料理': { pt: 'culinária / prato / comida', en: 'cooking / dish / cuisine', pos: 'NOUN' },
+  '店員': { pt: 'atendente / funcionário / garçom', en: 'clerk / staff / waiter', pos: 'NOUN' },
+  '客': { pt: 'cliente / convidado', en: 'customer / guest', pos: 'NOUN' },
+  'お客さん': { pt: 'cliente / freguês', en: 'customer / guest', pos: 'NOUN' },
+  '店長': { pt: 'gerente da loja', en: 'store manager', pos: 'NOUN' },
+  'テーブル': { pt: 'mesa', en: 'table', pos: 'NOUN' },
+  '席': { pt: 'assento / lugar', en: 'seat', pos: 'NOUN' },
+  '椅子': { pt: 'cadeira', en: 'chair', pos: 'NOUN' },
+  'いす': { pt: 'cadeira', en: 'chair', pos: 'NOUN' },
+  '会計': { pt: 'conta / pagamento', en: 'bill / check', pos: 'NOUN' },
+  'お会計': { pt: 'conta / fechamento da conta', en: 'bill / check', pos: 'NOUN' },
+  '勘定': { pt: 'conta / cálculo', en: 'bill / calculation', pos: 'NOUN' },
+  'お勘定': { pt: 'a conta, por favor', en: 'the bill / check', pos: 'NOUN' },
+  '美味しい': { pt: 'delicioso / saboroso / gostoso', en: 'delicious / tasty', pos: 'ADJ' },
+  'おいしい': { pt: 'delicioso / saboroso / gostoso', en: 'delicious / tasty', pos: 'ADJ' },
+  '不味い': { pt: 'ruim / com gosto ruim', en: 'bad-tasting / unappetizing', pos: 'ADJ' },
+  'まずい': { pt: 'ruim / desagradável', en: 'bad-tasting / awkward', pos: 'ADJ' },
+  '甘い': { pt: 'doce', en: 'sweet', pos: 'ADJ' },
+  '辛い': { pt: 'picante / apimentado', en: 'spicy / hot', pos: 'ADJ' },
+  'しょっぱい': { pt: 'salgado', en: 'salty', pos: 'ADJ' },
+  '苦い': { pt: 'amargo', en: 'bitter', pos: 'ADJ' },
+  'コーヒー': { pt: 'café', en: 'coffee', pos: 'NOUN' },
+  '珈琲': { pt: 'café', en: 'coffee', pos: 'NOUN' },
+  '紅茶': { pt: 'chá preto', en: 'black tea', pos: 'NOUN' },
+  '緑茶': { pt: 'chá verde', en: 'green tea', pos: 'NOUN' },
+  'ビール': { pt: 'cerveja', en: 'beer', pos: 'NOUN' },
+  'ワイン': { pt: 'vinho', en: 'wine', pos: 'NOUN' },
+  'ジュース': { pt: 'suco', en: 'juice', pos: 'NOUN' },
+  '牛乳': { pt: 'leite de vaca / leite', en: 'milk', pos: 'NOUN' },
+  'ミルク': { pt: 'leite', en: 'milk', pos: 'NOUN' },
+  '朝ご飯': { pt: 'café da manhã', en: 'breakfast', pos: 'NOUN' },
+  '朝食': { pt: 'café da manhã / desjejum', en: 'breakfast', pos: 'NOUN' },
+  '昼ご飯': { pt: 'almoço', en: 'lunch', pos: 'NOUN' },
+  '昼食': { pt: 'almoço', en: 'lunch', pos: 'NOUN' },
+  '晩ご飯': { pt: 'jantar', en: 'dinner / supper', pos: 'NOUN' },
+  '夕食': { pt: 'jantar', en: 'dinner', pos: 'NOUN' },
+  '肉': { pt: 'carne', en: 'meat', pos: 'NOUN' },
+  '魚': { pt: 'peixe', en: 'fish', pos: 'NOUN' },
+  '野菜': { pt: 'vegetais / legumes / verduras', en: 'vegetables', pos: 'NOUN' },
+  '果物': { pt: 'fruta(s)', en: 'fruit', pos: 'NOUN' },
+  'パン': { pt: 'pão', en: 'bread', pos: 'NOUN' },
+  '卵': { pt: 'ovo', en: 'egg', pos: 'NOUN' },
+  'たまご': { pt: 'ovo', en: 'egg', pos: 'NOUN' },
+  'ラーメン': { pt: 'lámen / ramen', en: 'ramen noodle soup', pos: 'NOUN' },
+  'うどん': { pt: 'udon (macarrão)', en: 'udon noodles', pos: 'NOUN' },
+  'そば': { pt: 'soba (macarrão de trigo sarraceno)', en: 'soba noodles', pos: 'NOUN' },
+  '寿司': { pt: 'sushi', en: 'sushi', pos: 'NOUN' },
+  'すし': { pt: 'sushi', en: 'sushi', pos: 'NOUN' },
+  '天ぷら': { pt: 'tempurá', en: 'tempura', pos: 'NOUN' },
+  'カレー': { pt: 'curry / caril', en: 'curry', pos: 'NOUN' },
+  'デザート': { pt: 'sobremesa', en: 'dessert', pos: 'NOUN' },
+  'ケーキ': { pt: 'bolo / torta doce', en: 'cake', pos: 'NOUN' },
+  'アイス': { pt: 'sorvete', en: 'ice cream', pos: 'NOUN' },
+  'アイスクリーム': { pt: 'sorvete', en: 'ice cream', pos: 'NOUN' },
+  '箸': { pt: 'hashi / pauzinhos', en: 'chopsticks', pos: 'NOUN' },
+  'お箸': { pt: 'hashi / pauzinhos', en: 'chopsticks', pos: 'NOUN' },
+  'フォーク': { pt: 'garfo', en: 'fork', pos: 'NOUN' },
+  'スプーン': { pt: 'colher', en: 'spoon', pos: 'NOUN' },
+  'ナイフ': { pt: 'faca', en: 'knife', pos: 'NOUN' },
+  '皿': { pt: 'prato', en: 'plate / dish', pos: 'NOUN' },
+  'お皿': { pt: 'prato', en: 'plate / dish', pos: 'NOUN' },
+  'グラス': { pt: 'copo de vidro / taça', en: 'glass', pos: 'NOUN' },
+  'コップ': { pt: 'copo', en: 'cup / glass', pos: 'NOUN' },
+  'カップ': { pt: 'xícara', en: 'cup', pos: 'NOUN' },
+
+  // Lugares, Cidade e Estabelecimentos
+  '日本': { pt: 'Japão', en: 'Japan', pos: 'NOUN' },
+  '日本の': { pt: 'do Japão / japonês(a)', en: "Japan's / Japanese", pos: 'ADJ' },
+  '東京': { pt: 'Tóquio', en: 'Tokyo', pos: 'NOUN' },
+  '京都': { pt: 'Quioto', en: 'Kyoto', pos: 'NOUN' },
+  '大阪': { pt: 'Osaka', en: 'Osaka', pos: 'NOUN' },
+  'コンビニ': { pt: 'loja de conveniência', en: 'convenience store', pos: 'NOUN' },
+  'スーパー': { pt: 'supermercado', en: 'supermarket', pos: 'NOUN' },
+  'デパート': { pt: 'loja de departamentos', en: 'department store', pos: 'NOUN' },
+  '銀行': { pt: 'banco (instituição)', en: 'bank', pos: 'NOUN' },
+  '病院': { pt: 'hospital', en: 'hospital', pos: 'NOUN' },
+  '薬局': { pt: 'farmácia', en: 'pharmacy', pos: 'NOUN' },
+  '郵便局': { pt: 'agência dos correios', en: 'post office', pos: 'NOUN' },
+  '図書館': { pt: 'biblioteca', en: 'library', pos: 'NOUN' },
+  '映画館': { pt: 'cinema', en: 'movie theater', pos: 'NOUN' },
+  '公園': { pt: 'parque público', en: 'park', pos: 'NOUN' },
+  'ホテル': { pt: 'hotel', en: 'hotel', pos: 'NOUN' },
+  '空港': { pt: 'aeroporto', en: 'airport', pos: 'NOUN' },
+  '駅': { pt: 'estação de trem', en: 'train station', pos: 'NOUN' },
+  '地下鉄': { pt: 'metrô', en: 'subway', pos: 'NOUN' },
+  'バス停': { pt: 'ponto de ônibus', en: 'bus stop', pos: 'NOUN' },
+  '交番': { pt: 'posto policial', en: 'police box', pos: 'NOUN' },
+  '部屋': { pt: 'quarto / cômodo', en: 'room', pos: 'NOUN' },
+  '台所': { pt: 'cozinha', en: 'kitchen', pos: 'NOUN' },
+  'キッチン': { pt: 'cozinha', en: 'kitchen', pos: 'NOUN' },
+  'トイレ': { pt: 'banheiro / lavabo', en: 'toilet / restroom', pos: 'NOUN' },
+  '玄関': { pt: 'entrada / hall de entrada', en: 'entrance / entryway', pos: 'NOUN' },
+  '窓': { pt: 'janela', en: 'window', pos: 'NOUN' },
+  'ドア': { pt: 'porta', en: 'door', pos: 'NOUN' },
+
+  // Posições, Espaço e Direções
+  '上': { pt: 'em cima / sobre / parte superior', en: 'above / on / top', pos: 'NOUN' },
+  '下': { pt: 'embaixo / sob / parte inferior', en: 'below / under / bottom', pos: 'NOUN' },
+  '前': { pt: 'na frente / diante / antes', en: 'front / before', pos: 'NOUN' },
+  '後': { pt: 'atrás / depois', en: 'behind / after', pos: 'NOUN' },
+  '後ろ': { pt: 'atrás / parte de trás', en: 'behind / back', pos: 'NOUN' },
+  '中': { pt: 'dentro / no meio', en: 'inside / middle', pos: 'NOUN' },
+  '外': { pt: 'fora / exterior', en: 'outside', pos: 'NOUN' },
+  '隣': { pt: 'ao lado / vizinho', en: 'next to / neighbor', pos: 'NOUN' },
+  'となり': { pt: 'ao lado / vizinho', en: 'next to / neighbor', pos: 'NOUN' },
+  '近く': { pt: 'perto / nas proximidades', en: 'near / nearby', pos: 'NOUN' },
+  '間': { pt: 'entre / intervalo', en: 'between / interval', pos: 'NOUN' },
+  'あいだ': { pt: 'entre / intervalo', en: 'between / interval', pos: 'NOUN' },
+  '右': { pt: 'direita', en: 'right', pos: 'NOUN' },
+  '左': { pt: 'esquerda', en: 'left', pos: 'NOUN' },
+  '北': { pt: 'norte', en: 'north', pos: 'NOUN' },
+  '南': { pt: 'sul', en: 'south', pos: 'NOUN' },
+  '東': { pt: 'leste', en: 'east', pos: 'NOUN' },
+  '西': { pt: 'oeste', en: 'west', pos: 'NOUN' },
+
+  // Pessoas, Família e Relações
+  '男': { pt: 'homem / masculino', en: 'man / male', pos: 'NOUN' },
+  '男の人': { pt: 'homem', en: 'man', pos: 'NOUN' },
+  '女': { pt: 'mulher / feminino', en: 'woman / female', pos: 'NOUN' },
+  '女の人': { pt: 'mulher', en: 'woman', pos: 'NOUN' },
+  '男の子': { pt: 'menino / garoto', en: 'boy', pos: 'NOUN' },
+  '女の子': { pt: 'menina / garota', en: 'girl', pos: 'NOUN' },
+  '子供': { pt: 'criança / filho(a)', en: 'child', pos: 'NOUN' },
+  '子ども': { pt: 'criança / filho(a)', en: 'child', pos: 'NOUN' },
+  '家族': { pt: 'família', en: 'family', pos: 'NOUN' },
+  '父': { pt: 'pai (meu pai)', en: 'father', pos: 'NOUN' },
+  'お父さん': { pt: 'pai / papai', en: 'father / dad', pos: 'NOUN' },
+  '母': { pt: 'mãe (minha mãe)', en: 'mother', pos: 'NOUN' },
+  'お母さん': { pt: 'mãe / mamãe', en: 'mother / mom', pos: 'NOUN' },
+  '兄': { pt: 'irmão mais velho (meu)', en: 'older brother', pos: 'NOUN' },
+  'お兄さん': { pt: 'irmão mais velho', en: 'older brother', pos: 'NOUN' },
+  '弟': { pt: 'irmão mais novo', en: 'younger brother', pos: 'NOUN' },
+  '姉': { pt: 'irmã mais velha (minha)', en: 'older sister', pos: 'NOUN' },
+  'お姉さん': { pt: 'irmã mais velha', en: 'older sister', pos: 'NOUN' },
+  '妹': { pt: 'irmã mais nova', en: 'younger sister', pos: 'NOUN' },
+
+  // Formas Verbais Cotidianas Flexionadas e Auxiliares
+  '行きます': { pt: 'vai / vou / vai ir', en: 'goes / will go / go', pos: 'VERB' },
+  '行きました': { pt: 'foi / foi para', en: 'went', pos: 'VERB' },
+  '行って': { pt: 'indo / vá (gerúndio/imperativo)', en: 'going / please go', pos: 'VERB' },
+  '来ます': { pt: 'vem / virei', en: 'comes / will come', pos: 'VERB' },
+  '来ました': { pt: 'veio / chegou', en: 'came', pos: 'VERB' },
+  '来て': { pt: 'vindo / venha', en: 'coming / please come', pos: 'VERB' },
+  '帰る': { pt: 'voltar / retornar para casa', en: 'to return home', pos: 'VERB' },
+  '帰ります': { pt: 'volta para casa / regressa', en: 'returns home', pos: 'VERB' },
+  '帰りました': { pt: 'voltou para casa', en: 'returned home', pos: 'VERB' },
+  '食べます': { pt: 'come / comeu', en: 'eats / will eat', pos: 'VERB' },
+  '食べました': { pt: 'comeu', en: 'ate', pos: 'VERB' },
+  '食べて': { pt: 'comendo', en: 'eating', pos: 'VERB' },
+  '飲みます': { pt: 'bebe', en: 'drinks / will drink', pos: 'VERB' },
+  '飲みました': { pt: 'bebeu', en: 'drank', pos: 'VERB' },
+  '飲んで': { pt: 'bebendo', en: 'drinking', pos: 'VERB' },
+  '見ます': { pt: 'vê / olha / assiste', en: 'sees / looks at / watches', pos: 'VERB' },
+  '見ました': { pt: 'viu / olhou / assistiu', en: 'saw / looked / watched', pos: 'VERB' },
+  '見て': { pt: 'vendo / olhe', en: 'looking / please look', pos: 'VERB' },
+  '聞きます': { pt: 'ouve / pergunta / escuta', en: 'listens / asks', pos: 'VERB' },
+  '聞きました': { pt: 'ouviu / perguntou', en: 'listened / asked', pos: 'VERB' },
+  '聞いて': { pt: 'ouvindo / pergunte', en: 'listening / asking', pos: 'VERB' },
+  '話します': { pt: 'fala / conversa', en: 'speaks / talks', pos: 'VERB' },
+  '話しました': { pt: 'falou / conversou', en: 'spoke / talked', pos: 'VERB' },
+  '話して': { pt: 'falando', en: 'speaking', pos: 'VERB' },
+  '読みます': { pt: 'lê', en: 'reads', pos: 'VERB' },
+  '読みました': { pt: 'leu', en: 'read', pos: 'VERB' },
+  '読んで': { pt: 'lendo', en: 'reading', pos: 'VERB' },
+  '書きます': { pt: 'escreve', en: 'writes', pos: 'VERB' },
+  '書きました': { pt: 'escreveu', en: 'wrote', pos: 'VERB' },
+  '書いて': { pt: 'escrevendo', en: 'writing', pos: 'VERB' },
+  '買います': { pt: 'compra', en: 'buys', pos: 'VERB' },
+  '買いました': { pt: 'comprou', en: 'bought', pos: 'VERB' },
+  '買って': { pt: 'comprando', en: 'buying', pos: 'VERB' },
+  '待つ': { pt: 'esperar / aguardar', en: 'to wait', pos: 'VERB' },
+  '待ちます': { pt: 'espera / aguarda', en: 'waits', pos: 'VERB' },
+  '待ちました': { pt: 'esperou / aguardou', en: 'waited', pos: 'VERB' },
+  '待って': { pt: 'esperando / espere', en: 'waiting / please wait', pos: 'VERB' },
+  '呼ぶ': { pt: 'chamar / convidar', en: 'to call / summon', pos: 'VERB' },
+  '呼びます': { pt: 'chama', en: 'calls', pos: 'VERB' },
+  '呼びました': { pt: 'chamou', en: 'called', pos: 'VERB' },
+  '呼んで': { pt: 'chamando / chamou', en: 'calling', pos: 'VERB' },
+  '頼む': { pt: 'pedir / solicitar', en: 'to ask / request', pos: 'VERB' },
+  '頼みます': { pt: 'pede / solicita', en: 'asks / requests', pos: 'VERB' },
+  '入る': { pt: 'entrar', en: 'to enter', pos: 'VERB' },
+  '入ります': { pt: 'entra', en: 'enters', pos: 'VERB' },
+  '入りました': { pt: 'entrou', en: 'entered', pos: 'VERB' },
+  '出る': { pt: 'sair', en: 'to exit / leave', pos: 'VERB' },
+  '出ます': { pt: 'sai', en: 'exits / leaves', pos: 'VERB' },
+  '出ました': { pt: 'saiu', en: 'exited / left', pos: 'VERB' },
+  '座る': { pt: 'sentar-se', en: 'to sit', pos: 'VERB' },
+  '座ります': { pt: 'senta-se', en: 'sits', pos: 'VERB' },
+  '座りました': { pt: 'sentou-se', en: 'sat down', pos: 'VERB' },
+  '立つ': { pt: 'ficar de pé / levantar-se', en: 'to stand', pos: 'VERB' },
+  '立ちます': { pt: 'fica de pé', en: 'stands', pos: 'VERB' },
+  '立ちました': { pt: 'ficou de pé / levantou-se', en: 'stood', pos: 'VERB' },
+  '歩く': { pt: 'caminhar / andar', en: 'to walk', pos: 'VERB' },
+  '歩きます': { pt: 'caminha / anda', en: 'walks', pos: 'VERB' },
+  '歩きました': { pt: 'caminhou / andou', en: 'walked', pos: 'VERB' },
+  '走る': { pt: 'correr', en: 'to run', pos: 'VERB' },
+  '走ります': { pt: 'corre', en: 'runs', pos: 'VERB' },
+  '走りました': { pt: 'correu', en: 'ran', pos: 'VERB' },
+  '会う': { pt: 'encontrar / reunir-se', en: 'to meet', pos: 'VERB' },
+  '会います': { pt: 'encontra / reúne-se com', en: 'meets', pos: 'VERB' },
+  '会いました': { pt: 'encontrou', en: 'met', pos: 'VERB' },
+  'あります': { pt: 'há / tem / existe (inanimado)', en: 'there is / have (inanimate)', pos: 'VERB' },
+  'ありました': { pt: 'havia / tinha / existia', en: 'there was / had', pos: 'VERB' },
+  'います': { pt: 'há / está / tem (seres vivos)', en: 'there is / is located (animate)', pos: 'VERB' },
+  'いました': { pt: 'estava / havia (seres vivos)', en: 'was / stayed (animate)', pos: 'VERB' },
+  'します': { pt: 'faz / fará', en: 'does / will do', pos: 'VERB' },
+  'しました': { pt: 'fez', en: 'did', pos: 'VERB' },
+  'して': { pt: 'fazendo', en: 'doing', pos: 'VERB' },
+  '分かる': { pt: 'entender / compreender', en: 'to understand', pos: 'VERB' },
+  '分かります': { pt: 'entende / compreende', en: 'understands', pos: 'VERB' },
+  '分かりました': { pt: 'entendi / compreendido', en: 'understood', pos: 'VERB' },
+  'わかります': { pt: 'entende / compreende', en: 'understands', pos: 'VERB' },
+  'わかりました': { pt: 'entendi / compreendido', en: 'understood', pos: 'VERB' },
+  '知る': { pt: 'saber / conhecer', en: 'to know', pos: 'VERB' },
+  '知っています': { pt: 'sabe / conhece', en: 'knows', pos: 'VERB' },
+  '知りません': { pt: 'não sei / não conheço', en: 'do not know', pos: 'VERB' },
+  '開ける': { pt: 'abrir', en: 'to open', pos: 'VERB' },
+  '開けます': { pt: 'abre', en: 'opens', pos: 'VERB' },
+  '開けました': { pt: 'abriu', en: 'opened', pos: 'VERB' },
+  '開けて': { pt: 'abrindo / abra', en: 'opening / please open', pos: 'VERB' },
+  '閉める': { pt: 'fechar', en: 'to close', pos: 'VERB' },
+  '閉めます': { pt: 'fecha', en: 'closes', pos: 'VERB' },
+  '閉めました': { pt: 'fechou', en: 'closed', pos: 'VERB' },
+  '閉めて': { pt: 'fechando / feche', en: 'closing / please close', pos: 'VERB' },
+  '言う': { pt: 'dizer / falar', en: 'to say', pos: 'VERB' },
+  '言います': { pt: 'diz / fala', en: 'says', pos: 'VERB' },
+  '言いました': { pt: 'disse / falou', en: 'said', pos: 'VERB' },
+  '言って': { pt: 'dizendo', en: 'saying', pos: 'VERB' },
+  '思う': { pt: 'achar / pensar', en: 'to think', pos: 'VERB' },
+  '思います': { pt: 'acho / pensa', en: 'thinks', pos: 'VERB' },
+  '思いました': { pt: 'achei / pensou', en: 'thought', pos: 'VERB' },
+  '使います': { pt: 'usa / utiliza', en: 'uses', pos: 'VERB' },
+  '使いました': { pt: 'usou / utilizou', en: 'used', pos: 'VERB' },
+  '使って': { pt: 'usando / utilize', en: 'using', pos: 'VERB' },
+  '教えます': { pt: 'ensina / informa', en: 'teaches / informs', pos: 'VERB' },
+  '教えました': { pt: 'ensinou / informou', en: 'taught / informed', pos: 'VERB' },
+  '教えて': { pt: 'ensinando / por favor me diga', en: 'teaching / please tell me', pos: 'VERB' },
+
+  // Adjetivos de Alta Frequência (JLPT N5)
+  '大きい': { pt: 'grande', en: 'big / large', pos: 'ADJ' },
+  'おおきい': { pt: 'grande', en: 'big / large', pos: 'ADJ' },
+  '小さい': { pt: 'pequeno', en: 'small', pos: 'ADJ' },
+  'ちいさい': { pt: 'pequeno', en: 'small', pos: 'ADJ' },
+  '新しい': { pt: 'novo', en: 'new', pos: 'ADJ' },
+  'あたらしい': { pt: 'novo', en: 'new', pos: 'ADJ' },
+  '古い': { pt: 'velho / antigo', en: 'old', pos: 'ADJ' },
+  'ふるい': { pt: 'velho / antigo', en: 'old', pos: 'ADJ' },
+  '高い': { pt: 'alto / caro', en: 'expensive / high / tall', pos: 'ADJ' },
+  'たかい': { pt: 'alto / caro', en: 'expensive / high / tall', pos: 'ADJ' },
+  '安い': { pt: 'barato', en: 'cheap', pos: 'ADJ' },
+  'やすい': { pt: 'barato', en: 'cheap', pos: 'ADJ' },
+  '良い': { pt: 'bom / bem', en: 'good', pos: 'ADJ' },
+  'いい': { pt: 'bom / legal', en: 'good / fine', pos: 'ADJ' },
+  'よい': { pt: 'bom', en: 'good', pos: 'ADJ' },
+  '悪い': { pt: 'ruim / mau', en: 'bad', pos: 'ADJ' },
+  'わるい': { pt: 'ruim / mau', en: 'bad', pos: 'ADJ' },
+  '面白い': { pt: 'interessante / divertido', en: 'interesting / fun', pos: 'ADJ' },
+  'おもしろい': { pt: 'interessante / divertido', en: 'interesting / fun', pos: 'ADJ' },
+  '忙しい': { pt: 'ocupado', en: 'busy', pos: 'ADJ' },
+  'いそがしい': { pt: 'ocupado', en: 'busy', pos: 'ADJ' },
+  '楽しい': { pt: 'divertido / agradável', en: 'fun / enjoyable', pos: 'ADJ' },
+  'たのしい': { pt: 'divertido / agradável', en: 'fun / enjoyable', pos: 'ADJ' },
+  '難しい': { pt: 'difícil', en: 'difficult', pos: 'ADJ' },
+  'むずかしい': { pt: 'difícil', en: 'difficult', pos: 'ADJ' },
+  '簡単': { pt: 'fácil / simples', en: 'easy / simple', pos: 'ADJ' },
+  'かんたん': { pt: 'fácil / simples', en: 'easy / simple', pos: 'ADJ' },
+  '好き': { pt: 'gostar de / favorito', en: 'like / fond of', pos: 'ADJ' },
+  'すき': { pt: 'gostar de / favorito', en: 'like / fond of', pos: 'ADJ' },
+  '大好き': { pt: 'adorar / amar / muito querido', en: 'love / very fond of', pos: 'ADJ' },
+  'だいすき': { pt: 'adorar / amar / muito querido', en: 'love / very fond of', pos: 'ADJ' },
+  '嫌い': { pt: 'detestar / não gostar', en: 'dislike / hate', pos: 'ADJ' },
+  'きらい': { pt: 'detestar / não gostar', en: 'dislike / hate', pos: 'ADJ' },
+  '上手': { pt: 'habilidoso / bom em', en: 'skillful / good at', pos: 'ADJ' },
+  'じょうず': { pt: 'habilidoso / bom em', en: 'skillful / good at', pos: 'ADJ' },
+  '下手': { pt: 'ruim em / inábil', en: 'poor at / unskillful', pos: 'ADJ' },
+  'へた': { pt: 'ruim em / inábil', en: 'poor at / unskillful', pos: 'ADJ' },
+  '元気': { pt: 'animado / com boa saúde', en: 'healthy / lively', pos: 'ADJ' },
+  'げんき': { pt: 'animado / com boa saúde', en: 'healthy / lively', pos: 'ADJ' },
+  '暇': { pt: 'livre / com tempo livre', en: 'free time / not busy', pos: 'ADJ' },
+  'ひま': { pt: 'livre / com tempo livre', en: 'free time / not busy', pos: 'ADJ' },
+  '有名': { pt: 'famoso(a)', en: 'famous', pos: 'ADJ' },
+  'ゆうめい': { pt: 'famoso(a)', en: 'famous', pos: 'ADJ' },
+
+  // Interrogativos, Pronomes e Conectores Fundamentais
+  '何': { pt: 'o que / qual', en: 'what', pos: 'PRON' },
+  'なん': { pt: 'o que / qual', en: 'what', pos: 'PRON' },
+  '誰': { pt: 'quem', en: 'who', pos: 'PRON' },
+  'だれ': { pt: 'quem', en: 'who', pos: 'PRON' },
+  'いつ': { pt: 'quando', en: 'when', pos: 'ADV' },
+  'どう': { pt: 'como / de que maneira', en: 'how', pos: 'ADV' },
+  'どうして': { pt: 'por que / qual o motivo', en: 'why / for what reason', pos: 'ADV' },
+  'なぜ': { pt: 'por que', en: 'why', pos: 'ADV' },
+  'どの': { pt: 'qual (antes de substantivo)', en: 'which', pos: 'PRON' },
+  'いくら': { pt: 'quanto custa / quanto', en: 'how much', pos: 'NOUN' },
+  'いくつ': { pt: 'quantos', en: 'how many', pos: 'NOUN' },
+  'そして': { pt: 'e / além disso', en: 'and / and then', pos: 'CONJ' },
+  'それから': { pt: 'depois disso / em seguida', en: 'after that / then', pos: 'CONJ' },
+  'しかし': { pt: 'porém / no entanto', en: 'however / but', pos: 'CONJ' },
+  'でも': { pt: 'mas / porém', en: 'but', pos: 'CONJ' },
+  'だから': { pt: 'por isso / portanto', en: 'so / therefore', pos: 'CONJ' },
+  'とても': { pt: 'muito / extremamente', en: 'very / extremely', pos: 'ADV' },
+  '少し': { pt: 'um pouco', en: 'a little', pos: 'ADV' },
+  'ちょっと': { pt: 'um pouco / um instante', en: 'a little / a moment', pos: 'ADV' },
+  'たくさん': { pt: 'muito / bastante / em grande quantidade', en: 'a lot / many / much', pos: 'ADV' },
+  '初めて': { pt: 'pela primeira vez', en: 'for the first time', pos: 'ADV' },
+  'はじめて': { pt: 'pela primeira vez', en: 'for the first time', pos: 'ADV' },
+  '色々な': { pt: 'vários / diversos / variados', en: 'various / varied', pos: 'ADJ' },
+  'いろいろな': { pt: 'vários / diversos / variados', en: 'various / varied', pos: 'ADJ' },
+  '色々': { pt: 'vários / muitas coisas', en: 'various / many things', pos: 'NOUN' },
+  'いろいろ': { pt: 'vários / muitas coisas', en: 'various / many things', pos: 'NOUN' },
+  'もう': { pt: 'já / mais um', en: 'already / more', pos: 'ADV' },
+  'まだ': { pt: 'ainda / ainda não', en: 'still / not yet', pos: 'ADV' },
+  'いつも': { pt: 'sempre', en: 'always', pos: 'ADV' },
+  '時々': { pt: 'às vezes / de vez em quando', en: 'sometimes', pos: 'ADV' },
+  'ときどき': { pt: 'às vezes / de vez em quando', en: 'sometimes', pos: 'ADV' },
 };
 
 /**
  * Determina com precisão e segurança se uma string de tradução é inválida, nula,
- * mera repetição da palavra original ou ideograma CJK sem tradução real para a língua nativa.
+ * mera repetição da palavra original ou placeholder genérico (ex: "Term in context").
  */
 export function isInvalidTranslation(
   translation: string | undefined | null,
@@ -426,17 +755,26 @@ export function isInvalidTranslation(
     return true;
   }
 
-  // 2. Termos genéricos, placeholders de templates de IA ou resquícios de prompts antigos
+  // 2. Termos genéricos, placeholders de templates de IA ou resquícios de fallbacks
   const invalidPlaceholders = [
+    'term in context',
     'termo em contexto',
+    'vocábulo no contexto',
+    'vocabulo no contexto',
     'contextual translation',
-    'termo da história',
-    'termo da historia',
+    'contextual translation in sentence below',
+    'tradução no contexto da frase abaixo',
+    'traducao no contexto da frase abaixo',
+    'tradução no contexto',
+    'traducao no contexto',
+    'target vocabulary',
     'target word',
     'palavra da história',
     'palavra da historia',
     'palavra alvo',
     'palavra-alvo',
+    'vocabulário alvo',
+    'vocabulario alvo',
     'palavra',
     'word',
     'termo',
@@ -444,6 +782,9 @@ export function isInvalidTranslation(
     'vocabulo',
     'unknown',
     'n/a',
+    'none',
+    'null',
+    'undefined',
   ];
 
   if (invalidPlaceholders.some((p) => cleanLower === p)) {
@@ -453,6 +794,13 @@ export function isInvalidTranslation(
   if (
     cleanLower.startsWith('termo da ') ||
     cleanLower.startsWith('termo em ') ||
+    cleanLower.startsWith('term in ') ||
+    cleanLower.startsWith('vocábulo no ') ||
+    cleanLower.startsWith('vocabulo no ') ||
+    cleanLower.startsWith('contextual translation') ||
+    cleanLower.startsWith('tradução no contexto') ||
+    cleanLower.startsWith('traducao no contexto') ||
+    cleanLower.startsWith('target ') ||
     cleanLower.startsWith('usado em:') ||
     cleanLower.startsWith('usado em :') ||
     cleanLower.startsWith('usado em "') ||
@@ -516,6 +864,23 @@ export function getAuxiliaryTranslation(
     const entry = JAPANESE_LEXICON[cleanWord];
     if (entry) return entry[uiLanguage];
 
+    // Tentativa com remoção de partículas gramaticais comuns anexadas ao final
+    // (ex: レストランに -> レストラン, 料理が -> 料理, お勧めは -> お勧め)
+    const particles = ['からは', 'までは', 'には', 'では', 'から', 'まで', 'より', 'など', 'に', 'で', 'を', 'は', 'が', 'の', 'と', 'へ', 'も', 'よ', 'ね', 'か'];
+    for (const p of particles) {
+      if (cleanWord.endsWith(p) && cleanWord.length > p.length) {
+        const stem = cleanWord.slice(0, -p.length);
+        const stemEntry = JAPANESE_LEXICON[stem];
+        if (stemEntry) {
+          const particleEntry = JAPANESE_LEXICON[p];
+          if (particleEntry) {
+            return `${stemEntry[uiLanguage]} + [${p}: ${particleEntry[uiLanguage].split('/')[0].trim()}]`;
+          }
+          return stemEntry[uiLanguage];
+        }
+      }
+    }
+
     if (cleanWord.length >= 2) {
       const chars = Array.from(cleanWord);
       const parts: string[] = [];
@@ -552,7 +917,16 @@ export function getAuxiliaryPOS(
   if (language === 'zh') {
     return CHINESE_LEXICON[cleanWord]?.pos;
   } else if (language === 'ja') {
-    return JAPANESE_LEXICON[cleanWord]?.pos;
+    const direct = JAPANESE_LEXICON[cleanWord]?.pos;
+    if (direct) return direct;
+    const particles = ['からは', 'までは', 'には', 'では', 'から', 'まで', 'より', 'など', 'に', 'で', 'を', 'は', 'が', 'の', 'と', 'へ', 'も', 'よ', 'ね', 'か'];
+    for (const p of particles) {
+      if (cleanWord.endsWith(p) && cleanWord.length > p.length) {
+        const stem = cleanWord.slice(0, -p.length);
+        const stemPos = JAPANESE_LEXICON[stem]?.pos;
+        if (stemPos) return stemPos;
+      }
+    }
   }
 
   return undefined;

@@ -1,7 +1,7 @@
 import { DictionaryEntry, LanguageCode, ProficiencyLevel, UserStats, AppSettings, WordDeepDiveData, Story } from '../types';
 import { createDefaultSRSMetrics } from './srsEngine';
 import { getAuxiliaryTranslation, isInvalidTranslation } from './auxiliaryLexicon';
-import { getAuxiliaryRuby } from './auxiliaryPhonetics';
+import { getAuxiliaryRuby, toRomaji } from './auxiliaryPhonetics';
 
 const KEYS = {
   SETTINGS: 'lang_stories_settings',
@@ -13,7 +13,7 @@ const KEYS = {
 } as const;
 
 export class StorageService {
-  public loadSettings(defaultSettings: AppSettings): AppSettings {
+  public loadSettings(defaultSettings: AppSettings = {} as AppSettings): AppSettings {
     try {
       const saved = localStorage.getItem(KEYS.SETTINGS);
       if (saved) {
@@ -89,18 +89,20 @@ export class StorageService {
       const isCJK = entry.language === 'zh' || entry.language === 'ja';
       const isRubyMismatched = isCJK && entry.word.length === 1 && Boolean(entry.ruby && entry.ruby.trim().includes(' '));
       const auxRuby = getAuxiliaryRuby(entry.word, entry.language as any);
-      const healedRuby = isRubyMismatched && auxRuby ? auxRuby : (entry.ruby || auxRuby);
+      const rawRuby = isRubyMismatched && auxRuby ? auxRuby : (entry.ruby || auxRuby);
+      const healedRuby = (entry.language === 'ja' && rawRuby) ? toRomaji(rawRuby) : rawRuby;
 
       if (isPlaceholder || (isRubyMismatched && auxRuby)) {
         modified = true;
+        const uiLang = (this.loadSettings()?.uiLanguage === 'en') ? 'en' : 'pt';
         const aux =
-          getAuxiliaryTranslation(entry.word, entry.language as any, 'pt') ||
-          getAuxiliaryTranslation(entry.word, entry.language as any, 'en');
+          getAuxiliaryTranslation(entry.word, entry.language as any, uiLang) ||
+          getAuxiliaryTranslation(entry.word, entry.language as any, uiLang === 'en' ? 'pt' : 'en');
         const healedTranslation =
           aux ||
           (!isDefInvalid
             ? entry.definition!
-            : (aux || 'Vocábulo no contexto'));
+            : (aux || (uiLang === 'en' ? 'Contextual term' : 'Termo em contexto')));
 
         return {
           ...entry,
@@ -305,23 +307,23 @@ export class StorageService {
     }
   }
 
-  public loadWordDeepDive(lang: LanguageCode, word: string): WordDeepDiveData | null {
+  public loadWordDeepDive(lang: LanguageCode, word: string, uiLang: string = 'pt'): WordDeepDiveData | null {
     try {
       const raw = localStorage.getItem('lang_stories_deep_dives_cache');
       if (!raw) return null;
       const cache = JSON.parse(raw);
-      const key = `${lang}:${word.trim()}`;
-      return cache[key] || null;
+      const key = `${lang}:${uiLang}:${word.trim()}`;
+      return cache[key] || cache[`${lang}:${word.trim()}`] || null;
     } catch {
       return null;
     }
   }
 
-  public saveWordDeepDive(lang: LanguageCode, word: string, data: WordDeepDiveData): void {
+  public saveWordDeepDive(lang: LanguageCode, word: string, data: WordDeepDiveData, uiLang: string = 'pt'): void {
     try {
       const raw = localStorage.getItem('lang_stories_deep_dives_cache');
       const cache = raw ? JSON.parse(raw) : {};
-      const key = `${lang}:${word.trim()}`;
+      const key = `${lang}:${uiLang}:${word.trim()}`;
       cache[key] = data;
       localStorage.setItem('lang_stories_deep_dives_cache', JSON.stringify(cache));
     } catch (e) {

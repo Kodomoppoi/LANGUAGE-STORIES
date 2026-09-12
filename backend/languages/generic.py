@@ -66,6 +66,8 @@ class GenericLanguageProfile(LanguageProfile):
         else:
             theme_instruction = f'Theme: AUTOMATIC & HIGHLY DIDACTIC. Choose the most practical, pedagogically effective, and engaging everyday theme for a {proficiency} language learner (e.g. daily routine, introducing oneself, asking for help/directions, café/restaurant, hobbies, or community life).'
 
+        ruby_desc = 'phonetic reading in official Hepburn Rōmaji with macrons (e.g. tōkyō, ohayō gozaimasu, kōhī, watashi)' if self._code in ['ja', 'jp'] else 'phonetic reading if applicable, else null'
+
         return f"""You are an expert language curriculum designer for {self._name}.
 Proficiency Level: {proficiency}.
 {theme_instruction}
@@ -81,7 +83,7 @@ Return strictly valid JSON only:
     {{
       "word": "word in {self._name}",
       "lemma": "dictionary form",
-      "ruby": "phonetic reading if applicable, else null",
+      "ruby": "{ruby_desc}",
       "part_of_speech": "NOUN/VERB/ADJ/etc",
       "context_translation": "meaning in {native_lang}",
       "example_sentence": "sentence in {self._name}",
@@ -111,6 +113,12 @@ Return strictly valid JSON only:
         else:
             theme_instruction = f'Story Theme: AUTOMATIC & HIGHLY DIDACTIC. Pick the most natural, immersive, and didactic scenario for a {proficiency} learner.'
 
+        romaji_rule = ""
+        ruby_sample = "..."
+        if self._code in ["ja", "jp"]:
+            romaji_rule = "\n6. PHONETIC NOTATION (HEPBURN RŌMAJI): For Japanese, for EVERY word/token (Kanji, Katakana, or Hiragana), 'ruby' MUST strictly be written in official Hepburn Rōmaji with macrons (e.g. '東京' -> 'tōkyō', 'おはようございます' -> 'ohayō gozaimasu', 'コーヒー' -> 'kōhī', 'カフェ' -> 'kafe', '美味しい' -> 'oishii'). Never output Katakana or Hiragana for ruby."
+            ruby_sample = "Hepburn Rōmaji reading with macrons (e.g. tōkyō, ohayō)"
+
         return f"""Write an engaging story in {self._name} for proficiency level {proficiency}.
 {theme_instruction}
 Native Language for Translations: {native_lang}.
@@ -128,7 +136,7 @@ MANDATORY OUTPUT REQUIREMENTS:
    ]
 4. "story_dictionary": List of important words in the story with part of speech and context translation.
    CRITICAL: For EVERY entry in "story_dictionary", "context_translation" in {native_lang} is MANDATORY. You MUST include every word from the TARGET WORDS list with its clear translation in {native_lang}. DO NOT leave "context_translation" blank or generic.
-5. "story_translated_dictionary": Mapping of translated terms back to original words in {self._name}.
+5. "story_translated_dictionary": Mapping of translated terms back to original words in {self._name}.{romaji_rule}
 
 Return strictly valid JSON only matching:
 {{
@@ -141,7 +149,7 @@ Return strictly valid JSON only matching:
     {{
       "word": "...",
       "lemma": "...",
-      "ruby": "...",
+      "ruby": "{ruby_sample}",
       "part_of_speech": "NOUN",
       "context_translation": "..."
     }}
@@ -273,7 +281,7 @@ TASK:
 Produce a dense, high-value, organized Markdown study dossier with pedagogical depth. DO NOT cut corners or use placeholder text.
 
 The dossier MUST contain these exact sections in clean Markdown:
-# 📖 {word} [Furigana/Reading] • [Part of Speech] • [JLPT Level]
+# 📖 {word} [Hepburn Rōmaji Reading] • [Part of Speech] • [JLPT Level]
 
 ## 🎯 1. Significado Contextual & Nuance
 Detailed explanation of what this word means in the context of the story, its register (casual, polite keigo, literary), and emotional nuance.
@@ -287,19 +295,19 @@ Detailed explanation of what this word means in the context of the story, its re
 A memorable visual story, mental anchor, or vivid association to permanently memorize this word.
 
 ## 🌳 4. Família de Palavras & Compostos (熟語)
-List 3 to 5 real high-frequency compound words formed with these kanji, with reading and translation in {native_lang}.
+List 3 to 5 real high-frequency compound words formed with these kanji, with official Hepburn Rōmaji reading and translation in {native_lang}.
 
 ## ⚠️ 5. Cuidados, Fonética & Homófonos
 Pronunciation advice, pitch accent tips, homophones (同音異義語) or near-synonym contrasts.
 
 ## 📝 6. Frases Práticas de Exemplo
-2 natural sentences featuring this word with Kanji, Furigana, and translation in {native_lang}.
+2 natural sentences featuring this word with Kanji, official Hepburn Rōmaji reading, and translation in {native_lang}.
 
 OUTPUT FORMAT:
 Return strictly valid JSON with the full Markdown text in "markdown_content":
 {{
   "word": "{word}",
-  "ruby": "furigana/kana",
+  "ruby": "Hepburn Rōmaji reading with macrons (e.g. tōkyō, ohayō)",
   "level": "JLPT {proficiency}",
   "part_of_speech": "Substantivo / Verbo / etc",
   "context_meaning": "Significado contextual resumido",

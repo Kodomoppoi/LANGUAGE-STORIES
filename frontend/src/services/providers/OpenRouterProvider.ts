@@ -105,10 +105,11 @@ CRITICAL RULES:
 2. For each sentence, provide a compact array of words/tokens with its contextual pronunciation and exact contextual translation.
    FORMAT: [word, phonetic_ruby_or_null, contextual_translation_in_${targetNativeLang}]
    - For Mandarin (zh): include Pinyin with tones in index 1 (e.g. ["咖啡馆", "kā fēi guǎn", "cafeteria"]).
-   - For Japanese (ja): include Hiragana furigana in index 1 for Kanji words (e.g. ["静か", "しずか", "tranquilo"]).
+   - For Japanese (ja): in index 1, provide official Hepburn Rōmaji with macrons (e.g. ["東京", "tōkyō", "Tóquio"], ["レストラン", "resutoran", "restaurante"], ["メニュー", "menyū", "cardápio"], ["静か", "shizuka", "tranquilo"]). NEVER split Katakana prolonged sound mark 'ー' from words (e.g. 'メニュー' must remain a single unit, never split into 'メニュ' and 'ー').
    - For other languages (es, fr, de, it, en, ru, etc.): set index 1 to null, and index 2 to the exact contextual translation of that specific inflected/conjugated word (e.g. ["estudiábamos", null, "estudávamos"]).
 3. "targetVocabulary": Array of 4 to 8 key pedagogical words taught in this lesson with word, ruby, part of speech, translation in ${targetNativeLang}, and an example sentence.
 4. ALL translations MUST strictly be in ${targetNativeLang}.
+5. ZERO PLACEHOLDERS: NEVER use generic placeholders like "Term in context", "Vocábulo no contexto", "Palavra", or "Target word". Every single word in the words array and targetVocabulary MUST have its genuine, precise translation in ${targetNativeLang}.
 
 Output strictly valid JSON matching this compact schema:
 {

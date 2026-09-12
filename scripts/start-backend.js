@@ -26,7 +26,7 @@ if (fs.existsSync(venvPython)) {
   }
 }
 
-const proc = spawn(pythonCmd, ['-m', 'uvicorn', 'backend.main:app', '--reload', '--port', '8000'], {
+const proc = spawn(pythonCmd, ['-m', 'uvicorn', 'backend.main:app', '--reload', '--reload-dir', 'backend', '--port', '8000'], {
   cwd: rootDir,
   stdio: 'inherit',
   shell: false,

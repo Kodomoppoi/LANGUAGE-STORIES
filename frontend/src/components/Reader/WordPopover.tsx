@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import { createDefaultSRSMetrics, getStatusColor, getRepetitionWeight } from '../../services/srsEngine';
 import { DictionaryEntry, ChineseTraits } from '../../types';
-import { getAuxiliaryRuby } from '../../services/auxiliaryPhonetics';
+import { getAuxiliaryRuby, toRomaji } from '../../services/auxiliaryPhonetics';
 import { getAuxiliaryTranslation, isInvalidTranslation } from '../../services/auxiliaryLexicon';
+import { resolveLocalizedWordTranslation, translateGloss } from '../../services/storyLocalization';
 
 export const WordPopover: React.FC = () => {
   const {
@@ -87,7 +88,8 @@ export const WordPopover: React.FC = () => {
   // recalibra para a fonética real do caractere individual
   const auxRuby = tokenText ? getAuxiliaryRuby(tokenText, currentLanguage) : undefined;
   const isRubyMismatched = isCJK && tokenText.length === 1 && Boolean(activeToken?.ruby && activeToken.ruby.trim().includes(' '));
-  const effectiveRuby = (isRubyMismatched && auxRuby) ? auxRuby : (activeToken?.ruby || auxRuby);
+  const rawRuby = (isRubyMismatched && auxRuby) ? auxRuby : (activeToken?.ruby || auxRuby);
+  const effectiveRuby = currentLanguage === 'ja' && rawRuby ? toRomaji(rawRuby) : rawRuby;
 
   // Pontuação contínua de saber e cor de status (0% a 100%)
   const masteryScore = vaultEntry?.masteryScore ?? activeToken?.masteryScore ?? 25;
@@ -107,13 +109,20 @@ export const WordPopover: React.FC = () => {
   // 1. Resolução de significado real sem placeholders (hook incondicional)
   const resolvedMeaning = useMemo(() => {
     if (!activeToken || !tokenText) return '';
+    const uiLang = (settings.uiLanguage as 'pt' | 'en') || 'pt';
 
-    if (!isInvalidTranslation(traits.contextMeaning, tokenText)) {
-      return traits.contextMeaning!;
+    // 1. Prioridade absoluta: Resolução estritamente sincronizada com o idioma da interface ('pt' ou 'en')
+    const localized = resolveLocalizedWordTranslation(
+      tokenText,
+      activeToken.translation || traits.contextMeaning,
+      currentLanguage,
+      uiLang
+    );
+    if (localized && !isInvalidTranslation(localized, tokenText)) {
+      return localized;
     }
-    if (!isInvalidTranslation(activeToken.translation, tokenText)) {
-      return activeToken.translation!;
-    }
+
+    // 2. Vocabulário Alvo da história (se já localizado)
     const matchingVocab = currentStory?.targetVocabulary?.find((v) => {
       const w = v?.word ? String(v.word).trim() : '';
       if (!w || !tokenText) return false;
@@ -121,34 +130,73 @@ export const WordPopover: React.FC = () => {
       if (tokenText.length > 1 && (w.includes(tokenText) || tokenText.includes(w))) return true;
       return false;
     });
-    if (!isInvalidTranslation(matchingVocab?.translation, tokenText)) {
-      return matchingVocab!.translation!;
+    if (matchingVocab?.translation && !isInvalidTranslation(matchingVocab.translation, tokenText)) {
+      const localizedVocab = resolveLocalizedWordTranslation(
+        matchingVocab.word || tokenText,
+        matchingVocab.translation,
+        currentLanguage,
+        uiLang
+      );
+      if (localizedVocab && !isInvalidTranslation(localizedVocab, tokenText)) {
+        return localizedVocab;
+      }
+      return matchingVocab.translation;
     }
-    const vaultItem = vocabularyVault.find(
-      (w) => w && w.word === tokenText && w.language === currentLanguage
-    );
-    if (!isInvalidTranslation(vaultItem?.translation, tokenText)) {
-      return vaultItem!.translation!;
-    }
-    const aux = getAuxiliaryTranslation(
-      tokenText,
-      currentLanguage,
-      settings.uiLanguage as 'pt' | 'en'
-    );
-    if (aux && !isInvalidTranslation(aux, tokenText)) return aux;
 
-    return settings.uiLanguage === 'pt'
+    // 3. Vault (Cofre de vocabulário)
+    const vaultItem = vocabularyVault.find(
+      (w) => w && w.language === currentLanguage && (
+        w.word === tokenText ||
+        (tokenText.length > 1 && (tokenText.startsWith(w.word) || w.word.startsWith(tokenText)))
+      )
+    );
+    if (vaultItem?.translation && !isInvalidTranslation(vaultItem.translation, tokenText)) {
+      const localizedVault = resolveLocalizedWordTranslation(
+        vaultItem.word,
+        vaultItem.translation,
+        currentLanguage,
+        uiLang
+      );
+      if (localizedVault && !isInvalidTranslation(localizedVault, tokenText)) {
+        return localizedVault;
+      }
+      return vaultItem.translation;
+    }
+
+    // 4. Traits context meaning com tradução de glosa
+    if (traits.contextMeaning && !isInvalidTranslation(traits.contextMeaning, tokenText)) {
+      const mapped = translateGloss(traits.contextMeaning, uiLang);
+      return mapped || traits.contextMeaning;
+    }
+
+    // 5. Active token translation direta com tradução de glosa
+    if (activeToken.translation && !isInvalidTranslation(activeToken.translation, tokenText)) {
+      const mapped = translateGloss(activeToken.translation, uiLang);
+      return mapped || activeToken.translation;
+    }
+
+    // 6. Explanation do token
+    if (activeToken.explanation && !isInvalidTranslation(activeToken.explanation, tokenText)) {
+      const mapped = translateGloss(activeToken.explanation, uiLang);
+      return mapped || activeToken.explanation;
+    }
+
+    return uiLang === 'pt'
       ? 'Tradução no contexto da frase abaixo'
       : 'Contextual translation in sentence below';
   }, [traits.contextMeaning, activeToken, tokenText, currentStory, vocabularyVault, currentLanguage, settings.uiLanguage]);
 
   const handleAddToVault = () => {
     if (isInVault || !tokenText || !activeToken) return;
+    const safeMeaning = resolvedMeaning && !isInvalidTranslation(resolvedMeaning, tokenText)
+      ? resolvedMeaning
+      : (auxRuby || tokenText);
+
     const newEntry: DictionaryEntry = {
       id: `vocab-${Date.now()}`,
       word: tokenText,
       ruby: effectiveRuby,
-      translation: resolvedMeaning || (settings.uiLanguage === 'en' ? 'Target word' : 'Termo em contexto'),
+      translation: safeMeaning,
       partOfSpeech: activeToken.partOfSpeech || 'Noun',
       definition: activeToken.explanation || resolvedMeaning || `Usage of ${tokenText} in context.`,
       exampleSentence: tokenText,
@@ -328,7 +376,7 @@ export const WordPopover: React.FC = () => {
         </div>
         {activeToken.explanation && (
           <div className="lateral-explanation-text">
-            {activeToken.explanation}
+            {translateGloss(activeToken.explanation, (settings.uiLanguage as 'pt' | 'en') || 'pt') || activeToken.explanation}
           </div>
         )}
       </div>
@@ -377,7 +425,7 @@ export const WordPopover: React.FC = () => {
           className="btn-secondary popover-deep-dive-btn"
           onClick={() => {
             closeTokenPopover();
-            openDeepDive(activeToken.text, activeToken.explanation || activeToken.translation);
+            openDeepDive(activeToken.text, getSentenceText(contextSentence));
           }}
           title={t('popoverDeepDiveTooltip')}
           style={{

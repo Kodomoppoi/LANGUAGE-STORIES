@@ -8,7 +8,7 @@ export const SUPPORTED_LANGUAGES: LanguageInfo[] = [
     nativeName: '日本語',
     flag: '🇯🇵',
     hasRuby: true,
-    rubyType: 'furigana',
+    rubyType: 'romaji',
     sampleFontFamily: 'Noto Sans JP',
     ttsVoiceHint: 'ja-JP',
   },

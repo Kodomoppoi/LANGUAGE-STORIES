@@ -9,6 +9,7 @@ import {
   Bot,
 } from 'lucide-react';
 import { getAuxiliaryTranslation, isInvalidTranslation } from '../../services/auxiliaryLexicon';
+import { resolveLocalizedWordTranslation, translateGloss } from '../../services/storyLocalization';
 
 interface StoryDictionaryProps {
   isStarredView?: boolean;
@@ -354,12 +355,28 @@ export const StoryDictionary: React.FC<StoryDictionaryProps> = ({ isStarredView 
                       {/* Translation */}
                       <td>
                         {(() => {
-                          const aux = getAuxiliaryTranslation(entry.word, currentStory.language, settings.uiLanguage as 'pt' | 'en');
-                          const displayTranslation = (!isInvalidTranslation(traits?.contextMeaning, entry.word))
-                            ? traits!.contextMeaning!
-                            : (!isInvalidTranslation(entry.translation, entry.word)
-                              ? entry.translation
-                              : (aux || (!isInvalidTranslation(entry.definition, entry.word) ? entry.definition : (settings.uiLanguage === 'en' ? 'Term in context' : 'Vocábulo no contexto'))));
+                          const uiLang = (settings.uiLanguage as 'pt' | 'en') || 'pt';
+                          const localized = resolveLocalizedWordTranslation(
+                            entry.word,
+                            entry.translation || traits?.contextMeaning,
+                            currentStory.language,
+                            uiLang
+                          );
+
+                          const targetVocabMatch = currentStory.targetVocabulary?.find((v) => {
+                            const vw = v?.word ? String(v.word).trim() : '';
+                            return vw && (vw === entry.word || (entry.word.length > 1 && (entry.word.startsWith(vw) || vw.startsWith(entry.word))));
+                          });
+                          const safeTargetTrans = targetVocabMatch && !isInvalidTranslation(targetVocabMatch.translation, entry.word)
+                            ? (resolveLocalizedWordTranslation(targetVocabMatch.word, targetVocabMatch.translation, currentStory.language, uiLang) || targetVocabMatch.translation)
+                            : null;
+
+                          const displayTranslation = localized
+                            || safeTargetTrans
+                            || (!isInvalidTranslation(traits?.contextMeaning, entry.word) ? (translateGloss(traits!.contextMeaning, uiLang) || traits!.contextMeaning!) : null)
+                            || (!isInvalidTranslation(entry.translation, entry.word) ? (translateGloss(entry.translation, uiLang) || entry.translation) : null)
+                            || (!isInvalidTranslation(entry.definition, entry.word) ? (translateGloss(entry.definition, uiLang) || entry.definition) : null)
+                            || (uiLang === 'en' ? 'Context meaning' : 'Sentido no contexto');
 
                           const hasValidDefinition = entry.definition &&
                             !isInvalidTranslation(entry.definition, entry.word) &&

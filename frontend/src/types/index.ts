@@ -170,7 +170,7 @@ export interface LanguageInfo {
   nativeName: string;
   flag: string;
   hasRuby: boolean;
-  rubyType?: 'furigana' | 'pinyin';
+  rubyType?: 'romaji' | 'katakana' | 'furigana' | 'pinyin';
   isRTL?: boolean;
   sampleFontFamily: string;
   ttsVoiceHint: string;

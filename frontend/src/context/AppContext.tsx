@@ -40,7 +40,7 @@ import { logService } from '../services/logService';
 import { getTranslation, TranslationKey } from '../services/i18n';
 import { localizeStory } from '../services/storyLocalization';
 import { getAuxiliaryTranslation, isInvalidTranslation } from '../services/auxiliaryLexicon';
-import { getAuxiliaryRuby } from '../services/auxiliaryPhonetics';
+import { getAuxiliaryRuby, toRomaji } from '../services/auxiliaryPhonetics';
 import { getProficiencyNativeInfo } from '../services/proficiencyUtils';
 
 interface AppContextType {
@@ -318,7 +318,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ) {
       return welcome;
     }
-    return loaded;
+    return localizeStory(loaded, uiLang);
   });
   const [bookError, setBookError] = useState<BookErrorInfo | null>(null);
   const clearBookError = useCallback(() => setBookError(null), []);
@@ -549,19 +549,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const mastery = vaultItem?.masteryScore ?? t.masteryScore ?? 25;
             const isPinned = vaultItem?.isPinned ?? vaultItem?.isStarred ?? false;
 
+            const targetVocabMatch = currentStory.targetVocabulary?.find((v) => {
+              const vw = v?.word ? String(v.word).trim() : '';
+              return vw && (vw === t.text || (t.text.length > 1 && (t.text.startsWith(vw) || vw.startsWith(t.text))));
+            });
+            const safeTargetTrans = targetVocabMatch && !isInvalidTranslation(targetVocabMatch.translation, t.text)
+              ? targetVocabMatch.translation
+              : null;
+
             const aux = getAuxiliaryTranslation(t.text, currentStory.language, (settings.uiLanguage as any) || 'pt');
             const rawTrans = t.translation ? String(t.translation).trim() : '';
             const isInvalidTrans = isInvalidTranslation(rawTrans, t.text);
-            const defaultFallback = settings.uiLanguage === 'en' ? 'Term in context' : 'Vocábulo no contexto';
 
             const resolvedTrans = !isInvalidTrans
               ? rawTrans
-              : (aux || (!isInvalidTranslation(vaultItem?.translation, t.text) ? vaultItem!.translation : (aux || defaultFallback)));
+              : (safeTargetTrans || aux || (!isInvalidTranslation(vaultItem?.translation, t.text) ? vaultItem!.translation : (aux || '')));
 
             const isCJK = currentStory.language === 'zh' || currentStory.language === 'ja';
             const isRubyMismatched = isCJK && t.text.length === 1 && Boolean(t.ruby && t.ruby.trim().includes(' '));
             const auxRuby = getAuxiliaryRuby(t.text, currentStory.language);
-            const resolvedRuby = (isRubyMismatched && auxRuby) ? auxRuby : (t.ruby || auxRuby);
+            const rawRuby = (isRubyMismatched && auxRuby) ? auxRuby : (t.ruby || auxRuby);
+            const resolvedRuby = (currentStory.language === 'ja' && rawRuby) ? toRomaji(rawRuby) : rawRuby;
 
             wordMap.set(t.text, {
               id: `token-${t.id}`,
@@ -602,12 +610,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const vaultMap = new Map<string, DictionaryEntry>();
       prev.forEach((item) => vaultMap.set(`${item.language}:${item.word}`, item));
 
-      const defaultFallback = settings.uiLanguage === 'en' ? 'Term in context' : 'Vocábulo no contexto';
-
       allStoryWords.forEach((storyItem) => {
         const key = `${storyItem.language}:${storyItem.word}`;
         const existing = vaultMap.get(key);
         const aux = getAuxiliaryTranslation(storyItem.word, storyItem.language, (settings.uiLanguage as any) || 'pt');
+        const targetVocabMatch = currentStory.targetVocabulary?.find((v) => {
+          const vw = v?.word ? String(v.word).trim() : '';
+          return vw && (vw === storyItem.word || (storyItem.word.length > 1 && (storyItem.word.startsWith(vw) || vw.startsWith(storyItem.word))));
+        });
+        const safeTargetTrans = targetVocabMatch && !isInvalidTranslation(targetVocabMatch.translation, storyItem.word)
+          ? targetVocabMatch.translation
+          : null;
 
         const isStoryTransInvalid = isInvalidTranslation(storyItem.translation, storyItem.word);
 
@@ -616,7 +629,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
           const finalTrans = !isStoryTransInvalid
             ? storyItem.translation
-            : (!isExistingTransInvalid ? existing.translation : (aux || defaultFallback));
+            : (!isExistingTransInvalid ? existing.translation : (safeTargetTrans || aux || ''));
 
           const mastery = existing.masteryScore ?? calculateMasteryScore(existing.srsMetrics, existing.lookedUpCount, existing.lastSeenDate);
           vaultMap.set(key, {
@@ -635,7 +648,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           });
         } else {
           const mastery = storyItem.masteryScore ?? 25;
-          const safeTrans = !isStoryTransInvalid ? storyItem.translation : (aux || defaultFallback);
+          const safeTrans = !isStoryTransInvalid ? storyItem.translation : (safeTargetTrans || aux || '');
           vaultMap.set(key, {
             ...storyItem,
             id: `vault-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -968,8 +981,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           throw new Error('A história retornada pela IA está vazia ou incompleta.');
         }
 
-        setCurrentStory(newStory);
-        storageService.saveStory(newStory);
+        const localizedStory = localizeStory(newStory, settings.uiLanguage || 'pt');
+        setCurrentStory(localizedStory);
+        storageService.saveStory(localizedStory);
         setBookError(null);
 
         const storyWords = (newStory.paragraphs || []).reduce(
@@ -1034,8 +1048,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error('A história retornada pela IA está vazia ou incompleta.');
       }
 
-      setCurrentStory(newStory);
-      storageService.saveStory(newStory);
+      const localizedStory = localizeStory(newStory, settings.uiLanguage || 'pt');
+      setCurrentStory(localizedStory);
+      storageService.saveStory(localizedStory);
       setBookError(null);
 
       const storyWords = (newStory.paragraphs || []).reduce(
@@ -1093,8 +1108,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           throw new Error('A história retornada pela IA está vazia ou incompleta.');
         }
 
-        setCurrentStory(newStory);
-        storageService.saveStory(newStory);
+        const localizedStory = localizeStory(newStory, settings.uiLanguage || 'pt');
+        setCurrentStory(localizedStory);
+        storageService.saveStory(localizedStory);
         setBookError(null);
 
         const storyWords = (newStory.paragraphs || []).reduce(

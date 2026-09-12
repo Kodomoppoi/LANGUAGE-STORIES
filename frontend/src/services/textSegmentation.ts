@@ -1,6 +1,6 @@
 import { StoryToken, DictionaryEntry, LanguageCode } from '../types';
 import { getAuxiliaryTranslation, getAuxiliaryPOS, isInvalidTranslation } from './auxiliaryLexicon';
-import { getAuxiliaryRuby } from './auxiliaryPhonetics';
+import { getAuxiliaryRuby, toRomaji } from './auxiliaryPhonetics';
 
 /**
  * Verifica com segurança se um texto consiste apenas de pontuação, símbolos ou espaços.
@@ -163,7 +163,11 @@ interface SegmenterInstance {
 
     // Se for palavra do vocabulário alvo da lição
     if (targetEntry) {
-      const targetRuby = targetEntry.ruby || getAuxiliaryRuby(cleanText, language as LanguageCode);
+      const targetRuby = (language === 'ja'
+        ? (getAuxiliaryRuby(cleanText, 'ja') || (targetEntry.ruby ? toRomaji(targetEntry.ruby) : undefined))
+        : undefined)
+        || targetEntry.ruby
+        || getAuxiliaryRuby(cleanText, language as LanguageCode);
       return {
         id: tokenId,
         text: cleanText,
@@ -178,7 +182,11 @@ interface SegmenterInstance {
     // Verifica se coincide com alguma palavra do vocabulário alvo mesmo não capturada no intervalo
     const matchedVocab = targetVocabulary.find((v) => v.word.trim() === cleanText);
     if (matchedVocab) {
-      const vRuby = matchedVocab.ruby || getAuxiliaryRuby(cleanText, language as LanguageCode);
+      const vRuby = (language === 'ja'
+        ? (getAuxiliaryRuby(cleanText, 'ja') || (matchedVocab.ruby ? toRomaji(matchedVocab.ruby) : undefined))
+        : undefined)
+        || matchedVocab.ruby
+        || getAuxiliaryRuby(cleanText, language as LanguageCode);
       return {
         id: tokenId,
         text: cleanText,
@@ -193,10 +201,14 @@ interface SegmenterInstance {
     // Tenta obter do rawTokensHint se o LLM tiver fornecido tradução válida e sem pontuação
     const hint = rawTokensHint.find(
       (h) => h.text.trim() === cleanText && !isInvalidTranslation(h.translation, cleanText)
+    ) || rawTokensHint.find(
+      (h) => (h.text.trim().startsWith(cleanText) || cleanText.startsWith(h.text.trim())) && !isInvalidTranslation(h.translation, cleanText)
     );
 
-    const hintRuby = hint?.ruby && !isPunctuationToken(hint.ruby) ? hint.ruby : undefined;
-    const resolvedRuby = hintRuby || getAuxiliaryRuby(cleanText, language as LanguageCode);
+    const hintRuby = hint?.ruby && !isPunctuationToken(hint.ruby) ? hint.ruby.trim() : undefined;
+    const resolvedRuby = language === 'ja'
+      ? (getAuxiliaryRuby(cleanText, 'ja') || (hintRuby ? toRomaji(hintRuby) : undefined))
+      : (hintRuby || getAuxiliaryRuby(cleanText, language as LanguageCode));
 
     const safeHintTrans = hint?.translation && !isInvalidTranslation(hint.translation, cleanText)
       ? hint.translation
@@ -204,7 +216,7 @@ interface SegmenterInstance {
 
     const resolvedTrans = safeHintTrans
       || getAuxiliaryTranslation(cleanText, language, uiLang)
-      || (uiLang === 'en' ? 'Term in context' : 'Vocábulo no contexto');
+      || undefined;
 
     const resolvedPos = hint?.partOfSpeech || getAuxiliaryPOS(cleanText, language);
 
@@ -310,6 +322,22 @@ export function sanitizeOrUnpackTokens(
     };
   });
 
+  // Em japonês, funde marcas de prolongamento de som em Katakana ('ー') órfãs ao token anterior (ex: 'メニュ' + 'ー' -> 'メニュー')
+  if (language === 'ja') {
+    for (let i = 1; i < parsedRaw.length; i++) {
+      const curr = parsedRaw[i];
+      const prev = parsedRaw[i - 1];
+      if (curr.text === 'ー' && prev.text && /[\u30A0-\u30FF]$/.test(prev.text)) {
+        prev.text += 'ー';
+        if (prev.ruby && curr.ruby) {
+          prev.ruby += curr.ruby;
+        }
+        parsedRaw.splice(i, 1);
+        i--;
+      }
+    }
+  }
+
   // Detecta se há tokens colados com pontuação (ex: "下午，小明和")
   const hasClumpedTokens = parsedRaw.some((item) => {
     if (!item.text) return false;
@@ -354,12 +382,11 @@ export function sanitizeOrUnpackTokens(
         (!isInvalid ? item.translation : null) ||
         safeMatchedTrans ||
         getAuxiliaryTranslation(item.text, language, uiLang) ||
-        (uiLang === 'en' ? 'Term in context' : 'Vocábulo no contexto');
+        undefined;
 
-      const resolvedRuby =
-        item.ruby ||
-        matchedVocab?.ruby ||
-        getAuxiliaryRuby(item.text, language as LanguageCode);
+      const resolvedRuby = language === 'ja'
+        ? (getAuxiliaryRuby(item.text, 'ja') || (item.ruby ? toRomaji(item.ruby) : undefined) || (matchedVocab?.ruby ? toRomaji(matchedVocab.ruby) : undefined))
+        : (item.ruby || matchedVocab?.ruby || getAuxiliaryRuby(item.text, language as LanguageCode));
 
       return {
         id: `${idPrefix}-${tokenIdx++}`,

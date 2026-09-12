@@ -1,4 +1,10 @@
 import { Story, StorySentence, StoryToken, DictionaryEntry } from '../types';
+import {
+  getAuxiliaryTranslation,
+  isInvalidTranslation,
+  CHINESE_LEXICON,
+  JAPANESE_LEXICON,
+} from './auxiliaryLexicon';
 
 /**
  * Dicionário de traduções bilingues (Inglês <-> Português) para as histórias base
@@ -319,7 +325,7 @@ const SENTENCE_TRANSLATIONS: Record<string, TextTranslation> = {
   },
 };
 
-const COMMON_WORD_TRANSLATIONS: Record<string, TextTranslation> = {
+export const COMMON_WORD_TRANSLATIONS: Record<string, TextTranslation> = {
   // Japanese words
   '喫茶店': { en: 'cafe / coffee shop', pt: 'cafeteria / café' },
   '静か': { en: 'quiet / peaceful', pt: 'tranquilo / calmo' },
@@ -343,7 +349,7 @@ const COMMON_WORD_TRANSLATIONS: Record<string, TextTranslation> = {
   '微笑': { en: 'smile', pt: 'sorriso / sorrir' },
 
   // Spanish words
-  'caléndula': { en: 'marigold', pt: 'calêndula' },
+  'caléndula': { en: 'marigold', pt: 'caléndula' },
   'jardín': { en: 'garden', pt: 'jardim' },
   'aroma': { en: 'aroma / scent', pt: 'aroma / perfume' },
   'antiguo': { en: 'ancient / old', pt: 'antigo' },
@@ -370,6 +376,167 @@ const COMMON_WORD_TRANSLATIONS: Record<string, TextTranslation> = {
   'Gasse': { en: 'alley / lane', pt: 'beco / ruela' },
 };
 
+// Índice bidirecional de glossários/traduções em memória para fallback resiliente
+const GLOSS_MAP_EN_TO_PT = new Map<string, string>();
+const GLOSS_MAP_PT_TO_EN = new Map<string, string>();
+
+function registerGlossPair(en: string, pt: string): void {
+  if (!en || !pt) return;
+  const normEn = en.trim().toLowerCase();
+  const normPt = pt.trim().toLowerCase();
+  if (!GLOSS_MAP_EN_TO_PT.has(normEn)) GLOSS_MAP_EN_TO_PT.set(normEn, pt.trim());
+  if (!GLOSS_MAP_PT_TO_EN.has(normPt)) GLOSS_MAP_PT_TO_EN.set(normPt, en.trim());
+
+  // Registra variantes separadas por barra (ex: "cafe / coffee shop" -> "cafe", "coffee shop")
+  const enVariants = en.split('/').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const ptVariants = pt.split('/').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  for (const ev of enVariants) {
+    if (!GLOSS_MAP_EN_TO_PT.has(ev)) GLOSS_MAP_EN_TO_PT.set(ev, pt.trim());
+  }
+  for (const pv of ptVariants) {
+    if (!GLOSS_MAP_PT_TO_EN.has(pv)) GLOSS_MAP_PT_TO_EN.set(pv, en.trim());
+  }
+}
+
+// 1. Popula a partir de termos comuns
+for (const val of Object.values(COMMON_WORD_TRANSLATIONS)) {
+  registerGlossPair(val.en, val.pt);
+}
+
+// 2. Popula a partir do Léxico Japonês (200+ termos JLPT)
+for (const entry of Object.values(JAPANESE_LEXICON)) {
+  registerGlossPair(entry.en, entry.pt);
+}
+
+// 3. Popula a partir do Léxico Mandarim (150+ termos HSK)
+for (const entry of Object.values(CHINESE_LEXICON)) {
+  registerGlossPair(entry.en, entry.pt);
+}
+
+// 4. Glossários pedagógicos de partículas, gramática e tokens de histórias padrão
+const ADDITIONAL_GLOSS_PAIRS: [string, string][] = [
+  ['Tokyo', 'Tóquio'],
+  ['Capital of Japan', 'Capital do Japão'],
+  ['of', 'de (partícula de ligação / posse)'],
+  ['in / at', 'em / no / na'],
+  ['in', 'em'],
+  ['at', 'em / no / na'],
+  ['connector', 'conector / partícula de ligação'],
+  ['small', 'pequeno / pequena'],
+  ['there is / exists', 'há / existe / ter'],
+  ['there is', 'há / existe'],
+  ['there are', 'há / existem'],
+  ['exists', 'existe / há'],
+  ['comma', 'vírgula'],
+  ['period', 'ponto final'],
+  ['subject marker', 'marcador de sujeito'],
+  ['topic marker', 'marcador de tópico'],
+  ['object marker', 'marcador de objeto direto'],
+  ['direction marker', 'marcador de direção'],
+  ['location marker', 'marcador de local'],
+  ['State of calm serenity', 'Estado de calma e serenidade'],
+  ['Traditional Japanese coffee salon', 'Cafeteria tradicional japonesa'],
+  ['A narrow backstreet', 'Um beco ou ruela estreita'],
+  ['To take a sip', 'Tomar um gole'],
+  ['evening / dusk', 'entardecer / crepúsculo'],
+  ['to call out / speak', 'falar / chamar / dirigir a palavra'],
+  ['warm feeling / heart', 'coração aquecido / sentimento caloroso'],
+  ['to return home', 'voltar para casa'],
+  ['customer / guest', 'cliente / freguês'],
+  ['seat / chair', 'assento / lugar / cadeira'],
+  ['window', 'janela'],
+  ['umbrella', 'guarda-chuva'],
+  ['person / people', 'pessoa / pessoas'],
+  ['rainy day', 'dia chuvoso / dia de chuva'],
+  ['book', 'livro'],
+  ['read', 'ler'],
+  ['tea', 'chá'],
+  ['coffee', 'café'],
+  ['water', 'água'],
+  ['restaurant', 'restaurante'],
+  ['menu', 'cardápio / menu'],
+  ['order', 'pedido / pedir'],
+  ['recommendation', 'recomendação / sugestão'],
+  ['store clerk', 'atendente / funcionário da loja'],
+  ['delicious', 'gostoso / delicioso'],
+  ['please', 'por favor'],
+];
+
+for (const [en, pt] of ADDITIONAL_GLOSS_PAIRS) {
+  registerGlossPair(en, pt);
+}
+
+/**
+ * Traduz uma glosa descritiva ou definição entre Inglês e Português
+ */
+export function translateGloss(
+  gloss: string | undefined,
+  targetLang: 'pt' | 'en'
+): string | undefined {
+  if (!gloss || typeof gloss !== 'string') return undefined;
+  const trimmed = gloss.trim();
+  if (!trimmed) return undefined;
+  const lower = trimmed.toLowerCase();
+
+  if (targetLang === 'pt') {
+    const direct = GLOSS_MAP_EN_TO_PT.get(lower);
+    if (direct) return direct;
+    const clean = lower.replace(/[().,;!?"']/g, '').trim();
+    const cleanMatch = GLOSS_MAP_EN_TO_PT.get(clean);
+    if (cleanMatch) return cleanMatch;
+  } else {
+    const direct = GLOSS_MAP_PT_TO_EN.get(lower);
+    if (direct) return direct;
+    const clean = lower.replace(/[().,;!?"']/g, '').trim();
+    const cleanMatch = GLOSS_MAP_PT_TO_EN.get(clean);
+    if (cleanMatch) return cleanMatch;
+  }
+
+  return undefined;
+}
+
+/**
+ * Resolve com máxima prioridade a tradução de uma palavra para o idioma ativo da interface ('pt' ou 'en').
+ * 1. Consulta o Léxico Auxiliar oficial verificado (garantia de 100% de precisão no idioma alvo)
+ * 2. Consulta termos comuns bilíngues
+ * 3. Se houver tradução prévia em outro idioma, converte a glosa via mapeamento de dicionário
+ */
+export function resolveLocalizedWordTranslation(
+  word: string,
+  existingTranslation: string | undefined,
+  language: string,
+  uiLanguage: 'pt' | 'en'
+): string | undefined {
+  if (!word) return undefined;
+  const cleanWord = word.replace(/[、。！？「」『』（）()\s,.!?:;"]/g, '').trim();
+
+  // 1. Alta prioridade: Léxico Auxiliar oficial verificado
+  const aux = getAuxiliaryTranslation(cleanWord, language, uiLanguage)
+    || getAuxiliaryTranslation(word.trim(), language, uiLanguage);
+  if (aux && !isInvalidTranslation(aux, word)) {
+    return aux;
+  }
+
+  // 2. Tabela de termos comuns
+  if (cleanWord && COMMON_WORD_TRANSLATIONS[cleanWord]) {
+    return COMMON_WORD_TRANSLATIONS[cleanWord][uiLanguage];
+  }
+  if (COMMON_WORD_TRANSLATIONS[word.trim()]) {
+    return COMMON_WORD_TRANSLATIONS[word.trim()][uiLanguage];
+  }
+
+  // 3. Tradução de glosa existente
+  if (existingTranslation && !isInvalidTranslation(existingTranslation, word)) {
+    const translatedGloss = translateGloss(existingTranslation, uiLanguage);
+    if (translatedGloss) {
+      return translatedGloss;
+    }
+    return existingTranslation;
+  }
+
+  return undefined;
+}
+
 /**
  * Localiza a história atual (título, frases, vocabulário e tokens)
  * estritamente de acordo com o idioma selecionado para a interface ('pt' ou 'en').
@@ -386,9 +553,9 @@ export function localizeStory(story: Story, uiLanguage: 'en' | 'pt'): Story {
   }
 
   // 2. Localiza Parágrafos e Sentenças
-  const localizedParagraphs = story.paragraphs.map((para) => ({
+  const localizedParagraphs = (story.paragraphs || []).map((para) => ({
     ...para,
-    sentences: para.sentences.map((sentence) => {
+    sentences: (para.sentences || []).map((sentence) => {
       let sentenceTranslation = sentence.translation;
 
       // Busca correspondência exata da frase
@@ -397,18 +564,39 @@ export function localizeStory(story: Story, uiLanguage: 'en' | 'pt'): Story {
         sentenceTranslation = SENTENCE_TRANSLATIONS[trimmedText][targetLang];
       }
 
-      // Localiza tokens individuais
+      // Localiza tokens individuais com rigor absoluto no idioma da interface
       const localizedTokens = (sentence.tokens || []).map((token) => {
-        let tokenTrans = token.translation;
-        const cleanedToken = token.text.trim();
+        const localizedTrans = resolveLocalizedWordTranslation(
+          token.text,
+          token.translation,
+          story.language,
+          targetLang
+        );
 
-        if (COMMON_WORD_TRANSLATIONS[cleanedToken]) {
-          tokenTrans = COMMON_WORD_TRANSLATIONS[cleanedToken][targetLang];
+        let localizedExp = token.explanation;
+        if (token.explanation) {
+          const transExp = translateGloss(token.explanation, targetLang);
+          if (transExp) localizedExp = transExp;
+        }
+
+        const updatedTraits = token.traits ? { ...token.traits } : undefined;
+        if (updatedTraits && (updatedTraits as any).contextMeaning) {
+          const localizedContextMeaning = resolveLocalizedWordTranslation(
+            token.text,
+            (updatedTraits as any).contextMeaning,
+            story.language,
+            targetLang
+          );
+          if (localizedContextMeaning) {
+            (updatedTraits as any).contextMeaning = localizedContextMeaning;
+          }
         }
 
         return {
           ...token,
-          translation: tokenTrans,
+          translation: localizedTrans || token.translation,
+          explanation: localizedExp,
+          traits: updatedTraits,
         };
       });
 
@@ -425,9 +613,14 @@ export function localizeStory(story: Story, uiLanguage: 'en' | 'pt'): Story {
     let trans = entry.translation;
     let def = entry.definition;
 
-    const cleanedWord = entry.word.trim();
-    if (COMMON_WORD_TRANSLATIONS[cleanedWord]) {
-      trans = COMMON_WORD_TRANSLATIONS[cleanedWord][targetLang];
+    const localizedTrans = resolveLocalizedWordTranslation(
+      entry.word,
+      entry.translation,
+      story.language,
+      targetLang
+    );
+    if (localizedTrans) {
+      trans = localizedTrans;
       def = `${trans} (${targetLang === 'pt' ? 'Vocabulário da história' : 'Story vocabulary'})`;
     }
 
@@ -445,3 +638,4 @@ export function localizeStory(story: Story, uiLanguage: 'en' | 'pt'): Story {
     targetVocabulary: localizedVocabulary,
   };
 }
+

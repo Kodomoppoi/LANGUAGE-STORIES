@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { apiService } from '../../services/apiService';
 import { WordDeepDiveData } from '../../types';
 import { getProficiencyNativeInfo } from '../../services/proficiencyUtils';
+import { getAuxiliaryRuby, toRomaji } from '../../services/auxiliaryPhonetics';
 import {
   X,
   Volume2,
@@ -38,7 +39,10 @@ function generateMarkdownFromLegacyData(
   if (!data) return '';
   const isEn = uiLanguage === 'en';
   const isCJK = language === 'zh' || language === 'ja';
-  const ruby = data.ruby || data.pinyin || '';
+  let ruby = data.ruby || data.pinyin || '';
+  if (language === 'ja' && ruby) {
+    ruby = toRomaji(ruby);
+  }
   const pos = data.part_of_speech || (isCJK ? 'Palavra CJK' : 'Vocábulo');
   const level = data.hsk_level || data.level || '';
 
@@ -77,7 +81,11 @@ function generateMarkdownFromLegacyData(
   if (isCJK && data.shared_characters && data.shared_characters.length > 0) {
     md += `## 🌳 3. ${isEn ? 'Word Family & Compounds' : 'Família de Palavras & Compostos'}\n`;
     for (const item of data.shared_characters) {
-      const r = item.ruby || item.pinyin ? ` [${item.ruby || item.pinyin}]` : '';
+      let itemRuby = item.ruby || item.pinyin || (language === 'ja' ? getAuxiliaryRuby(item.word, 'ja') : undefined);
+      if (language === 'ja' && itemRuby) {
+        itemRuby = toRomaji(itemRuby);
+      }
+      const r = itemRuby ? ` [${itemRuby}]` : '';
       md += `- **${item.word}**${r}: ${item.meaning}\n`;
     }
     md += '\n';
@@ -278,10 +286,14 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
     if (vaultEntry) {
       toggleStarWord(vaultEntry.id);
     } else {
+      let rubyToSave = data?.ruby || data?.pinyin || getAuxiliaryRuby(word, currentLanguage);
+      if (currentLanguage === 'ja' && rubyToSave) {
+        rubyToSave = toRomaji(rubyToSave);
+      }
       addWordToVault({
         id: `vault-${Date.now()}`,
         word,
-        ruby: data?.ruby || data?.pinyin,
+        ruby: rubyToSave,
         translation: data?.context_meaning || 'Vocábulo analisado',
         partOfSpeech: data?.part_of_speech || 'Word',
         definition: data?.context_meaning || '',
@@ -354,9 +366,15 @@ export const WordDeepDiveModal: React.FC<WordDeepDiveModalProps> = ({
               <span className="deep-dive-word" id="deep-dive-title">
                 {word}
               </span>
-              {(data?.ruby || data?.pinyin) && (
-                <span className="deep-dive-ruby">{data?.ruby || data?.pinyin}</span>
-              )}
+              {(() => {
+                let effectiveRuby = data?.ruby || data?.pinyin || getAuxiliaryRuby(word, currentLanguage);
+                if (currentLanguage === 'ja' && effectiveRuby) {
+                  effectiveRuby = toRomaji(effectiveRuby);
+                }
+                return effectiveRuby ? (
+                  <span className="deep-dive-ruby">{effectiveRuby}</span>
+                ) : null;
+              })()}
               <span
                 className="deep-dive-level-badge"
                 style={{

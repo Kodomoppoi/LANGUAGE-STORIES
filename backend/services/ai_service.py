@@ -70,8 +70,8 @@ class ProviderRateLimiter:
                     now = time.monotonic()
                     self.timestamps = [t for t in self.timestamps if now - t < 60.0]
 
-            # 2. Espaçamento mínimo entre chamadas consecutivas
-            if self.timestamps:
+            # 2. Espaçamento mínimo entre chamadas consecutivas apenas se houver alta taxa (> 50% da cota)
+            if self.timestamps and len(self.timestamps) >= (self.effective_rpm * 0.5):
                 last_req = self.timestamps[-1]
                 elapsed = now - last_req
                 if elapsed < self.min_interval:
@@ -106,9 +106,9 @@ class AIService:
         emit_log(f"Disparando inferência no modelo {effective_model} via Gemini API (pacing 80% ativo, zero reasoning)...", level="INFO", source="GEMINI")
 
         candidate_models = [effective_model]
-        fallback_model = "gemini-3.7-flash" if effective_model != "gemini-3.7-flash" else "gemini-3.6-flash"
-        if fallback_model not in candidate_models:
-            candidate_models.append(fallback_model)
+        for fallback in ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-3.8-flash"]:
+            if fallback not in candidate_models:
+                candidate_models.append(fallback)
 
         for target_model in candidate_models:
             clean_model = target_model.replace("models/", "").strip()
@@ -120,17 +120,19 @@ class AIService:
 
             gen_config: Dict[str, Any] = {"responseMimeType": "application/json"}
             clean_model_lower = clean_model.lower()
-            if clean_model_lower.startswith("gemini-3") or "3." in clean_model_lower:
-                gen_config["thinkingConfig"] = {"thinkingLevel": "MINIMAL"}
-            elif "2.5" in clean_model_lower:
-                gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+            if "3.7" in clean_model_lower or "3.8" in clean_model_lower:
+                gen_config["thinkingConfig"] = {"thinkingLevel": "LOW"}
+            elif "3.5" in clean_model_lower or "3.6" in clean_model_lower:
+                gen_config["thinkingConfig"] = {"thinkingBudget": 128}
+            elif "flash" in clean_model_lower:
+                gen_config["thinkingConfig"] = {"thinkingLevel": "LOW"}
 
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": gen_config,
             }
 
-            async with httpx.AsyncClient(timeout=18.0) as client:
+            async with httpx.AsyncClient(timeout=35.0) as client:
                 for attempt in range(2):
                     try:
                         resp = await client.post(endpoint, json=payload, headers=headers)
@@ -160,7 +162,12 @@ class AIService:
                         elif resp.status_code == 400:
                             resp_text = resp.text
                             emit_log(f"Gemini retornou status 400 [{clean_model}]: {resp_text[:150]}", level="WARN", source="GEMINI")
-                            if "API key not valid" in resp_text or "INVALID_ARGUMENT" in resp_text:
+                            if "thinking" in resp_text.lower() and "thinkingConfig" in gen_config and attempt == 0:
+                                emit_log(f"Recuperando de 400: Retestando [{clean_model}] sem thinkingConfig...", level="INFO", source="GEMINI")
+                                gen_config.pop("thinkingConfig", None)
+                                payload["generationConfig"] = gen_config
+                                continue
+                            if "API key not valid" in resp_text:
                                 raise AIServiceError(
                                     "A chave da API Gemini fornecida não é válida ou foi recusada pelo Google (Erro 400).",
                                     error_type="api_key_error",
@@ -179,17 +186,11 @@ class AIService:
                         elif resp.status_code == 429:
                             resp_text = resp.text
                             emit_log(f"Gemini retornou status 429 [{clean_model}]: {resp_text[:150]}", level="WARN", source="GEMINI")
-                            if "billing details" in resp_text or "plan and billing" in resp_text:
-                                raise AIServiceError(
-                                    "Cota diária ou plano gratuito do Gemini esgotado no Google AI Studio (Erro 429). Utilize o OpenRouter (Free Tier) ou adicione outra chave.",
-                                    error_type="quota_exceeded",
-                                    status_code=429,
-                                )
-                            raise AIServiceError(
-                                "Cota de requisições por minuto do Gemini excedida (Erro 429 RESOURCE_EXHAUSTED).",
-                                error_type="quota_exceeded",
-                                status_code=429,
-                            )
+                            if "per_day" in resp_text.lower() or "daily" in resp_text.lower():
+                                emit_log(f"Cota diária esgotada para [{clean_model}]. Testando próximo modelo...", level="WARN", source="GEMINI")
+                            else:
+                                emit_log(f"Cota de RPM temporariamente atingida no modelo {clean_model}. Testando próximo modelo candidato...", level="INFO", source="GEMINI")
+                            break
 
                         else:
                             emit_log(f"Gemini retornou status {resp.status_code} [{clean_model}]: {resp.text[:150]}", level="WARN", source="GEMINI")
@@ -198,16 +199,16 @@ class AIService:
                     except AIServiceError:
                         raise
                     except httpx.TimeoutException:
-                        emit_log(f"Timeout (18s) na requisição Gemini [{clean_model}].", level="WARN", source="GEMINI")
+                        emit_log(f"Timeout (35s) na requisição Gemini [{clean_model}].", level="WARN", source="GEMINI")
                         break
                     except Exception as e:
                         emit_log(f"Falha na requisição Gemini [{clean_model}] ({e}).", level="WARN", source="GEMINI")
                         break
 
         raise AIServiceError(
-            "Os servidores do Google Gemini estão enfrentando alta demanda temporária (Erro 503).",
-            error_type="service_unavailable",
-            status_code=503,
+            "Modelos candidatos do Google Gemini atingiram limite de requisições ou estão indisponíveis (Erro 429/503).",
+            error_type="quota_exceeded",
+            status_code=429,
         )
 
     async def _call_openrouter(

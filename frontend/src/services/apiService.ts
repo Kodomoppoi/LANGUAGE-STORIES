@@ -364,9 +364,11 @@ class ApiService {
       throw new Error('Palavra inválida');
     }
 
+    const uiLang = settings.uiLanguage || 'pt';
+
     // 1. Verificação em Cache Local (0ms de latência)
     if (!forceRefresh) {
-      const cached = storageService.loadWordDeepDive(language, trimmedWord);
+      const cached = storageService.loadWordDeepDive(language, trimmedWord, uiLang);
       if (cached) {
         logService.addLog('INFO', 'FRONTEND', `Raio-X de "${trimmedWord}" carregado instantaneamente do cache local (0ms).`);
         return cached;
@@ -397,7 +399,7 @@ class ApiService {
         });
         if (resp.ok) {
           const data = await resp.json();
-          storageService.saveWordDeepDive(language, trimmedWord, data);
+          storageService.saveWordDeepDive(language, trimmedWord, data, uiLang);
           logService.addLog('SUCCESS', 'STAGE', `Raio-X de "${trimmedWord}" recebido e armazenado em cache!`);
           return data;
         }
@@ -418,7 +420,7 @@ class ApiService {
           nativeLang,
           settings
         );
-        storageService.saveWordDeepDive(language, trimmedWord, data);
+        storageService.saveWordDeepDive(language, trimmedWord, data, uiLang);
         logService.addLog('SUCCESS', 'GEMINI', `Raio-X de "${trimmedWord}" gerado via Gemini e armazenado em cache!`);
         return data;
       } catch (err) {
@@ -437,7 +439,7 @@ class ApiService {
           language,
           proficiency
         );
-        storageService.saveWordDeepDive(language, trimmedWord, data);
+        storageService.saveWordDeepDive(language, trimmedWord, data, uiLang);
         logService.addLog('SUCCESS', 'OPENROUTER', `Raio-X de "${trimmedWord}" gerado via OpenRouter e armazenado em cache!`);
         return data;
       } catch (err) {

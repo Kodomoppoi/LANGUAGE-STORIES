@@ -1,6 +1,6 @@
-from typing import Dict
 from .base import LanguageProfile
 from .chinese import ChineseProfile
+from .japanese import JapaneseProfile
 from .generic import GenericLanguageProfile
 
 
@@ -8,6 +8,7 @@ class LanguageRegistry:
     def __init__(self):
         self._profiles: Dict[str, LanguageProfile] = {
             "zh": ChineseProfile(),
+            "ja": JapaneseProfile(),
         }
 
     def register(self, profile: LanguageProfile):

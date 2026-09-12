@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     app_name: str = "Language Stories Backend"
     database_url: str = f"sqlite:///{BASE_DIR / 'language_stories.db'}"
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
     openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
     openrouter_model: str = os.getenv("OPENROUTER_MODEL", "openrouter/free")
     api_provider: str = os.getenv("API_PROVIDER", "hybrid")

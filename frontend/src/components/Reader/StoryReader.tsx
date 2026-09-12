@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { WordPopover } from './WordPopover';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { BookErrorCard } from './BookErrorCard';
-import { getAuxiliaryRuby } from '../../services/auxiliaryPhonetics';
+import { getAuxiliaryRuby, toRomaji } from '../../services/auxiliaryPhonetics';
 import {
   ChevronLeft,
   ChevronRight,
@@ -323,7 +323,9 @@ export const StoryReader: React.FC = () => {
                       title={t('clickForDetails')}
                     >
                       {(() => {
-                        const displayRuby = token.ruby || (langInfo?.hasRuby ? getAuxiliaryRuby(token.text, currentLanguage) : undefined);
+                        const displayRuby = currentLanguage === 'ja'
+                          ? (getAuxiliaryRuby(token.text, 'ja') || (token.ruby ? toRomaji(token.ruby) : undefined))
+                          : (token.ruby || (langInfo?.hasRuby ? getAuxiliaryRuby(token.text, currentLanguage) : undefined));
                         return settings.showRuby && displayRuby ? (
                           <ruby>
                             {token.text}
@@ -1054,14 +1056,14 @@ export const StoryReader: React.FC = () => {
           )}
         </div>
 
-        {/* Ruby Toggle */}
+        {/* Ruby / Phonetics Toggle */}
         {langInfo?.hasRuby && (
           <button
             className={`dock-chip-btn ${settings.showRuby ? 'active' : ''}`}
             onClick={() => updateSettings({ showRuby: !settings.showRuby })}
             title={t('rubyTooltip')}
           >
-            Ruby {settings.showRuby ? 'ON' : 'OFF'}
+            {currentLanguage === 'ja' ? 'Rōmaji' : (currentLanguage === 'zh' ? 'Pinyin' : 'Ruby')} {settings.showRuby ? 'ON' : 'OFF'}
           </button>
         )}
 
