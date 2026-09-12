@@ -1,9 +1,9 @@
 > [!NOTE]
 > **Important information for beginners:** This application lets you practice a new language by reading interactive 3D stories. No manual setup is required – just double‑click `run.bat`. The script will check for Node.js and Python, install missing packages, and automatically open your default web browser.
 
-[Demo video](https://youtu.be/q0s4YX148H8?si=OEB-99Ce7YFSyOY_)
+🎥 **Demo Video**: [Watch the walkthrough on YouTube (10-12 min)](https://youtu.be/q0s4YX148H8)
 
-![Demo GIF](file:///C:/Users/Pichau/Downloads/Gravando2026-09-12142601-ezgif.com-video-to-gif-converter.gif)
+![Demo GIF](assets/demo.gif)
 
 #  Language Stories
 
