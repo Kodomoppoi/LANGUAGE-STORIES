@@ -6,34 +6,34 @@ const rootDir = path.resolve(__dirname, '..');
 const frontendDir = path.join(rootDir, 'frontend');
 const backendDir = path.join(rootDir, 'backend');
 
-console.log('\n🔍 [Language Stories] Verificando requisitos e dependências...');
+console.log('\n🔍 [Language Stories] Verifying requirements and dependencies...');
 
-// 1. Verificar arquivo .env
+// 1. Verify .env file
 const rootEnv = path.join(rootDir, '.env');
 const backendEnv = path.join(backendDir, '.env');
 const envExample = path.join(backendDir, '.env.example');
 
 if (!fs.existsSync(rootEnv) && !fs.existsSync(backendEnv)) {
   if (fs.existsSync(envExample)) {
-    console.log('📝 Criando arquivo .env a partir de backend/.env.example...');
+    console.log('📝 Creating .env file from backend/.env.example...');
     fs.copyFileSync(envExample, rootEnv);
-    console.log('   ✅ Arquivo .env criado na raiz do projeto.');
+    console.log('   ✅ .env file created at project root.');
   }
 }
 
-// 2. Verificar dependências do frontend
+// 2. Verify frontend dependencies
 const frontendNodeModules = path.join(frontendDir, 'node_modules');
 if (!fs.existsSync(frontendNodeModules)) {
-  console.log('📦 Dependências do Frontend não encontradas. Baixando automaticamente (npm install)...');
+  console.log('📦 Frontend dependencies not found. Installing automatically (npm install)...');
   try {
     execSync('npm install', { cwd: frontendDir, stdio: 'inherit' });
-    console.log('   ✅ Dependências do Frontend instaladas com sucesso.');
+    console.log('   ✅ Frontend dependencies installed successfully.');
   } catch (err) {
-    console.error('   ❌ Falha ao instalar dependências do Frontend:', err.message);
+    console.error('   ❌ Failed to install frontend dependencies:', err.message);
   }
 }
 
-// 3. Verificar ambiente virtual Python (.venv)
+// 3. Verify Python virtual environment (.venv)
 const isWindows = process.platform === 'win32';
 const venvDir = path.join(rootDir, '.venv');
 const pythonInVenv = isWindows
@@ -41,7 +41,7 @@ const pythonInVenv = isWindows
   : path.join(venvDir, 'bin', 'python');
 
 if (!fs.existsSync(pythonInVenv)) {
-  console.log('🐍 Ambiente virtual Python (.venv) não encontrado. Criando automaticamente...');
+  console.log('🐍 Python virtual environment (.venv) not found. Setting up...');
   let venvCreated = false;
   try {
     execSync('python -m venv .venv', { cwd: rootDir, stdio: 'inherit' });
@@ -51,23 +51,23 @@ if (!fs.existsSync(pythonInVenv)) {
       execSync('python3 -m venv .venv', { cwd: rootDir, stdio: 'inherit' });
       venvCreated = true;
     } catch (e2) {
-      console.warn('   ⚠️ Não foi possível criar .venv automaticamente. Verifique se o Python está no PATH.');
+      console.warn('   ⚠️ Could not automatically create .venv. Please ensure Python is in your PATH.');
     }
   }
 
   if (venvCreated && fs.existsSync(pythonInVenv)) {
-    console.log('📦 Instalando bibliotecas Python do backend (requirements.txt)...');
+    console.log('📦 Installing backend Python packages (requirements.txt)...');
     const pipInVenv = isWindows
       ? path.join(venvDir, 'Scripts', 'pip.exe')
       : path.join(venvDir, 'bin', 'pip');
     const reqFile = path.join(backendDir, 'requirements.txt');
     try {
       execSync(`"${pipInVenv}" install -r "${reqFile}"`, { cwd: rootDir, stdio: 'inherit' });
-      console.log('   ✅ Bibliotecas Python instaladas com sucesso.');
+      console.log('   ✅ Python packages installed successfully.');
     } catch (err) {
-      console.error('   ❌ Falha ao instalar requirements.txt:', err.message);
+      console.error('   ❌ Failed to install requirements.txt:', err.message);
     }
   }
 }
 
-console.log('🚀 [Language Stories] Requisitos verificados com sucesso!\n');
+console.log('🚀 [Language Stories] All dependencies and services verified!\n');
