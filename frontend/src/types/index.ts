@@ -15,6 +15,8 @@ export type ProficiencyLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
 
 export type SRSStage = 'new' | 'learning' | 'review' | 'mastered';
 
+export type SRSStatusColor = 'orange' | 'yellow' | 'green';
+
 export interface SRSMetrics {
   repetition: number;
   interval: number; // Days until next review
@@ -26,6 +28,22 @@ export interface SRSMetrics {
   correctReviews: number;
 }
 
+/**
+ * Traços Linguísticos Específicos para Mandarim (languages/chinese.py)
+ */
+export interface ChineseTraits {
+  hanzi?: string;
+  pinyin?: string;
+  radicals?: string; // Radical estrutural do caractere (部首) e significado (ex: "氵 (água)")
+  radicalChar?: string;
+  radicalMeaning?: string;
+  hskLevel?: string; // HSK 1 a HSK 6
+  contextMeaning?: string; // Tradução e sentido exato no contexto da frase
+  partOfSpeech?: string; // Classificação gramatical
+}
+
+export type LanguageTraits = ChineseTraits | Record<string, any>;
+
 export interface StoryToken {
   id: string;
   text: string;
@@ -36,7 +54,11 @@ export interface StoryToken {
   explanation?: string;
   isTargetWord?: boolean; // Highlighted word for learning in this story
   srsStage?: SRSStage;
+  masteryScore?: number; // 0 - 100%
+  statusColor?: SRSStatusColor; // 'orange' | 'yellow' | 'green'
+  traits?: LanguageTraits;
   audioText?: string;
+  isPunctuation?: boolean; // Static punctuation token (not clickable, no SRS highlight)
 }
 
 export interface StorySentence {
@@ -64,8 +86,14 @@ export interface DictionaryEntry {
   language: LanguageCode;
   proficiency: ProficiencyLevel;
   isStarred?: boolean;
-  occurrences?: number; // How many times it appears in current story
-  lifetimeOccurrences?: number; // Cumulative occurrences across all stories read
+  isPinned?: boolean; // Pinned (⭐): prioridade máxima no prompt e repetição no tema
+  masteryScore?: number; // Pontuação contínua de saber (0.0 a 1.0 ou 0% a 100%)
+  statusColor?: SRSStatusColor; // 'orange' (0-35%), 'yellow' (36-70%), 'green' (71-100%)
+  repetitionWeight?: number; // Peso de repetição (ex: 4 para laranja/fixadas, 2 para amarelo, 1 para verde)
+  lookedUpCount?: number; // Quantidade de vezes consultada no leitor (penaliza score recente)
+  traits?: LanguageTraits; // Traços específicos da língua (ex: ChineseTraits com Hanzi, Pinyin, Radicais, HSK)
+  occurrences?: number; // Quantas vezes aparece na história atual
+  lifetimeOccurrences?: number; // Cumulativo através de todas as histórias
   lastSeenDate?: string;
   srsMetrics: SRSMetrics;
   createdAt: string;
@@ -112,13 +140,18 @@ export interface UserStats {
   lastActiveDate: string;
 }
 
-export type ActiveTab = 'story' | 'dictionary' | 'library';
+export type ActiveTab = 'story' | 'dictionary' | 'starred' | 'library';
+
+export type UILanguage = 'en' | 'pt';
 
 export interface AppSettings {
   theme: 'light' | 'dark';
-  apiProvider: 'hybrid' | 'gemini' | 'ollama' | 'mock';
+  uiLanguage: UILanguage;
+  apiProvider: 'hybrid' | 'gemini' | 'openrouter' | 'ollama' | 'mock';
   geminiApiKey: string;
   geminiModel: string;
+  openRouterApiKey?: string;
+  openRouterModel?: string;
   ollamaUrl: string;
   ollamaModel: string;
   backendUrl: string;
@@ -137,8 +170,74 @@ export interface LanguageInfo {
   nativeName: string;
   flag: string;
   hasRuby: boolean;
-  rubyType?: 'furigana' | 'pinyin';
+  rubyType?: 'romaji' | 'katakana' | 'furigana' | 'pinyin';
   isRTL?: boolean;
   sampleFontFamily: string;
   ttsVoiceHint: string;
 }
+
+// ---------------------------------------------------------------------------
+// Server-Sent Events (SSE) Streaming e Mascote de Carregamento
+// ---------------------------------------------------------------------------
+
+export type SSEStage =
+  | 'idle'
+  | 'stage_start:curation'
+  | 'stage_curation_done'
+  | 'stage_start:generation'
+  | 'stage_done'
+  | 'error';
+
+export interface SSEGenerationPayload {
+  message?: string;
+  new_words_count?: number;
+  review_words_count?: number;
+  story_id?: string | number;
+  title?: string;
+  dictionary?: any[];
+  content?: string;
+  error_message?: string;
+  story?: Story;
+  [key: string]: any;
+}
+
+export interface SSEGenerationEvent {
+  event: SSEStage;
+  data: SSEGenerationPayload;
+}
+
+export interface MascotState {
+  isActive: boolean;
+  stage: SSEStage;
+  action: 'idle' | 'searching' | 'celebrating' | 'writing' | 'presenting' | 'alert';
+  message: string;
+  counts?: {
+    newWordsCount: number;
+    reviewWordsCount: number;
+  };
+  progress: number;
+}
+
+// ---------------------------------------------------------------------------
+// Diagnóstico de Erros no Livro (Book Error Info)
+// ---------------------------------------------------------------------------
+
+export type BookErrorType =
+  | 'api_key_error'
+  | 'quota_exceeded'
+  | 'service_unavailable'
+  | 'tts_error'
+  | 'generation_error';
+
+export interface BookErrorInfo {
+  type: BookErrorType;
+  title: string;
+  message: string;
+  actionInstructions: string[];
+  actionLabel: string;
+  actionType: 'open_settings' | 'retry' | 'dismiss';
+  rawError?: string;
+  language?: LanguageCode;
+}
+
+export * from './deepDive';

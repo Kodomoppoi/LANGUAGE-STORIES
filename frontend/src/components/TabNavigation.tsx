@@ -7,6 +7,7 @@ export const TabNavigation: React.FC = () => {
     activeTab,
     setActiveTab,
     allStoryWords,
+    t,
   } = useApp();
 
   return (
@@ -23,14 +24,14 @@ export const TabNavigation: React.FC = () => {
             <BookOpen size={22} />
           </div>
           <div className="tab-card-text">
-            <h3>Activate Story on Current Tab</h3>
+            <h3>{t('tabCardStoryTitle')}</h3>
             <p>
-              Interactive reader with clickable tokens, ruby phonetics, and retention quiz
+              {t('tabCardStoryDesc')}
             </p>
           </div>
         </div>
         <span className="tab-status-pill">
-          {activeTab === 'story' ? 'Active Reader 📖' : 'Switch to Story'}
+          {activeTab === 'story' ? t('tabCardStoryActive') : t('tabCardStorySwitch')}
         </span>
       </div>
 
@@ -46,14 +47,14 @@ export const TabNavigation: React.FC = () => {
             <BookMarked size={22} />
           </div>
           <div className="tab-card-text">
-            <h3>Activate Dictionary on Current Tab</h3>
+            <h3>{t('tabCardDictTitle')}</h3>
             <p>
-              Full tabular dictionary indexing all {allStoryWords.length} words of this narrative
+              {t('tabCardDictDesc')} ({allStoryWords.length})
             </p>
           </div>
         </div>
         <span className="tab-status-pill">
-          {activeTab === 'dictionary' ? 'Active Table 📚' : 'Switch to Dictionary'}
+          {activeTab === 'dictionary' ? t('tabCardDictActive') : t('tabCardDictSwitch')}
         </span>
       </div>
     </div>

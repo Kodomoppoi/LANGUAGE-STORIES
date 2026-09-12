@@ -1,4 +1,4 @@
-import { Story, LanguageCode, ProficiencyLevel, DictionaryEntry, StoryLength, RepetitionDensity, AppSettings } from '../../types';
+import { Story, LanguageCode, ProficiencyLevel, DictionaryEntry, StoryLength, RepetitionDensity, AppSettings, SSEGenerationEvent } from '../../types';
 
 export interface GenerateStoryParams {
   language: LanguageCode;
@@ -10,6 +10,7 @@ export interface GenerateStoryParams {
   targetWords?: string[];
   storyLength?: StoryLength;
   repetitionDensity?: RepetitionDensity;
+  nativeLanguage?: 'Portuguese' | 'English';
 }
 
 export interface StoryGeneratorProvider {
@@ -17,4 +18,10 @@ export interface StoryGeneratorProvider {
   readonly name: string;
   isAvailable(settings: AppSettings): boolean;
   generateStory(params: GenerateStoryParams, settings: AppSettings): Promise<Story>;
+  generateStoryStream?(
+    params: GenerateStoryParams,
+    settings: AppSettings,
+    onEvent: (event: SSEGenerationEvent) => void
+  ): Promise<Story>;
 }
+

@@ -31,19 +31,6 @@ const CONTEXT_PRESETS = [
 
 const PROFICIENCY_LEVELS: ProficiencyLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1'];
 
-const STORY_LENGTHS: { value: StoryLength; label: string; desc: string }[] = [
-  { value: 'standard', label: 'Mínimo (~350 palavras)', desc: '4 Parágrafos estruturados' },
-  { value: 'medium', label: 'Médio (~600 palavras)', desc: '6 Parágrafos detalhados' },
-  { value: 'extended', label: 'Longo (~900 palavras)', desc: '8 Parágrafos imersivos' },
-  { value: 'epic', label: 'Épico (~1300 palavras)', desc: '10+ Parágrafos extensos' },
-];
-
-const REPETITION_DENSITIES: { value: RepetitionDensity; label: string; desc: string }[] = [
-  { value: 'high', label: 'Alta (3x a 5x)', desc: 'Repetição ideal para retenção' },
-  { value: 'intense', label: 'Intensa (4x a 6x)', desc: 'Imersão e fixação máxima' },
-  { value: 'normal', label: 'Normal (2x a 3x)', desc: 'Repetição balanceada' },
-];
-
 export const Sidebar: React.FC = () => {
   const {
     currentLanguage,
@@ -57,11 +44,52 @@ export const Sidebar: React.FC = () => {
     generateWithSameDictionary,
     increaseDictionaryAndGenerate,
     isGeneratingStory,
+    t,
   } = useApp();
 
   const [selectedContext, setSelectedContext] = useState('');
   const [customContext, setCustomContext] = useState('');
   const [numNewWords, setNumNewWords] = useState(3);
+
+  const isEn = settings.uiLanguage === 'en';
+
+  const contextPresets = [
+    { value: '', label: isEn ? 'None (Automatic by Proficiency)' : 'Nenhum (Automático por Nível)' },
+    { value: 'Cozy Tokyo Cafe', label: isEn ? '☕ Cozy Tokyo Cafe' : '☕ Café Aconchegante em Tóquio' },
+    { value: 'Desert Caravan Mystery', label: isEn ? '🏜️ Desert Caravan Mystery' : '🏜️ Mistério da Caravana no Deserto' },
+    { value: 'Traditional Teahouse', label: isEn ? '🍵 Traditional Teahouse' : '🍵 Casa de Chá Tradicional' },
+    { value: 'The Old Alchemist Garden', label: isEn ? '🌿 Old Alchemist Garden' : '🌿 Jardim do Velho Alquimista' },
+    { value: 'Midnight Street Food Market', label: isEn ? '🏮 Midnight Food Market' : '🏮 Feira Noturna de Gastronomia' },
+    { value: 'Cyberpunk Neon Alley', label: isEn ? '🚀 Cyberpunk Neon Alley' : '🚀 Beco Neon Cyberpunk' },
+    { value: 'Sunny Mediterranean Harbor', label: isEn ? '⛵ Mediterranean Harbor' : '⛵ Porto Mediterrâneo Ensolarado' },
+    { value: 'Custom', label: isEn ? '✍️ Custom Theme / Prompt...' : '✍️ Tema / Contexto Personalizado...' },
+  ];
+
+  const storyLengths: { value: StoryLength; label: string; desc: string }[] = isEn
+    ? [
+        { value: 'standard', label: 'Minimum (~350 words)', desc: '4 Structured paragraphs' },
+        { value: 'medium', label: 'Medium (~600 words)', desc: '6 Detailed paragraphs' },
+        { value: 'extended', label: 'Long (~900 words)', desc: '8 Immersive paragraphs' },
+        { value: 'epic', label: 'Epic (~1300 words)', desc: '10+ Extensive paragraphs' },
+      ]
+    : [
+        { value: 'standard', label: 'Mínimo (~350 palavras)', desc: '4 Parágrafos estruturados' },
+        { value: 'medium', label: 'Médio (~600 palavras)', desc: '6 Parágrafos detalhados' },
+        { value: 'extended', label: 'Longo (~900 palavras)', desc: '8 Parágrafos imersivos' },
+        { value: 'epic', label: 'Épico (~1300 palavras)', desc: '10+ Parágrafos extensos' },
+      ];
+
+  const repetitionDensities: { value: RepetitionDensity; label: string; desc: string }[] = isEn
+    ? [
+        { value: 'high', label: 'High (3x to 5x)', desc: 'Ideal repetition for retention' },
+        { value: 'intense', label: 'Intense (4x to 6x)', desc: 'Maximum immersion and reinforcement' },
+        { value: 'normal', label: 'Normal (2x to 3x)', desc: 'Balanced repetition' },
+      ]
+    : [
+        { value: 'high', label: 'Alta (3x a 5x)', desc: 'Repetição ideal para retenção' },
+        { value: 'intense', label: 'Intensa (4x a 6x)', desc: 'Imersão e fixação máxima' },
+        { value: 'normal', label: 'Normal (2x a 3x)', desc: 'Repetição balanceada' },
+      ];
 
   const handleGenerateNew = async () => {
     const finalContext = selectedContext === 'Custom' ? customContext : selectedContext;
@@ -80,7 +108,7 @@ export const Sidebar: React.FC = () => {
       <div className="sidebar-panel">
         <div className="panel-header-title">
           <Cpu size={16} />
-          <span>Engine & Target Language</span>
+          <span>{t('sidebarEngineAndLang')}</span>
         </div>
 
         {/* API Status Widget */}
@@ -88,9 +116,9 @@ export const Sidebar: React.FC = () => {
           className="control-group"
           style={{ cursor: 'pointer' }}
           onClick={() => setIsSettingsOpen(true)}
-          title="Click to configure Backend, Gemini or Ollama"
+          title={t('sidebarEngineTooltip')}
         >
-          <label className="control-label">API Engine & Provider</label>
+          <label className="control-label">{t('sidebarApiEngine')}</label>
           <div
             style={{
               display: 'flex',
@@ -104,19 +132,23 @@ export const Sidebar: React.FC = () => {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {settings.isBackendConnected ? (
+              {(settings.geminiApiKey?.trim() || settings.openRouterApiKey?.trim()) ? (
+                <Sparkles size={15} color="#22c55e" />
+              ) : settings.isBackendConnected ? (
                 <CheckCircle2 size={15} color="#22c55e" />
-              ) : settings.geminiApiKey ? (
-                <Sparkles size={15} color="var(--flower-400)" />
               ) : (
                 <AlertCircle size={15} color="var(--flower-400)" />
               )}
               <span style={{ fontWeight: 600 }}>
-                {settings.isBackendConnected
-                  ? 'FastAPI Backend Live'
-                  : settings.geminiApiKey
-                  ? 'Gemini 2.5 Flash'
-                  : 'Smart Procedural Offline'}
+                {settings.geminiApiKey?.trim() && settings.openRouterApiKey?.trim()
+                  ? '⚡ Auto-Fallback (Gemini + OpenRouter)'
+                  : settings.openRouterApiKey?.trim()
+                  ? `OpenRouter Free (${settings.openRouterModel?.split('/')?.[1] || 'Free Tier'})`
+                  : settings.geminiApiKey?.trim()
+                  ? (settings.isBackendConnected ? `FastAPI + ${settings.geminiModel || 'Gemini'}` : `${settings.geminiModel || 'Gemini'} (Direct)`)
+                  : settings.isBackendConnected
+                  ? (isEn ? 'FastAPI Local (Sem IA)' : 'FastAPI Local (Sem IA)')
+                  : (isEn ? 'Smart Procedural Offline' : 'Procedural Inteligente Offline')}
               </span>
             </div>
             <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Config ⚙️</span>
@@ -127,7 +159,7 @@ export const Sidebar: React.FC = () => {
         <div className="control-group">
           <label className="control-label" htmlFor="lang-select">
             <Globe size={13} style={{ display: 'inline', marginRight: 4 }} />
-            Target Language
+            {t('sidebarTargetLanguage')}
           </label>
           <select
             id="lang-select"
@@ -149,7 +181,7 @@ export const Sidebar: React.FC = () => {
         <div className="control-group">
           <label className="control-label">
             <Gauge size={13} style={{ display: 'inline', marginRight: 4 }} />
-            Proficiency Level (CEFR)
+            {t('sidebarProficiency')}
           </label>
           <div className="proficiency-grid">
             {PROFICIENCY_LEVELS.map((lvl) => (
@@ -170,13 +202,13 @@ export const Sidebar: React.FC = () => {
       <div className="sidebar-panel">
         <div className="panel-header-title">
           <BookOpen size={16} />
-          <span>Tamanho & Repetições</span>
+          <span>{t('sidebarStoryLengthAndRep')}</span>
         </div>
 
         {/* Story Length Selector */}
         <div className="control-group">
           <label className="control-label" htmlFor="length-select">
-            Tamanho da História
+            {t('sidebarStoryLength')}
           </label>
           <select
             id="length-select"
@@ -184,7 +216,7 @@ export const Sidebar: React.FC = () => {
             value={settings.storyLength || 'standard'}
             onChange={(e) => updateSettings({ storyLength: e.target.value as StoryLength })}
           >
-            {STORY_LENGTHS.map((len) => (
+            {storyLengths.map((len) => (
               <option key={len.value} value={len.value}>
                 {len.label} · {len.desc}
               </option>
@@ -196,7 +228,7 @@ export const Sidebar: React.FC = () => {
         <div className="control-group">
           <label className="control-label" htmlFor="rep-select">
             <Repeat size={13} style={{ display: 'inline', marginRight: 4 }} />
-            Densidade de Repetição (SRS)
+            {t('sidebarRepetitionDensity')}
           </label>
           <select
             id="rep-select"
@@ -204,7 +236,7 @@ export const Sidebar: React.FC = () => {
             value={settings.repetitionDensity || 'high'}
             onChange={(e) => updateSettings({ repetitionDensity: e.target.value as RepetitionDensity })}
           >
-            {REPETITION_DENSITIES.map((rep) => (
+            {repetitionDensities.map((rep) => (
               <option key={rep.value} value={rep.value}>
                 {rep.label} · {rep.desc}
               </option>
@@ -217,13 +249,13 @@ export const Sidebar: React.FC = () => {
       <div className="sidebar-panel">
         <div className="panel-header-title">
           <Layers size={16} />
-          <span>Story Context & Generator</span>
+          <span>{t('sidebarStoryContext')}</span>
         </div>
 
         {/* Context Selector */}
         <div className="control-group">
           <label className="control-label" htmlFor="context-select">
-            Context of Story Selector
+            {t('sidebarContextSelector')}
           </label>
           <select
             id="context-select"
@@ -231,7 +263,7 @@ export const Sidebar: React.FC = () => {
             value={selectedContext}
             onChange={(e) => setSelectedContext(e.target.value)}
           >
-            {CONTEXT_PRESETS.map((preset) => (
+            {contextPresets.map((preset) => (
               <option key={preset.value} value={preset.value}>
                 {preset.label}
               </option>
@@ -242,11 +274,11 @@ export const Sidebar: React.FC = () => {
         {/* Custom Context input if selected */}
         {selectedContext === 'Custom' && (
           <div className="control-group">
-            <label className="control-label">Custom Theme / Prompt</label>
+            <label className="control-label">{t('sidebarCustomPrompt')}</label>
             <input
               type="text"
               className="control-input"
-              placeholder="e.g. Lost in a cyberpunk market..."
+              placeholder={t('sidebarCustomPromptPlaceholder')}
               value={customContext}
               onChange={(e) => setCustomContext(e.target.value)}
             />
@@ -262,12 +294,12 @@ export const Sidebar: React.FC = () => {
           {isGeneratingStory ? (
             <>
               <Loader2 size={18} className="spin" />
-              <span>Weaving Story...</span>
+              <span>{t('sidebarWeavingStory')}</span>
             </>
           ) : (
             <>
               <Sparkles size={18} />
-              <span>Generate New Story</span>
+              <span>{t('sidebarGenerateNewStory')}</span>
             </>
           )}
         </button>
@@ -277,17 +309,17 @@ export const Sidebar: React.FC = () => {
           className="btn-secondary"
           onClick={generateWithSameDictionary}
           disabled={isGeneratingStory}
-          title="Generates a new plot reusing target vocabulary to reinforce memory"
+          title={t('sidebarGenerateSameDictTooltip')}
         >
           <RefreshCw size={15} />
-          <span>Generate with Same Dict</span>
+          <span>{t('sidebarGenerateSameDict')}</span>
         </button>
 
         {/* Action 3: Increase Option (+ New Words) */}
         <div className="increase-words-box">
           <div className="increase-header">
-            <span>Increase Option</span>
-            <span style={{ color: 'var(--flower-400)', fontWeight: 700 }}>+{numNewWords} words</span>
+            <span>{t('sidebarIncreaseOption')}</span>
+            <span style={{ color: 'var(--flower-400)', fontWeight: 700 }}>+{numNewWords} {t('sidebarWords')}</span>
           </div>
           <div className="word-count-selector">
             {[3, 5, 8, 10].map((num) => (
@@ -308,7 +340,7 @@ export const Sidebar: React.FC = () => {
             disabled={isGeneratingStory}
           >
             <PlusCircle size={15} />
-            <span>Add to Current Dictionary</span>
+            <span>{t('sidebarAddToCurrentDict')}</span>
           </button>
         </div>
       </div>

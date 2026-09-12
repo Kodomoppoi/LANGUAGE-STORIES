@@ -9,6 +9,7 @@ import {
 } from '../../types';
 import { SAMPLE_STORIES } from '../sampleStories';
 import { createDefaultSRSMetrics } from '../srsEngine';
+import { localizeStory } from '../storyLocalization';
 import { GenerateStoryParams, StoryGeneratorProvider } from './types';
 
 export class ProceduralProvider implements StoryGeneratorProvider {
@@ -21,7 +22,7 @@ export class ProceduralProvider implements StoryGeneratorProvider {
 
   public async generateStory(
     params: GenerateStoryParams,
-    _settings?: AppSettings
+    settings?: AppSettings
   ): Promise<Story> {
     const baseStory = SAMPLE_STORIES[params.language] || SAMPLE_STORIES['ja'];
     const themeName = params.contextTheme || baseStory.contextTheme;
@@ -69,7 +70,8 @@ export class ProceduralProvider implements StoryGeneratorProvider {
       cloned.targetVocabulary = [...cloned.targetVocabulary, ...extraWords];
     }
 
-    return cloned;
+    const uiLang = (settings?.uiLanguage || (params.nativeLanguage === 'English' ? 'en' : 'pt')) as 'en' | 'pt';
+    return localizeStory(cloned, uiLang);
   }
 
   private getExtraVocabForLanguage(lang: LanguageCode, count: number): DictionaryEntry[] {

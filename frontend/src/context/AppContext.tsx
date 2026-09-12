@@ -5,10 +5,12 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
+  useRef,
   ReactNode,
 } from 'react';
 import {
   Story,
+  StorySentence,
   StoryToken,
   DictionaryEntry,
   LanguageCode,
@@ -16,12 +18,30 @@ import {
   UserStats,
   ActiveTab,
   AppSettings,
+  MascotState,
+  SSEGenerationEvent,
+  BookErrorInfo,
 } from '../types';
-import { SAMPLE_STORIES } from '../services/sampleStories';
-import { calculateSM2, isReviewDue, createDefaultSRSMetrics } from '../services/srsEngine';
+import { SAMPLE_STORIES, createWelcomeStory } from '../services/sampleStories';
+import {
+  calculateSM2,
+  isReviewDue,
+  createDefaultSRSMetrics,
+  calculateMasteryScore,
+  getStatusColor,
+  getRepetitionWeight,
+  recordWordLookup,
+  recordWordQuizReview,
+} from '../services/srsEngine';
 import { ttsService } from '../services/ttsService';
 import { apiService } from '../services/apiService';
 import { storageService } from '../services/storageService';
+import { logService } from '../services/logService';
+import { getTranslation, TranslationKey } from '../services/i18n';
+import { localizeStory } from '../services/storyLocalization';
+import { getAuxiliaryTranslation, isInvalidTranslation } from '../services/auxiliaryLexicon';
+import { getAuxiliaryRuby, toRomaji } from '../services/auxiliaryPhonetics';
+import { getProficiencyNativeInfo } from '../services/proficiencyUtils';
 
 interface AppContextType {
   // Navigation
@@ -39,13 +59,23 @@ interface AppContextType {
   setCurrentStory: (story: Story) => void;
   isGeneratingStory: boolean;
 
+  // Book Error Diagnostic
+  bookError: BookErrorInfo | null;
+  setBookError: (error: BookErrorInfo | null) => void;
+  clearBookError: () => void;
+
+  // Mascote de Carregamento em Tempo Real (SSE)
+  mascotState: MascotState;
+  cancelGeneration: () => void;
+
   // All words extracted from current story for Tabular Dictionary
   allStoryWords: DictionaryEntry[];
 
   // Popover Token Lookup
   activeToken: StoryToken | null;
+  activeSentence: StorySentence | null;
   popoverPosition: { x: number; y: number } | null;
-  openTokenPopover: (token: StoryToken, event: React.MouseEvent) => void;
+  openTokenPopover: (token: StoryToken, event: React.MouseEvent, sentence?: StorySentence) => void;
   closeTokenPopover: () => void;
 
   // Master Vocabulary Vault & JSON Archive
@@ -63,6 +93,7 @@ interface AppContextType {
   ttsSpeed: number;
   setTtsSpeed: (speed: number) => void;
   playStoryAudio: () => void;
+  playSentenceAudio: (sentenceIndex: number, sentenceText: string) => void;
   pauseStoryAudio: () => void;
   stopStoryAudio: () => void;
   speakSingleToken: (token: StoryToken) => void;
@@ -72,9 +103,20 @@ interface AppContextType {
   setIsQuizOpen: (open: boolean) => void;
   submitQuiz: (scoreQuality: number, targetWordIds: string[]) => void;
 
-  // Modals
+  // Modals & Panels
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
+  isTerminalOpen: boolean;
+  setIsTerminalOpen: (open: boolean) => void;
+
+  // Word Deep Dive (Raio-X IA)
+  deepDiveTarget: { word: string; contextSentence?: string } | null;
+  openDeepDive: (word: string, contextSentence?: string) => void;
+  closeDeepDive: () => void;
+
+  // Custom Story Theme (Bottom Dock)
+  customStoryTheme: string;
+  setCustomStoryTheme: (theme: string) => void;
 
   // Generator Actions (Sidebar)
   generateNewStory: (contextTheme?: string, customPrompt?: string) => Promise<void>;
@@ -86,13 +128,19 @@ interface AppContextType {
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   toggleTheme: () => void;
+
+  // i18n Translation helper
+  t: (key: TranslationKey) => string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark', // Warm Woody Timber by default
+  uiLanguage: 'pt', // Default interface language: Portuguese (BR)
   apiProvider: 'hybrid',
   geminiApiKey: '',
-  geminiModel: 'gemini-2.5-flash',
+  geminiModel: 'gemini-3.6-flash',
+  openRouterApiKey: '',
+  openRouterModel: 'openrouter/free',
   ollamaUrl: 'http://localhost:11434',
   ollamaModel: 'llama3.2',
   backendUrl: 'http://localhost:8000',
@@ -106,46 +154,319 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const DEFAULT_STATS: UserStats = {
-  totalWordsRead: 350,
-  starredWordsCount: 14,
-  totalStoriesRead: 6,
-  reviewsDueToday: 5,
+  totalWordsRead: 0,
+  starredWordsCount: 0,
+  totalStoriesRead: 0,
+  reviewsDueToday: 0,
   lastActiveDate: new Date().toISOString(),
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+function parseErrorToBookErrorInfo(
+  err: any,
+  language: LanguageCode,
+  uiLang: 'pt' | 'en'
+): BookErrorInfo {
+  const errMsg = String(err?.message || err || '');
+  const isPt = uiLang === 'pt';
+
+  if (
+    errMsg.includes('API key not valid') ||
+    errMsg.includes('400') ||
+    errMsg.includes('403') ||
+    errMsg.includes('INVALID_ARGUMENT') ||
+    errMsg.includes('Chave de API') ||
+    err?.errorType === 'api_key_error'
+  ) {
+    return {
+      type: 'api_key_error',
+      title: isPt ? 'Chave de API Inválida ou Ausente' : 'API Key Invalid or Missing',
+      message: isPt
+        ? 'A chave de API configurada foi recusada pelo provedor de IA (Erro 400/401/403). Sem uma chave válida e ativa, a IA não consegue redigir histórias.'
+        : 'The configured API key was rejected by the AI provider (Error 400/401/403). The AI cannot generate stories without a valid key.',
+      actionInstructions: isPt
+        ? [
+          'Obtenha uma chave gratuita da API Gemini (aistudio.google.com) ou do OpenRouter (openrouter.ai).',
+          'Clique em "Abrir Configurações" no botão abaixo ou no menu lateral.',
+          'Cole sua chave no campo correspondente e clique em Testar Conexão.',
+          'Clique em "Salvar Configurações" e tente gerar a história novamente.'
+        ]
+        : [
+          'Get a free API key from Google AI Studio (aistudio.google.com) or OpenRouter (openrouter.ai).',
+          'Click "Open Settings" below or in the sidebar.',
+          'Paste your key into the corresponding field and click Test Connection.',
+          'Click "Save Settings" and generate your story again.'
+        ],
+      actionLabel: isPt ? 'Abrir Configurações' : 'Open Settings',
+      actionType: 'open_settings',
+      rawError: errMsg,
+      language,
+    };
+  }
+
+  if (
+    errMsg.includes('503') ||
+    errMsg.includes('high demand') ||
+    errMsg.includes('Spikes in demand') ||
+    errMsg.includes('temporarily unavailable') ||
+    errMsg.includes('service_unavailable') ||
+    err?.errorType === 'service_unavailable' ||
+    err?.statusCode === 503
+  ) {
+    return {
+      type: 'service_unavailable',
+      title: isPt ? 'Servidores em Alta Demanda Temporária (Status 503)' : 'Servers Experiencing High Demand (Status 503)',
+      message: isPt
+        ? 'Os servidores de IA estão com um pico temporário de demanda. Se você tiver tanto o Gemini quanto o OpenRouter configurados, o sistema aciona o Auto-Fallback automaticamente.'
+        : 'The AI servers are experiencing temporary high demand spikes. If you have both Gemini and OpenRouter configured, Auto-Fallback switches automatically.',
+      actionInstructions: isPt
+        ? [
+          'Aguarde cerca de 5 a 15 segundos para que a capacidade se normalize.',
+          'Ative o modo Auto-Fallback nas Configurações com uma chave OpenRouter gratuita para redundância instantânea.',
+          'Clique no botão "Tentar Novamente" abaixo para reenviar a história.'
+        ]
+        : [
+          'Wait about 5 to 15 seconds for server capacity to normalize.',
+          'Enable Auto-Fallback in Settings with a free OpenRouter key for instant redundancy.',
+          'Click the "Try Again" button below to resubmit your story request.'
+        ],
+      actionLabel: isPt ? 'Tentar Novamente' : 'Try Again',
+      actionType: 'retry',
+      rawError: errMsg,
+      language,
+    };
+  }
+
+  if (
+    errMsg.includes('429') ||
+    errMsg.includes('RESOURCE_EXHAUSTED') ||
+    errMsg.includes('Quota') ||
+    errMsg.includes('cota') ||
+    err?.errorType === 'quota_exceeded' ||
+    err?.statusCode === 429
+  ) {
+    return {
+      type: 'quota_exceeded',
+      title: isPt ? 'Cota de Requisições Excedida (Rate Limit 429)' : 'Rate Limit Exceeded (429)',
+      message: isPt
+        ? 'O limite de requisições por minuto do provedor gratuito foi atingido. Nosso sistema já aplica pacing a 80% da capacidade para protegê-lo.'
+        : 'The per-minute request limit for your free tier was reached. Our system applies 80% pacing protection to keep requests safe.',
+      actionInstructions: isPt
+        ? [
+          'Aguarde cerca de 30 a 60 segundos para que a janela de requisições seja renovada.',
+          'Configure também sua chave gratuita do OpenRouter nas Configurações para ter Auto-Fallback com redundância.',
+          'Assim que aguardar, clique em "Tentar Novamente" abaixo.'
+        ]
+        : [
+          'Wait about 30 to 60 seconds for the rate limit window to reset.',
+          'Configure your free OpenRouter key in Settings to enjoy seamless Auto-Fallback.',
+          'Click "Try Again" below once ready.'
+        ],
+      actionLabel: isPt ? 'Tentar Novamente' : 'Try Again',
+      actionType: 'retry',
+      rawError: errMsg,
+      language,
+    };
+  }
+
+  return {
+    type: 'generation_error',
+    title: isPt ? 'Falha na Geração da História' : 'Story Generation Error',
+    message: errMsg || (isPt ? 'Ocorreu um erro inesperado ao redigir a narrativa.' : 'An unexpected error occurred while writing the story.'),
+    actionInstructions: isPt
+      ? [
+        'Verifique sua conexão com a internet.',
+        'Se estiver usando o Backend Local, certifique-se de que o servidor FastAPI está ativo (porta 8000).',
+        'Tente gerar novamente com outro tema ou clique no botão abaixo.'
+      ]
+      : [
+        'Check your internet connection.',
+        'If using the Local Backend, verify that the FastAPI server is running (port 8000).',
+        'Try again with a different theme or click the button below.'
+      ],
+    actionLabel: isPt ? 'Tentar Novamente' : 'Try Again',
+    actionType: 'retry',
+    rawError: errMsg,
+    language,
+  };
+}
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // State Initialization via StorageService
+  // Navigation
   const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>(() => storageService.loadLanguage('ja'));
-  const [currentProficiency, setCurrentProficiency] = useState<ProficiencyLevel>(() => storageService.loadProficiency('A2'));
+  const [currentProficiency, setCurrentProficiency] = useState<ProficiencyLevel>(() =>
+    storageService.loadProficiencyForLanguage(storageService.loadLanguage('ja'), 'A2')
+  );
   const [settings, setSettings] = useState<AppSettings>(() => storageService.loadSettings(DEFAULT_SETTINGS));
   const [userStats, setUserStats] = useState<UserStats>(() => storageService.loadStats(DEFAULT_STATS));
   const [vocabularyVault, setVocabularyVault] = useState<DictionaryEntry[]>(() =>
-    storageService.loadVault(SAMPLE_STORIES['ja'].targetVocabulary)
+    storageService.loadVault([])
   );
 
-  const [currentStory, setCurrentStory] = useState<Story>(() => SAMPLE_STORIES[currentLanguage] || SAMPLE_STORIES['ja']);
+  const [currentStory, setCurrentStory] = useState<Story>(() => {
+    const lang = storageService.loadLanguage('ja');
+    const uiLang = storageService.loadSettings(DEFAULT_SETTINGS).uiLanguage || 'pt';
+    const welcome = createWelcomeStory(lang, uiLang);
+    const loaded = storageService.loadStory(welcome);
+    if (
+      !loaded ||
+      !loaded.paragraphs ||
+      loaded.paragraphs.length === 0 ||
+      loaded.title?.startsWith('Story in ') ||
+      loaded.fullText?.includes('Sample sentence')
+    ) {
+      return welcome;
+    }
+    return localizeStory(loaded, uiLang);
+  });
+  const [bookError, setBookError] = useState<BookErrorInfo | null>(null);
+  const clearBookError = useCallback(() => setBookError(null), []);
   const [activeTab, setActiveTab] = useState<ActiveTab>('story');
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  const [customStoryTheme, setCustomStoryTheme] = useState('');
 
   // Popover Token state
   const [activeToken, setActiveToken] = useState<StoryToken | null>(null);
+  const [activeSentence, setActiveSentence] = useState<StorySentence | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ x: number; y: number } | null>(null);
+
+  // Mascote de Carregamento em Tempo Real (SSE)
+  const [mascotState, setMascotState] = useState<MascotState>({
+    isActive: false,
+    stage: 'idle',
+    action: 'idle',
+    message: '',
+    progress: 0,
+  });
+
+  const cancelGeneration = useCallback(() => {
+    setIsGeneratingStory(false);
+    setMascotState((prev) => ({ ...prev, isActive: false }));
+    logService.addLog('WARN', 'FRONTEND', 'Geração da história cancelada pelo usuário.');
+  }, []);
+
+  const handleSSEEvent = useCallback((event: SSEGenerationEvent) => {
+    if (event.data?.message) {
+      logService.addLog('INFO', 'STAGE', `[Etapa SSE] ${event.data.message}`);
+    }
+
+    const eventName = String(event.event || '');
+    const stageType = event.data?.stage || (eventName.startsWith('stage_start:') ? eventName.split(':')[1] : '');
+
+    if (eventName === 'stage_start' || eventName.startsWith('stage_start:')) {
+      if (stageType === 'curation') {
+        setMascotState({
+          isActive: true,
+          stage: 'stage_start:curation',
+          action: 'searching',
+          message: event.data.message || 'Analisando seu cofre e escolhendo novas palavras...',
+          progress: 25,
+        });
+      } else if (stageType === 'generation') {
+        setMascotState((prev) => ({
+          ...prev,
+          isActive: true,
+          stage: 'stage_start:generation',
+          action: 'writing',
+          message: event.data.message || 'Escrevendo a história com repetição calculada...',
+          progress: 75,
+        }));
+      } else if (stageType === 'validation') {
+        setMascotState((prev) => ({
+          ...prev,
+          isActive: true,
+          stage: 'stage_start:generation',
+          action: 'writing',
+          message: event.data.message || 'Validando gramática e hidratação de traços...',
+          progress: 90,
+        }));
+      } else {
+        setMascotState((prev) => ({
+          ...prev,
+          isActive: true,
+          stage: 'stage_start:curation',
+          action: 'searching',
+          message: event.data.message || 'Iniciando narrativa didática...',
+          progress: 20,
+        }));
+      }
+      return;
+    }
+
+    switch (eventName) {
+      case 'stage_curation_done':
+        setMascotState((prev) => ({
+          ...prev,
+          isActive: true,
+          stage: 'stage_curation_done',
+          action: 'celebrating',
+          message: event.data.message || 'Vocabulário alvo curado com sucesso!',
+          counts: {
+            newWordsCount: event.data.count || event.data.new_words_count || 5,
+            reviewWordsCount: event.data.review_words_count || 3,
+          },
+          progress: 50,
+        }));
+        break;
+      case 'stage_done':
+        setMascotState((prev) => ({
+          ...prev,
+          isActive: true,
+          stage: 'stage_done',
+          action: 'presenting',
+          message: event.data.message || 'História e glossário prontos! Apresentando sua leitura...',
+          progress: 100,
+        }));
+        // Fecha o overlay após mostrar o mascote alegre brevemente
+        setTimeout(() => {
+          setMascotState((prev) => ({ ...prev, isActive: false }));
+        }, 1200);
+        break;
+      case 'error':
+        setMascotState({
+          isActive: true,
+          stage: 'error',
+          action: 'alert',
+          message: event.data.error_message || event.data.message || 'Erro durante a geração',
+          progress: 100,
+        });
+        setTimeout(() => {
+          setMascotState((prev) => ({ ...prev, isActive: false }));
+        }, 1500);
+        break;
+    }
+  }, []);
 
   // Audio state
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [currentPlayingSentenceIndex, setCurrentPlayingSentenceIndex] = useState(-1);
   const [ttsSpeed, setTtsSpeedState] = useState<number>(settings.ttsSpeed || 1.0);
+  const ttsSpeedRef = useRef<number>(settings.ttsSpeed || 1.0);
 
   // Modals state
   const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [deepDiveTarget, setDeepDiveTarget] = useState<{ word: string; contextSentence?: string } | null>(null);
+
+  const openDeepDive = useCallback((word: string, contextSentence?: string) => {
+    setDeepDiveTarget({ word, contextSentence });
+  }, []);
+
+  const closeDeepDive = useCallback(() => {
+    setDeepDiveTarget(null);
+  }, []);
 
   // Synchronize Settings & Theme
   useEffect(() => {
     document.body.setAttribute('data-theme', settings.theme);
     storageService.saveSettings(settings);
+    ttsService.setBackendUrl(settings.backendUrl);
+    ttsService.setProvider(settings.ttsProvider);
+    const speed = settings.ttsSpeed || 1.0;
+    ttsSpeedRef.current = speed;
+    ttsService.setSpeed(speed);
   }, [settings]);
 
   // Persist State Changes
@@ -174,14 +495,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSettings((prev) => ({ ...prev, isBackendConnected: isConnected }));
       }
     };
+
     checkHealth();
+    const interval = setInterval(checkHealth, 30000);
     return () => {
       isMounted = false;
+      clearInterval(interval);
     };
   }, [settings.backendUrl]);
 
-  // Extract ALL words from current story for Tabular Dictionary
-  const allStoryWords = useMemo(() => {
+  // COMPUTE COMPLETE DICTIONARY TABLE (All distinct words in current story)
+  const allStoryWords = useMemo<DictionaryEntry[]>(() => {
+    if (!currentStory?.paragraphs) return [];
+
     const wordMap = new Map<string, DictionaryEntry>();
 
     // Pre-index vocabulary vault for instant O(1) lookup
@@ -192,8 +518,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     // 1. Index declared target words
     (currentStory.targetVocabulary || []).forEach((item) => {
+      const vaultItem = vaultIndex.get(`${currentStory.language}:${item.word}`);
+      const mastery = vaultItem?.masteryScore ?? item.masteryScore ?? 25;
+      const isPinned = vaultItem?.isPinned ?? vaultItem?.isStarred ?? item.isPinned ?? item.isStarred ?? false;
       wordMap.set(item.word, {
         ...item,
+        isStarred: isPinned,
+        isPinned,
+        masteryScore: mastery,
+        statusColor: vaultItem?.statusColor ?? item.statusColor ?? getStatusColor(mastery),
+        repetitionWeight: vaultItem?.repetitionWeight ?? item.repetitionWeight ?? getRepetitionWeight(mastery, isPinned),
+        traits: vaultItem?.traits ?? item.traits,
         occurrences: 0,
       });
     });
@@ -211,19 +546,48 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             existing.occurrences = (existing.occurrences || 0) + 1;
           } else {
             const vaultItem = vaultIndex.get(`${currentStory.language}:${t.text}`);
+            const mastery = vaultItem?.masteryScore ?? t.masteryScore ?? 25;
+            const isPinned = vaultItem?.isPinned ?? vaultItem?.isStarred ?? false;
+
+            const targetVocabMatch = currentStory.targetVocabulary?.find((v) => {
+              const vw = v?.word ? String(v.word).trim() : '';
+              return vw && (vw === t.text || (t.text.length > 1 && (t.text.startsWith(vw) || vw.startsWith(t.text))));
+            });
+            const safeTargetTrans = targetVocabMatch && !isInvalidTranslation(targetVocabMatch.translation, t.text)
+              ? targetVocabMatch.translation
+              : null;
+
+            const aux = getAuxiliaryTranslation(t.text, currentStory.language, (settings.uiLanguage as any) || 'pt');
+            const rawTrans = t.translation ? String(t.translation).trim() : '';
+            const isInvalidTrans = isInvalidTranslation(rawTrans, t.text);
+
+            const resolvedTrans = !isInvalidTrans
+              ? rawTrans
+              : (safeTargetTrans || aux || (!isInvalidTranslation(vaultItem?.translation, t.text) ? vaultItem!.translation : (aux || '')));
+
+            const isCJK = currentStory.language === 'zh' || currentStory.language === 'ja';
+            const isRubyMismatched = isCJK && t.text.length === 1 && Boolean(t.ruby && t.ruby.trim().includes(' '));
+            const auxRuby = getAuxiliaryRuby(t.text, currentStory.language);
+            const rawRuby = (isRubyMismatched && auxRuby) ? auxRuby : (t.ruby || auxRuby);
+            const resolvedRuby = (currentStory.language === 'ja' && rawRuby) ? toRomaji(rawRuby) : rawRuby;
 
             wordMap.set(t.text, {
               id: `token-${t.id}`,
               word: t.text,
-              ruby: t.ruby,
-              translation: t.translation || 'Termo da história',
+              ruby: resolvedRuby,
+              translation: resolvedTrans,
               partOfSpeech: t.partOfSpeech || 'Palavra',
-              definition: t.explanation || `Usado em: "${s.text}"`,
+              definition: t.explanation || (aux ? aux : resolvedTrans),
               exampleSentence: s.text,
               exampleTranslation: s.translation,
               language: currentStory.language,
               proficiency: currentStory.proficiency,
-              isStarred: vaultItem?.isStarred || false,
+              isStarred: isPinned,
+              isPinned,
+              masteryScore: mastery,
+              statusColor: vaultItem?.statusColor ?? t.statusColor ?? getStatusColor(mastery),
+              repetitionWeight: vaultItem?.repetitionWeight ?? getRepetitionWeight(mastery, isPinned),
+              traits: vaultItem?.traits ?? t.traits,
               occurrences: 1,
               lifetimeOccurrences: vaultItem?.lifetimeOccurrences || 1,
               lastSeenDate: new Date().toISOString(),
@@ -236,11 +600,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
 
     return Array.from(wordMap.values());
-  }, [currentStory, vocabularyVault]);
+  }, [currentStory, vocabularyVault, settings.uiLanguage]);
+
+  const lastHarvestedStoryIdRef = useRef<string>('');
 
   // AUTOMATIC MASTER HARVEST: Harvest and consolidate all tokens into master JSON bank
   useEffect(() => {
-    if (!allStoryWords.length) return;
+    if (!allStoryWords.length || currentStory.id === 'welcome') return;
+    if (lastHarvestedStoryIdRef.current === currentStory.id) return;
+    lastHarvestedStoryIdRef.current = currentStory.id;
 
     setVocabularyVault((prev) => {
       const vaultMap = new Map<string, DictionaryEntry>();
@@ -249,21 +617,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       allStoryWords.forEach((storyItem) => {
         const key = `${storyItem.language}:${storyItem.word}`;
         const existing = vaultMap.get(key);
+        const aux = getAuxiliaryTranslation(storyItem.word, storyItem.language, (settings.uiLanguage as any) || 'pt');
+        const targetVocabMatch = currentStory.targetVocabulary?.find((v) => {
+          const vw = v?.word ? String(v.word).trim() : '';
+          return vw && (vw === storyItem.word || (storyItem.word.length > 1 && (storyItem.word.startsWith(vw) || vw.startsWith(storyItem.word))));
+        });
+        const safeTargetTrans = targetVocabMatch && !isInvalidTranslation(targetVocabMatch.translation, storyItem.word)
+          ? targetVocabMatch.translation
+          : null;
+
+        const isStoryTransInvalid = isInvalidTranslation(storyItem.translation, storyItem.word);
 
         if (existing) {
+          const isExistingTransInvalid = isInvalidTranslation(existing.translation, existing.word);
+
+          const finalTrans = !isStoryTransInvalid
+            ? storyItem.translation
+            : (!isExistingTransInvalid ? existing.translation : (safeTargetTrans || aux || ''));
+
+          const mastery = existing.masteryScore ?? calculateMasteryScore(existing.srsMetrics, existing.lookedUpCount, existing.lastSeenDate);
           vaultMap.set(key, {
             ...existing,
             ruby: storyItem.ruby || existing.ruby,
-            translation: storyItem.translation !== 'Termo da história' ? storyItem.translation : existing.translation,
+            translation: finalTrans,
+            definition: !isInvalidTranslation(existing.definition, existing.word) ? existing.definition : (storyItem.definition || finalTrans),
             exampleSentence: storyItem.exampleSentence || existing.exampleSentence,
             exampleTranslation: storyItem.exampleTranslation || existing.exampleTranslation,
+            traits: storyItem.traits || existing.traits,
+            masteryScore: mastery,
+            statusColor: existing.statusColor || getStatusColor(mastery),
+            repetitionWeight: existing.repetitionWeight || getRepetitionWeight(mastery, existing.isPinned || existing.isStarred),
             lifetimeOccurrences: (existing.lifetimeOccurrences || 1) + (storyItem.occurrences || 1),
             lastSeenDate: new Date().toISOString(),
           });
         } else {
+          const mastery = storyItem.masteryScore ?? 25;
+          const safeTrans = !isStoryTransInvalid ? storyItem.translation : (safeTargetTrans || aux || '');
           vaultMap.set(key, {
             ...storyItem,
             id: `vault-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            translation: safeTrans,
+            definition: !isInvalidTranslation(storyItem.definition, storyItem.word) ? storyItem.definition : safeTrans,
+            masteryScore: mastery,
+            statusColor: storyItem.statusColor || getStatusColor(mastery),
+            repetitionWeight: storyItem.repetitionWeight || getRepetitionWeight(mastery, storyItem.isPinned || storyItem.isStarred),
+            traits: storyItem.traits,
             lifetimeOccurrences: storyItem.occurrences || 1,
             lastSeenDate: new Date().toISOString(),
           });
@@ -272,20 +670,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       return Array.from(vaultMap.values());
     });
-  }, [currentStory.id]);
+  }, [currentStory.id, allStoryWords]);
 
-  // Update stats summary
+  // Update stats summary (sync stars & reviews due from vault)
   useEffect(() => {
     const starredCount = vocabularyVault.filter((v) => v.isStarred).length;
     const dueCount = vocabularyVault.filter((v) => isReviewDue(v.srsMetrics.nextReviewDate)).length;
 
-    setUserStats((prev) => ({
-      ...prev,
-      starredWordsCount: starredCount,
-      reviewsDueToday: dueCount,
-      totalWordsRead: prev.totalWordsRead + allStoryWords.length,
-    }));
-  }, [vocabularyVault, allStoryWords.length]);
+    setUserStats((prev) => {
+      if (prev.starredWordsCount === starredCount && prev.reviewsDueToday === dueCount) {
+        return prev;
+      }
+      return {
+        ...prev,
+        starredWordsCount: starredCount,
+        reviewsDueToday: dueCount,
+      };
+    });
+  }, [vocabularyVault]);
 
   // Export / Import Helpers via StorageService
   const exportVocabularyJson = useCallback(
@@ -315,16 +717,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Handlers
   const setLanguage = useCallback((lang: LanguageCode) => {
     setCurrentLanguage(lang);
+    const savedLevel = storageService.loadProficiencyForLanguage(lang, 'A2');
+    setCurrentProficiency(savedLevel);
     ttsService.stop();
     setIsPlayingAudio(false);
     setCurrentPlayingSentenceIndex(-1);
-    const story = SAMPLE_STORIES[lang] || SAMPLE_STORIES['ja'];
-    setCurrentStory(story);
-  }, []);
+
+    const savedStory = storageService.loadStoryForLanguage(lang);
+    if (savedStory && savedStory.id !== 'welcome' && savedStory.paragraphs?.length > 0) {
+      setCurrentStory(localizeStory(savedStory, settings.uiLanguage || 'pt'));
+    } else {
+      const welcome = createWelcomeStory(lang, settings.uiLanguage || 'pt');
+      setCurrentStory(welcome);
+    }
+  }, [settings.uiLanguage]);
 
   const setProficiency = useCallback((level: ProficiencyLevel) => {
     setCurrentProficiency(level);
-  }, []);
+    storageService.saveProficiencyForLanguage(currentLanguage, level);
+    const info = getProficiencyNativeInfo(currentLanguage, level);
+    logService.addLog('INFO', 'STAGE', `Dificuldade ajustada: ${info.fullLabel}`);
+  }, [currentLanguage]);
 
   const toggleTheme = useCallback(() => {
     setSettings((prev) => ({
@@ -335,24 +748,47 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
     setSettings((prev) => ({ ...prev, ...newSettings }));
+    if (newSettings.uiLanguage) {
+      setCurrentStory((prevStory) => localizeStory(prevStory, newSettings.uiLanguage!));
+    }
   }, []);
 
   const setTtsSpeed = useCallback((speed: number) => {
     setTtsSpeedState(speed);
+    ttsSpeedRef.current = speed;
+    ttsService.setSpeed(speed);
     setSettings((prev) => ({ ...prev, ttsSpeed: speed }));
   }, []);
 
-  // Popover handlers
-  const openTokenPopover = useCallback((token: StoryToken, event: React.MouseEvent) => {
+  // Popover handlers with 4.1 Lookup Penalty
+  const openTokenPopover = useCallback((token: StoryToken, event: React.MouseEvent, sentence?: StorySentence) => {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const x = Math.min(window.innerWidth - 330, Math.max(20, rect.left - 40));
     const y = rect.bottom + 12 > window.innerHeight - 240 ? rect.top - 230 : rect.bottom + 10;
     setActiveToken(token);
+    setActiveSentence(sentence || null);
     setPopoverPosition({ x, y });
-  }, []);
+
+    // 4.1 Penalidade por consultas no leitor:
+    // Se o usuário clica na palavra durante a leitura para ver a tradução,
+    // penaliza a pontuação recente e sinaliza necessidade de reforço
+    setVocabularyVault((prev) => {
+      try {
+        const existing = prev.find((w) => w && w.word === token.text && w.language === currentLanguage);
+        if (existing) {
+          const updated = recordWordLookup(existing);
+          return prev.map((w) => (w.id === existing.id ? updated : w));
+        }
+      } catch (err) {
+        console.warn('Non-fatal error updating word lookup penalty:', err);
+      }
+      return prev;
+    });
+  }, [currentLanguage]);
 
   const closeTokenPopover = useCallback(() => {
     setActiveToken(null);
+    setActiveSentence(null);
     setPopoverPosition(null);
   }, []);
 
@@ -362,7 +798,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (prev.some((w) => w.word === entry.word && w.language === entry.language)) {
         return prev;
       }
-      return [entry, ...prev];
+      const mastery = entry.masteryScore ?? 25;
+      return [{
+        ...entry,
+        masteryScore: mastery,
+        statusColor: entry.statusColor || getStatusColor(mastery),
+        repetitionWeight: entry.repetitionWeight || getRepetitionWeight(mastery, entry.isPinned || entry.isStarred),
+      }, ...prev];
     });
   }, []);
 
@@ -370,23 +812,59 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setVocabularyVault((prev) => prev.filter((w) => w.id !== id));
   }, []);
 
+  // 4.3 Palavras fixadas (⭐): prioridade máxima
   const toggleStarWord = useCallback((id: string) => {
     setVocabularyVault((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, isStarred: !w.isStarred } : w))
-    );
-  }, []);
-
-  const updateWordSRS = useCallback((wordId: string, quality: number) => {
-    setVocabularyVault((prev) =>
       prev.map((w) => {
-        if (w.id === wordId) {
-          const updatedMetrics = calculateSM2(w.srsMetrics, quality);
-          return { ...w, srsMetrics: updatedMetrics };
+        if (w.id === id) {
+          const newPinned = !(w.isPinned ?? w.isStarred);
+          const score = w.masteryScore ?? 25;
+          return {
+            ...w,
+            isStarred: newPinned,
+            isPinned: newPinned,
+            repetitionWeight: getRepetitionWeight(score, newPinned),
+          };
         }
         return w;
       })
     );
   }, []);
+
+  const updateWordSRS = useCallback(
+    (wordId: string, quality: number) => {
+      setVocabularyVault((prev) => {
+        const index = prev.findIndex((w) => w.id === wordId || w.word === wordId);
+        if (index >= 0) {
+          return prev.map((w, idx) => (idx === index ? recordWordQuizReview(w, quality) : w));
+        }
+        // Se a palavra revisada ainda não estava no cofre, busca no vocabulário alvo da história e adiciona
+        const storyTarget = (currentStory.targetVocabulary || []).find(
+          (v) => v.id === wordId || v.word === wordId
+        );
+        if (storyTarget) {
+          return [...prev, recordWordQuizReview(storyTarget, quality)];
+        }
+        return prev;
+      });
+
+      // Sincroniza o status visual no vocabulário da história atual
+      setCurrentStory((prev) => {
+        if (!prev.targetVocabulary || !prev.targetVocabulary.length) return prev;
+        const updatedTarget = prev.targetVocabulary.map((v) => {
+          if (v.id === wordId || v.word === wordId) {
+            return recordWordQuizReview(v, quality);
+          }
+          return v;
+        });
+        return {
+          ...prev,
+          targetVocabulary: updatedTarget,
+        };
+      });
+    },
+    [currentStory.targetVocabulary]
+  );
 
   // Audio Playback
   const playStoryAudio = useCallback(() => {
@@ -410,24 +888,75 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return;
       }
       setCurrentPlayingSentenceIndex(idx);
-      ttsService.speak(sentences[idx].text, currentStory.language, ttsSpeed, {
+      const activeSpeed = ttsSpeedRef.current;
+      ttsService.speak(sentences[idx].text, currentStory.language, activeSpeed, {
         onEnd: () => {
           playSentence(idx + 1);
+        },
+        onError: (err: any) => {
+          setIsPlayingAudio(false);
+          setCurrentPlayingSentenceIndex(-1);
+          const isPt = settings.uiLanguage === 'pt';
+          setBookError({
+            type: 'tts_error',
+            title: isPt ? 'Áudio Indisponível para este Idioma' : 'Audio Unavailable for this Language',
+            message: isPt
+              ? `Seu navegador não possui uma voz de leitura instalada para o idioma selecionado (${currentStory.language.toUpperCase()}).`
+              : `Your browser has no text-to-speech voice installed for ${currentStory.language.toUpperCase()}.`,
+            actionInstructions: isPt
+              ? [
+                'Conecte o Backend FastAPI (porta 8000) para síntese neural de alta definição com Edge-TTS.',
+                'Ou adicione vozes no sistema operacional (Configurações do Windows > Hora e Idioma > Fala > Adicionar Vozes).',
+                'Selecione "Edge-TTS (Backend Local)" nas Configurações do app.'
+              ]
+              : [
+                'Connect the FastAPI backend (port 8000) for high-definition neural Edge-TTS.',
+                'Or add speech voices in OS Settings (Windows Settings > Time & Language > Speech).',
+                'Select "Edge-TTS (Local Backend)" in the app Settings.'
+              ],
+            actionLabel: isPt ? 'Dispensar' : 'Dismiss',
+            actionType: 'dismiss',
+            language: currentStory.language,
+          });
+        },
+      });
+    };
+
+    playSentence(currentIdx);
+  }, [isPlayingAudio, currentStory, currentPlayingSentenceIndex, settings.uiLanguage]);
+
+  const pauseStoryAudio = useCallback(() => {
+    ttsService.pause();
+    setIsPlayingAudio(false);
+  }, []);
+
+  const playSentenceAudio = useCallback(
+    (sentenceIndex: number, sentenceText: string) => {
+      if (isPlayingAudio && currentPlayingSentenceIndex === sentenceIndex) {
+        ttsService.pause();
+        setIsPlayingAudio(false);
+        setCurrentPlayingSentenceIndex(-1);
+        return;
+      }
+
+      ttsService.stop();
+      setIsPlayingAudio(true);
+      setCurrentPlayingSentenceIndex(sentenceIndex);
+
+      const activeSpeed = ttsSpeedRef.current;
+      ttsService.speak(sentenceText, currentStory.language, activeSpeed, {
+        onEnd: () => {
+          setIsPlayingAudio(false);
+          setCurrentPlayingSentenceIndex(-1);
         },
         onError: () => {
           setIsPlayingAudio(false);
           setCurrentPlayingSentenceIndex(-1);
         },
       });
-    };
-
-    playSentence(currentIdx);
-  }, [isPlayingAudio, currentStory, currentPlayingSentenceIndex, ttsSpeed]);
-
-  const pauseStoryAudio = useCallback(() => {
-    ttsService.pause();
-    setIsPlayingAudio(false);
-  }, []);
+    },
+    [isPlayingAudio, currentPlayingSentenceIndex, currentStory.language]
+  );
 
   const stopStoryAudio = useCallback(() => {
     ttsService.stop();
@@ -437,57 +966,105 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const speakSingleToken = useCallback(
     (token: StoryToken) => {
-      ttsService.speakToken(token.text, currentStory.language, ttsSpeed * 0.9);
+      const activeSpeed = ttsSpeedRef.current;
+      ttsService.speakToken(token.text, currentStory.language, activeSpeed);
     },
-    [currentStory.language, ttsSpeed]
+    [currentStory.language]
   );
 
-  // Story Generator Actions
+  // Story Generator Actions com SSE Streaming e Pesos SRS
   const generateNewStory = useCallback(
     async (contextTheme?: string, customPrompt?: string) => {
       setIsGeneratingStory(true);
+      setBookError(null);
+      const effectiveTheme = contextTheme !== undefined ? contextTheme : (customStoryTheme.trim() || undefined);
+      logService.addLog(
+        'INFO',
+        'FRONTEND',
+        `Disparando geração (${currentLanguage.toUpperCase()} - ${currentProficiency}). Tema: ${effectiveTheme || 'Automático (mais didático)'}`
+      );
       try {
         const langVaultWords = vocabularyVault.filter((v) => v.language === currentLanguage);
+
+        // Curadoria: 4.3 Palavras fixadas (⭐ prioridade máxima), frágeis (laranja 3-4x) e revisões devidas
+        const pinnedWords = langVaultWords.filter((v) => v.isPinned || v.isStarred).map((v) => v.word);
+        const fragileWords = langVaultWords.filter((v) => (v.masteryScore ?? 25) <= 35).map((v) => v.word);
         const dueSRSWords = langVaultWords
           .filter((v) => isReviewDue(v.srsMetrics.nextReviewDate))
           .map((v) => v.word);
 
-        const priorityBankWords =
-          dueSRSWords.length > 0 ? dueSRSWords : langVaultWords.slice(0, 10).map((v) => v.word);
+        const prioritizedTargetWords = Array.from(new Set([...pinnedWords, ...fragileWords, ...dueSRSWords])).slice(0, 10);
 
-        const newStory = await apiService.generateStory(
+        const newStory = await apiService.generateStoryStream(
           {
             language: currentLanguage,
             proficiency: currentProficiency,
-            contextTheme,
+            contextTheme: effectiveTheme,
             customPrompt,
-            targetWords: priorityBankWords.length > 0 ? priorityBankWords : undefined,
+            targetWords: prioritizedTargetWords.length > 0 ? prioritizedTargetWords : undefined,
             existingDictionary: langVaultWords.slice(0, 15),
             storyLength: settings.storyLength,
             repetitionDensity: settings.repetitionDensity,
           },
-          settings
+          settings,
+          handleSSEEvent
         );
 
-        setCurrentStory(newStory);
+        if (!newStory || !newStory.paragraphs || newStory.paragraphs.length === 0) {
+          throw new Error('A história retornada pela IA está vazia ou incompleta.');
+        }
+
+        const localizedStory = localizeStory(newStory, settings.uiLanguage || 'pt');
+        setCurrentStory(localizedStory);
+        storageService.saveStory(localizedStory);
+        setBookError(null);
+
+        const storyWords = (newStory.paragraphs || []).reduce(
+          (acc, p) => acc + (p.sentences || []).reduce((sAcc, s) => sAcc + (s.tokens || []).length, 0),
+          0
+        );
         setUserStats((prev) => ({
           ...prev,
           totalStoriesRead: prev.totalStoriesRead + 1,
+          totalWordsRead: prev.totalWordsRead + storyWords,
         }));
-      } catch (err) {
+        logService.addLog(
+          'SUCCESS',
+          'FRONTEND',
+          `História "${newStory.title}" recebida com sucesso (${(newStory.paragraphs || []).length} parágrafos, ${(newStory.targetVocabulary || []).length} vocábulos)!`
+        );
+      } catch (err: any) {
+        logService.addLog('ERROR', 'FRONTEND', `Erro na geração da história: ${err instanceof Error ? err.message : String(err)}`);
         console.error('Failed to generate story:', err);
+        setMascotState((prev) => ({ ...prev, isActive: false }));
+
+        const errorInfo = parseErrorToBookErrorInfo(err, currentLanguage, (settings.uiLanguage as 'pt' | 'en') || 'pt');
+        setBookError(errorInfo);
+
+        // Se a história atual for vazia ou dummy, garante que mostre o fallback limpo de boas-vindas ("que mostra que nao tem historias")
+        if (
+          !currentStory.paragraphs ||
+          currentStory.paragraphs.length === 0 ||
+          currentStory.title?.startsWith('Story in ') ||
+          currentStory.fullText?.includes('Sample sentence')
+        ) {
+          const welcome = createWelcomeStory(currentLanguage, settings.uiLanguage || 'pt');
+          setCurrentStory(welcome);
+        }
       } finally {
         setIsGeneratingStory(false);
+        setMascotState((prev) => ({ ...prev, isActive: false }));
       }
     },
-    [currentLanguage, currentProficiency, settings, vocabularyVault]
+    [currentLanguage, currentProficiency, currentStory, settings, vocabularyVault, handleSSEEvent, customStoryTheme]
   );
 
   const generateWithSameDictionary = useCallback(async () => {
     setIsGeneratingStory(true);
+    setBookError(null);
     try {
       const langVaultWords = vocabularyVault.filter((v) => v.language === currentLanguage);
-      const newStory = await apiService.generateStory(
+      const newStory = await apiService.generateStoryStream(
         {
           language: currentLanguage,
           proficiency: currentProficiency,
@@ -496,41 +1073,110 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           storyLength: settings.storyLength,
           repetitionDensity: settings.repetitionDensity,
         },
-        settings
+        settings,
+        handleSSEEvent
       );
-      setCurrentStory(newStory);
-    } catch (err) {
+
+      if (!newStory || !newStory.paragraphs || newStory.paragraphs.length === 0) {
+        throw new Error('A história retornada pela IA está vazia ou incompleta.');
+      }
+
+      const localizedStory = localizeStory(newStory, settings.uiLanguage || 'pt');
+      setCurrentStory(localizedStory);
+      storageService.saveStory(localizedStory);
+      setBookError(null);
+
+      const storyWords = (newStory.paragraphs || []).reduce(
+        (acc, p) => acc + (p.sentences || []).reduce((sAcc, s) => sAcc + (s.tokens || []).length, 0),
+        0
+      );
+      setUserStats((prev) => ({
+        ...prev,
+        totalStoriesRead: prev.totalStoriesRead + 1,
+        totalWordsRead: prev.totalWordsRead + storyWords,
+      }));
+    } catch (err: any) {
       console.error('Failed to regenerate with same dictionary:', err);
+      setMascotState((prev) => ({ ...prev, isActive: false }));
+      const errorInfo = parseErrorToBookErrorInfo(err, currentLanguage, (settings.uiLanguage as 'pt' | 'en') || 'pt');
+      setBookError(errorInfo);
+      if (
+        !currentStory.paragraphs ||
+        currentStory.paragraphs.length === 0 ||
+        currentStory.title?.startsWith('Story in ') ||
+        currentStory.fullText?.includes('Sample sentence')
+      ) {
+        const welcome = createWelcomeStory(currentLanguage, settings.uiLanguage || 'pt');
+        setCurrentStory(welcome);
+      }
     } finally {
       setIsGeneratingStory(false);
+      setMascotState((prev) => ({ ...prev, isActive: false }));
     }
-  }, [currentLanguage, currentProficiency, currentStory, settings, vocabularyVault]);
+  }, [currentLanguage, currentProficiency, currentStory, settings, vocabularyVault, handleSSEEvent]);
 
   const increaseDictionaryAndGenerate = useCallback(
     async (numNewWords: number) => {
       setIsGeneratingStory(true);
+      setBookError(null);
+      const themeSuffix = customStoryTheme.trim() ? ` - Tema: ${customStoryTheme.trim()}` : '';
+      logService.addLog('INFO', 'FRONTEND', `Injetando +${numNewWords} palavras no vocabulário e gerando nova história${themeSuffix}...`);
       try {
         const langVaultWords = vocabularyVault.filter((v) => v.language === currentLanguage);
-        const newStory = await apiService.generateStory(
+        const newStory = await apiService.generateStoryStream(
           {
             language: currentLanguage,
             proficiency: currentProficiency,
-            contextTheme: `Expanded Story (+${numNewWords} words)`,
+            contextTheme: customStoryTheme.trim() ? customStoryTheme.trim() : `Expanded Story (+${numNewWords} words)`,
             existingDictionary: langVaultWords.length > 0 ? langVaultWords.slice(0, 15) : currentStory.targetVocabulary,
             injectNewWordsCount: numNewWords,
             storyLength: settings.storyLength,
             repetitionDensity: settings.repetitionDensity,
           },
-          settings
+          settings,
+          handleSSEEvent
         );
-        setCurrentStory(newStory);
-      } catch (err) {
+
+        if (!newStory || !newStory.paragraphs || newStory.paragraphs.length === 0) {
+          throw new Error('A história retornada pela IA está vazia ou incompleta.');
+        }
+
+        const localizedStory = localizeStory(newStory, settings.uiLanguage || 'pt');
+        setCurrentStory(localizedStory);
+        storageService.saveStory(localizedStory);
+        setBookError(null);
+
+        const storyWords = (newStory.paragraphs || []).reduce(
+          (acc, p) => acc + (p.sentences || []).reduce((sAcc, s) => sAcc + (s.tokens || []).length, 0),
+          0
+        );
+        setUserStats((prev) => ({
+          ...prev,
+          totalStoriesRead: prev.totalStoriesRead + 1,
+          totalWordsRead: prev.totalWordsRead + storyWords,
+        }));
+        logService.addLog('SUCCESS', 'FRONTEND', `História expandida gerada com sucesso (+${numNewWords} palavras inseridas)!`);
+      } catch (err: any) {
+        logService.addLog('ERROR', 'FRONTEND', `Erro ao injetar palavras: ${err instanceof Error ? err.message : String(err)}`);
         console.error('Failed to increase dictionary and generate:', err);
+        setMascotState((prev) => ({ ...prev, isActive: false }));
+        const errorInfo = parseErrorToBookErrorInfo(err, currentLanguage, (settings.uiLanguage as 'pt' | 'en') || 'pt');
+        setBookError(errorInfo);
+        if (
+          !currentStory.paragraphs ||
+          currentStory.paragraphs.length === 0 ||
+          currentStory.title?.startsWith('Story in ') ||
+          currentStory.fullText?.includes('Sample sentence')
+        ) {
+          const welcome = createWelcomeStory(currentLanguage, settings.uiLanguage || 'pt');
+          setCurrentStory(welcome);
+        }
       } finally {
         setIsGeneratingStory(false);
+        setMascotState((prev) => ({ ...prev, isActive: false }));
       }
     },
-    [currentLanguage, currentProficiency, currentStory, settings, vocabularyVault]
+    [currentLanguage, currentProficiency, currentStory, settings, vocabularyVault, handleSSEEvent, customStoryTheme]
   );
 
   const submitQuiz = useCallback(
@@ -540,6 +1186,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       });
     },
     [updateWordSRS]
+  );
+
+  const t = useCallback(
+    (key: TranslationKey) => getTranslation(key, settings.uiLanguage || 'pt'),
+    [settings.uiLanguage]
   );
 
   return (
@@ -554,8 +1205,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         currentStory,
         setCurrentStory,
         isGeneratingStory,
+        bookError,
+        setBookError,
+        clearBookError,
+        mascotState,
+        cancelGeneration,
         allStoryWords,
         activeToken,
+        activeSentence,
         popoverPosition,
         openTokenPopover,
         closeTokenPopover,
@@ -571,6 +1228,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         ttsSpeed,
         setTtsSpeed,
         playStoryAudio,
+        playSentenceAudio,
         pauseStoryAudio,
         stopStoryAudio,
         speakSingleToken,
@@ -579,6 +1237,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         submitQuiz,
         isSettingsOpen,
         setIsSettingsOpen,
+        isTerminalOpen,
+        setIsTerminalOpen,
+        deepDiveTarget,
+        openDeepDive,
+        closeDeepDive,
+        customStoryTheme,
+        setCustomStoryTheme,
         generateNewStory,
         generateWithSameDictionary,
         increaseDictionaryAndGenerate,
@@ -586,6 +1251,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         settings,
         updateSettings,
         toggleTheme,
+        t,
       }}
     >
       {children}

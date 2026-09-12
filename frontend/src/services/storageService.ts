@@ -1,5 +1,7 @@
-import { DictionaryEntry, LanguageCode, ProficiencyLevel, UserStats, AppSettings } from '../types';
+import { DictionaryEntry, LanguageCode, ProficiencyLevel, UserStats, AppSettings, WordDeepDiveData, Story } from '../types';
 import { createDefaultSRSMetrics } from './srsEngine';
+import { getAuxiliaryTranslation, isInvalidTranslation } from './auxiliaryLexicon';
+import { getAuxiliaryRuby, toRomaji } from './auxiliaryPhonetics';
 
 const KEYS = {
   SETTINGS: 'lang_stories_settings',
@@ -7,13 +9,21 @@ const KEYS = {
   PROFICIENCY: 'lang_stories_proficiency',
   VAULT: 'lang_stories_vault',
   STATS: 'lang_stories_stats',
+  STORY: 'lang_stories_story',
 } as const;
 
 export class StorageService {
-  public loadSettings(defaultSettings: AppSettings): AppSettings {
+  public loadSettings(defaultSettings: AppSettings = {} as AppSettings): AppSettings {
     try {
       const saved = localStorage.getItem(KEYS.SETTINGS);
-      return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (!parsed.geminiModel || parsed.geminiModel === 'gemini-1.5-flash' || parsed.geminiModel === 'gemini-2.0-flash') {
+          parsed.geminiModel = 'gemini-3.6-flash';
+        }
+        return { ...defaultSettings, ...parsed };
+      }
+      return defaultSettings;
     } catch {
       return defaultSettings;
     }
@@ -43,10 +53,92 @@ export class StorageService {
     localStorage.setItem(KEYS.PROFICIENCY, level);
   }
 
+  public loadProficiencyForLanguage(lang: LanguageCode, defaultLevel: ProficiencyLevel = 'A2'): ProficiencyLevel {
+    try {
+      const mapRaw = localStorage.getItem('lang_stories_proficiencies_map');
+      if (mapRaw) {
+        const map = JSON.parse(mapRaw);
+        if (map && map[lang]) return map[lang] as ProficiencyLevel;
+      }
+      return defaultLevel;
+    } catch {
+      return defaultLevel;
+    }
+  }
+
+  public saveProficiencyForLanguage(lang: LanguageCode, level: ProficiencyLevel): void {
+    try {
+      const mapRaw = localStorage.getItem('lang_stories_proficiencies_map');
+      const map = mapRaw ? JSON.parse(mapRaw) : {};
+      map[lang] = level;
+      localStorage.setItem('lang_stories_proficiencies_map', JSON.stringify(map));
+    } catch (e) {
+      console.error('Failed to save language proficiency map', e);
+    }
+  }
+
+  public sanitizeVaultEntries(entries: DictionaryEntry[]): DictionaryEntry[] {
+    if (!Array.isArray(entries)) return [];
+    let modified = false;
+    const sanitized = entries.map((entry) => {
+      if (!entry || !entry.word) return entry;
+
+      const isPlaceholder = isInvalidTranslation(entry.translation, entry.word);
+      const isDefInvalid = isInvalidTranslation(entry.definition, entry.word);
+
+      const isCJK = entry.language === 'zh' || entry.language === 'ja';
+      const isRubyMismatched = isCJK && entry.word.length === 1 && Boolean(entry.ruby && entry.ruby.trim().includes(' '));
+      const auxRuby = getAuxiliaryRuby(entry.word, entry.language as any);
+      const rawRuby = isRubyMismatched && auxRuby ? auxRuby : (entry.ruby || auxRuby);
+      const healedRuby = (entry.language === 'ja' && rawRuby) ? toRomaji(rawRuby) : rawRuby;
+
+      if (isPlaceholder || (isRubyMismatched && auxRuby)) {
+        modified = true;
+        const uiLang = (this.loadSettings()?.uiLanguage === 'en') ? 'en' : 'pt';
+        const aux =
+          getAuxiliaryTranslation(entry.word, entry.language as any, uiLang) ||
+          getAuxiliaryTranslation(entry.word, entry.language as any, uiLang === 'en' ? 'pt' : 'en');
+        const healedTranslation =
+          aux ||
+          (!isDefInvalid
+            ? entry.definition!
+            : (aux || (uiLang === 'en' ? 'Contextual term' : 'Termo em contexto')));
+
+        return {
+          ...entry,
+          ruby: healedRuby,
+          translation: healedTranslation,
+          definition:
+            !isDefInvalid
+              ? entry.definition!
+              : healedTranslation,
+          srsMetrics: entry.srsMetrics || createDefaultSRSMetrics(),
+        };
+      }
+
+      if (!entry.srsMetrics) {
+        modified = true;
+        return {
+          ...entry,
+          ruby: healedRuby,
+          srsMetrics: createDefaultSRSMetrics(),
+        };
+      }
+
+      return entry;
+    });
+
+    if (modified) {
+      this.saveVault(sanitized);
+    }
+    return sanitized;
+  }
+
   public loadVault(defaultEntries: DictionaryEntry[] = []): DictionaryEntry[] {
     try {
       const saved = localStorage.getItem(KEYS.VAULT);
-      return saved ? JSON.parse(saved) : defaultEntries;
+      const raw = saved ? JSON.parse(saved) : defaultEntries;
+      return this.sanitizeVaultEntries(raw);
     } catch {
       return defaultEntries;
     }
@@ -74,6 +166,70 @@ export class StorageService {
       localStorage.setItem(KEYS.STATS, JSON.stringify(stats));
     } catch (e) {
       console.error('Failed to save stats to localStorage', e);
+    }
+  }
+
+  private isDummyStory(story: any): boolean {
+    if (!story) return true;
+    const title = String(story.title || '');
+    const fullText = String(story.fullText || '');
+    if (
+      title.startsWith('Story in ') ||
+      fullText.includes('Sample sentence') ||
+      title.startsWith('História em ') ||
+      (story.paragraphs && story.paragraphs.length === 0 && story.id !== 'welcome')
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  public loadStory(defaultStory: Story): Story {
+    try {
+      const saved = localStorage.getItem(KEYS.STORY);
+      if (!saved) return defaultStory;
+      const parsed = JSON.parse(saved);
+      if (this.isDummyStory(parsed)) {
+        localStorage.removeItem(KEYS.STORY);
+        return defaultStory;
+      }
+      return parsed;
+    } catch {
+      return defaultStory;
+    }
+  }
+
+  public saveStory(story: Story): void {
+    try {
+      if (story && story.id !== 'welcome' && !this.isDummyStory(story)) {
+        localStorage.setItem(KEYS.STORY, JSON.stringify(story));
+        localStorage.setItem(`${KEYS.STORY}_${story.language}`, JSON.stringify(story));
+      }
+    } catch (e) {
+      console.error('Failed to save story to localStorage', e);
+    }
+  }
+
+  public loadStoryForLanguage(lang: LanguageCode): Story | null {
+    try {
+      const saved = localStorage.getItem(`${KEYS.STORY}_${lang}`);
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      if (this.isDummyStory(parsed)) {
+        localStorage.removeItem(`${KEYS.STORY}_${lang}`);
+        return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  public clearStory(): void {
+    try {
+      localStorage.removeItem(KEYS.STORY);
+    } catch (e) {
+      console.error('Failed to clear story from localStorage', e);
     }
   }
 
@@ -148,6 +304,30 @@ export class StorageService {
         }));
     } catch {
       return null;
+    }
+  }
+
+  public loadWordDeepDive(lang: LanguageCode, word: string, uiLang: string = 'pt'): WordDeepDiveData | null {
+    try {
+      const raw = localStorage.getItem('lang_stories_deep_dives_cache');
+      if (!raw) return null;
+      const cache = JSON.parse(raw);
+      const key = `${lang}:${uiLang}:${word.trim()}`;
+      return cache[key] || cache[`${lang}:${word.trim()}`] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  public saveWordDeepDive(lang: LanguageCode, word: string, data: WordDeepDiveData, uiLang: string = 'pt'): void {
+    try {
+      const raw = localStorage.getItem('lang_stories_deep_dives_cache');
+      const cache = raw ? JSON.parse(raw) : {};
+      const key = `${lang}:${uiLang}:${word.trim()}`;
+      cache[key] = data;
+      localStorage.setItem('lang_stories_deep_dives_cache', JSON.stringify(cache));
+    } catch (e) {
+      console.error('Failed to save deep dive cache to localStorage', e);
     }
   }
 }

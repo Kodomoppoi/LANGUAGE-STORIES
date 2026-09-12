@@ -9,7 +9,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-const SPEED_OPTIONS = [0.75, 1.0, 1.25, 1.5];
+const SPEED_OPTIONS = [0.5, 0.75, 1.0, 1.25, 1.5];
 
 export const TTSPlayer: React.FC = () => {
   const {
@@ -21,6 +21,8 @@ export const TTSPlayer: React.FC = () => {
     stopStoryAudio,
     ttsSpeed,
     setTtsSpeed,
+    settings,
+    t,
   } = useApp();
 
   const allSentences = currentStory.paragraphs.flatMap((p) => p.sentences);
@@ -34,7 +36,7 @@ export const TTSPlayer: React.FC = () => {
         <button
           className="tts-btn-round"
           onClick={isPlayingAudio ? pauseStoryAudio : playStoryAudio}
-          title={isPlayingAudio ? 'Pause Narration' : 'Start Narration'}
+          title={isPlayingAudio ? t('ttsPauseNarration') : t('ttsStartNarration')}
         >
           {isPlayingAudio ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: 2 }} />}
         </button>
@@ -42,7 +44,7 @@ export const TTSPlayer: React.FC = () => {
         <button
           className="tts-btn-icon"
           onClick={stopStoryAudio}
-          title="Restart from beginning"
+          title={t('ttsRestart')}
         >
           <RotateCcw size={16} />
         </button>
@@ -51,11 +53,11 @@ export const TTSPlayer: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Volume2 size={14} color="var(--flower-500)" />
             <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>
-              {isPlayingAudio ? 'Playing Narration' : 'Interactive TTS Audio'}
+              {isPlayingAudio ? t('ttsPlaying') : t('ttsInteractive')}
             </span>
           </div>
           <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-            Sentence {currentSentenceNum} of {allSentences.length}
+            {t('ttsSentencePrefix')} {currentSentenceNum} {t('ofPrefix')} {allSentences.length}
           </span>
         </div>
       </div>
@@ -69,7 +71,7 @@ export const TTSPlayer: React.FC = () => {
               type="button"
               className={`speed-chip ${ttsSpeed === speed ? 'active' : ''}`}
               onClick={() => setTtsSpeed(speed)}
-              title={`Narration speed: ${speed}x`}
+              title={`${t('ttsSpeedTooltip')} ${speed}x`}
             >
               {speed}x
             </button>
@@ -88,9 +90,18 @@ export const TTSPlayer: React.FC = () => {
             borderRadius: 'var(--radius-full)',
             border: '1px solid var(--border-subtle)',
           }}
+          title={
+            currentStory.language === 'ja'
+              ? 'Voz Japonesa: ja-JP-NanamiNeural / Voz do Navegador'
+              : 'Síntese de Voz Interativa'
+          }
         >
           <Sparkles size={12} color="#ffa34d" />
-          <span>Neural TTS</span>
+          <span>
+            {settings.ttsProvider === 'edge-tts'
+              ? (currentStory.language === 'ja' ? 'Neural JP (Nanami)' : 'Neural TTS')
+              : (currentStory.language === 'ja' ? 'TTS JP' : 'TTS Audio')}
+          </span>
         </div>
       </div>
     </div>
