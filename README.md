@@ -5,6 +5,8 @@
 
 ![Demo GIF](assets/demo.gif)
 
+tested language support only chinese and japanese!
+
 #  Language Stories
 
 > **Immersive natural language acquisition platform based on the *Comprehensible Input* principle, featuring 3D open-book reading, full phonetic annotations (100% Ruby / Pinyin / Furigana), Spaced Repetition System (SRS), and real-time synchronized audio.**
